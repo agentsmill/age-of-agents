@@ -1,0 +1,162 @@
+.hud-panel {
+  position: absolute;
+  background: rgba(26, 26, 23, 0.88);
+  border: 1px solid #444441;
+  border-radius: 8px;
+  color: #f1efe8;
+  font-size: 13px;
+}
+
+.portraits {
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+}
+
+.portrait {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background: #2c2c2a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  gap: 2px;
+}
+
+.portrait.selected {
+  outline: 2px solid #f1efe8;
+}
+
+.portrait .face {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: #1a1a17;
+}
+
+.portrait .state {
+  font-size: 9px;
+  opacity: 0.85;
+  max-width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resources {
+  top: 12px;
+  right: 12px;
+  padding: 6px 12px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.missions {
+  top: 52px;
+  right: 12px;
+  width: 260px;
+  padding: 10px 12px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.missions h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+.mission {
+  padding: 4px 0;
+  border-top: 1px solid #33332f;
+  line-height: 1.35;
+}
+
+.mission .meta {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.sidepanel {
+  top: 12px;
+  right: 12px;
+  bottom: 88px;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 8px;
+}
+
+.sidepanel .head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 8px;
+}
+
+.sidepanel .transcript {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid #33332f;
+  padding-top: 8px;
+}
+
+.line {
+  padding: 6px 8px;
+  border-radius: 6px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.line.user {
+  background: #2e3a2e;
+  align-self: flex-end;
+  max-width: 92%;
+}
+
+.line.assistant {
+  background: #2c2c34;
+  align-self: flex-start;
+  max-width: 92%;
+}
+
+.minimap {
+  bottom: 12px;
+  right: 12px;
+  padding: 6px;
+}
+
+.minimap canvas {
+  display: block;
+  border-radius: 4px;
+  cursor: crosshair;
+}
+
+button.ghost {
+  background: none;
+  border: 1px solid #555;
+  color: #f1efe8;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 8px;
+}

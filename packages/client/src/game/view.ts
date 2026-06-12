@@ -8,6 +8,20 @@ import { WaypointGraph } from './pathfind';
 import { buildBuilding, drawRoads, drawTerrain } from './placeholders';
 import { Unit } from './unit';
 
+/** Rejestr aktywnego widoku — HUD (minimapa, portrety) sięga przez niego do sceny. */
+let activeView: GameView | undefined;
+export function getGameView(): GameView | undefined {
+  return activeView;
+}
+
+export interface UnitDot {
+  id: string;
+  gx: number;
+  gy: number;
+  colorIndex: number;
+  isPeon: boolean;
+}
+
 /**
  * Główny widok gry: scena Pixi + viewport, rekoncyliacja stanu świata
  * (zustand) na jednostki oraz wybór celów wg stanu/narzędzia.
@@ -89,11 +103,39 @@ export class GameView {
     this.unsubscribe = useWorld.subscribe((state) => this.reconcile(state.heroes, state.peons));
     const { heroes, peons } = useWorld.getState();
     this.reconcile(heroes, peons);
+    activeView = this;
   }
 
   destroy(): void {
+    if (activeView === this) activeView = undefined;
     this.unsubscribe?.();
     this.app.destroy(true, { children: true });
+  }
+
+  /** Wycentruj kamerę na pozycji siatki (klik w minimapę / portret). */
+  centerOn(gx: number, gy: number): void {
+    const { x, y } = this.theme.projection.toScreen(gx, gy);
+    this.viewport.animate({ position: { x, y }, time: 350, ease: 'easeInOutSine' });
+  }
+
+  centerOnUnit(id: string): void {
+    const unit = this.units.get(id);
+    if (unit) this.centerOn(unit.gx, unit.gy);
+  }
+
+  /** Pozycje jednostek do minimapy. */
+  unitDots(): UnitDot[] {
+    return [...this.units.values()].map((u) => ({
+      id: u.id,
+      gx: u.gx,
+      gy: u.gy,
+      colorIndex: u.colorIndex,
+      isPeon: u.isPeon,
+    }));
+  }
+
+  worldGrid(): { w: number; h: number } {
+    return this.theme.grid;
   }
 
   private roadSegments(): [number, number, number, number][] {
@@ -117,6 +159,10 @@ export class GameView {
       if (!unit) {
         const door = this.building('citadel').door;
         unit = new Unit(hero.sessionId, hero.teamColor, false, clipName(hero.title), door, this.theme.projection);
+        unit.container.eventMode = 'static';
+        unit.container.cursor = 'pointer';
+        const sessionId = hero.sessionId;
+        unit.container.on('pointertap', () => useWorld.getState().select(sessionId));
         this.units.set(hero.sessionId, unit);
         this.unitLayer.addChild(unit.container);
       }
@@ -132,6 +178,10 @@ export class GameView {
         const parent = this.units.get(peon.parentSessionId);
         const start = parent ? { gx: parent.gx, gy: parent.gy } : this.building('barracks').door;
         unit = new Unit(peon.agentId, this.parentColor(peon, heroes), true, clipName(peon.description ?? 'peon', 22), start, this.theme.projection);
+        unit.container.eventMode = 'static';
+        unit.container.cursor = 'pointer';
+        const parentId = peon.parentSessionId;
+        unit.container.on('pointertap', () => useWorld.getState().select(parentId));
         this.units.set(peon.agentId, unit);
         this.unitLayer.addChild(unit.container);
       }

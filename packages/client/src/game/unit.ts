@@ -26,7 +26,7 @@ export class Unit {
 
   constructor(
     readonly id: string,
-    colorIndex: number,
+    readonly colorIndex: number,
     readonly isPeon: boolean,
     name: string,
     start: { gx: number; gy: number },
