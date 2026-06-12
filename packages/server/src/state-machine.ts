@@ -19,10 +19,8 @@ export interface StateThresholds {
   peonDoneAfterMs: number;
 }
 
-// TODO(użytkownik): dobierz wartości progów. To kompromis czytelności mapy:
-// za krótkie → jednostki migoczą i znikają w trakcie pracy; za długie →
-// mapa zapełnia się martwymi bohaterami po zamkniętych sesjach.
-// Dla odniesienia: AgentCraft desaturuje bohaterów po 5 min bezczynności.
+// Profil "zrównoważony" — wybór projektowy użytkownika (2026-06-13):
+// rytm zbliżony do AgentCrafta (sen po 5 min bezczynności).
 export const DEFAULT_THRESHOLDS: StateThresholds = {
   idleAfterMs: 30_000,
   sleepAfterMs: 5 * 60_000,
