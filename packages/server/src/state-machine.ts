@@ -1,6 +1,7 @@
 import { basename } from 'node:path';
 import type { HeroSnapshot, HeroStateKind } from '@agent-citadel/shared';
 import type { Fact } from './transcript/facts.js';
+import { cleanTitle, isSubstantialPrompt } from './transcript/title.js';
 import type { World } from './world.js';
 
 /**
@@ -42,8 +43,8 @@ export class SessionTracker {
   private errorUntil = 0;
   private lastPrompt = { text: '', atMs: 0 };
   // Kandydaci na nazwę bohatera, wg malejącego priorytetu (patrz displayTitle()).
-  private explicitTitle?: string; // jawny tytuł z CLI (custom-title/ai-title)
-  private firstPrompt?: string; // pierwszy realny prompt człowieka (stabilny)
+  private explicitTitle?: string; // jawny tytuł z CLI (custom-title/ai-title), jeśli wersja Claude go zapisze
+  private firstSubstantialPrompt?: string; // pierwszy SENSOWNY prompt (nie "ok"/"dawaj") — stabilna nazwa
   private projectName?: string; // basename cwd, np. "RTS agents"
 
   constructor(
@@ -70,9 +71,10 @@ export class SessionTracker {
     };
   }
 
-  /** Nazwa bohatera wg priorytetu: jawny tytuł → pierwszy prompt → projekt → UUID. */
+  /** Nazwa bohatera wg priorytetu: jawny tytuł → pierwszy SENSOWNY prompt → projekt → UUID.
+   *  Konwersacyjne openery ("ok"/"dawaj"/"realizuj plan") NIGDY nie zostają nazwą. */
   private displayTitle(): string {
-    return this.explicitTitle ?? this.firstPrompt ?? this.projectName ?? this.sessionId.slice(0, 8);
+    return this.explicitTitle ?? this.firstSubstantialPrompt ?? this.projectName ?? this.sessionId.slice(0, 8);
   }
 
   private patch(patch: Partial<HeroSnapshot>, ts?: string): void {
@@ -91,7 +93,10 @@ export class SessionTracker {
         const atMs = Date.parse(fact.ts) || Date.now();
         if (fact.text === this.lastPrompt.text && Math.abs(atMs - this.lastPrompt.atMs) < 15_000) break;
         this.lastPrompt = { text: fact.text, atMs };
-        if (!this.firstPrompt) this.firstPrompt = clipTitle(fact.text); // stabilna nazwa = pierwsze zadanie
+        // Stabilna nazwa = pierwszy SENSOWNY prompt (pomija "ok"/"dawaj"/"realizuj plan").
+        if (!this.firstSubstantialPrompt && isSubstantialPrompt(fact.text)) {
+          this.firstSubstantialPrompt = cleanTitle(fact.text);
+        }
         this.missionCounter++;
         this.activeMissionId = `${this.sessionId}-m${this.missionCounter}`;
         this.world.startMission({
@@ -203,10 +208,4 @@ export class SessionTracker {
     }
     return 'keep';
   }
-}
-
-/** Skraca prompt do roli nazwy bohatera. */
-function clipTitle(text: string, max = 40): string {
-  const t = text.trim();
-  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
