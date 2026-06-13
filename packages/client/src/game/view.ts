@@ -7,6 +7,8 @@ import type { BuildingId, ThemeDef } from '../theme/types';
 import { WaypointGraph } from './pathfind';
 import { buildBuilding, drawRoads, drawTerrain, TEAM_COLORS } from './placeholders';
 import { Unit } from './unit';
+import { getHeroSheet, getPeonSheet, loadThemeSprites } from './sprites';
+import { sessionToArchetypeKey } from './archetype';
 
 interface Particle {
   g: Graphics;
@@ -132,6 +134,10 @@ export class GameView {
       this.updateParticles(dt);
     });
 
+    // Atlasy PixelLab ładujemy zanim powstaną jednostki — brak atlasu danego
+    // klucza = jednostka spada na placeholder (fallback w Unit).
+    await loadThemeSprites(this.theme.id);
+
     this.unsubscribe = useWorld.subscribe((state) => this.reconcile(state.heroes, state.peons, state.missions));
     const { heroes, peons, missions } = useWorld.getState();
     this.reconcile(heroes, peons, missions);
@@ -208,7 +214,8 @@ export class GameView {
       let unit = this.units.get(hero.sessionId);
       if (!unit) {
         const door = this.building('citadel').door;
-        unit = new Unit(hero.sessionId, hero.teamColor, false, clipName(hero.title), door, this.theme.projection);
+        const sheet = getHeroSheet(sessionToArchetypeKey(hero));
+        unit = new Unit(hero.sessionId, hero.teamColor, false, clipName(hero.title), door, this.theme.projection, sheet);
         unit.container.eventMode = 'static';
         unit.container.cursor = 'pointer';
         const sessionId = hero.sessionId;
@@ -227,7 +234,7 @@ export class GameView {
       if (!unit) {
         const parent = this.units.get(peon.parentSessionId);
         const start = parent ? { gx: parent.gx, gy: parent.gy } : this.building('barracks').door;
-        unit = new Unit(peon.agentId, this.parentColor(peon, heroes), true, clipName(peon.description ?? 'peon', 22), start, this.theme.projection);
+        unit = new Unit(peon.agentId, this.parentColor(peon, heroes), true, clipName(peon.description ?? 'peon', 22), start, this.theme.projection, getPeonSheet());
         unit.container.eventMode = 'static';
         unit.container.cursor = 'pointer';
         const parentId = peon.parentSessionId;

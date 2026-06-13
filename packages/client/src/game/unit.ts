@@ -1,10 +1,16 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { AnimatedSprite, Container, Graphics, Text, type Spritesheet } from 'pixi.js';
 import type { HeroStateKind } from '@agent-citadel/shared';
 import type { Projection } from './projection';
 import type { PathNode } from './pathfind';
 import { buildUnitBody, labelStyle, teamColor } from './placeholders';
+import { stateToAnimation } from './archetype';
 
 const SPEED_GRID_PER_S = 2.2;
+
+/** Skala sprite'a PixelLab (~68px canvas) do skali jednostki na kaflu 48px. */
+const SPRITE_SCALE = 0.8;
+/** Kotwica Y sprite'a wyliczona z pikseli: stopa ≈ wiersz 57-59/68 → 0.87. */
+const SPRITE_FOOT_ANCHOR = 0.87;
 
 /**
  * Jednostka na mapie (bohater lub peon): pozycja na siatce logicznej,
@@ -17,6 +23,8 @@ export class Unit {
   gy: number;
   private path: PathNode[] = [];
   private body: Container;
+  private animated?: AnimatedSprite;
+  private sheet?: Spritesheet;
   private aura = new Graphics();
   private crate = new Graphics();
   private overlay = new Text({ text: '', style: labelStyle });
@@ -32,10 +40,26 @@ export class Unit {
     name: string,
     start: { gx: number; gy: number },
     private readonly projection: Projection,
+    sheet?: Spritesheet | null,
   ) {
     this.gx = start.gx;
     this.gy = start.gy;
-    this.body = buildUnitBody(teamColor(colorIndex), isPeon);
+
+    if (sheet) {
+      // Prawdziwy sprite PixelLab owinięty w Container, by mechanika odbicia/przygaszenia
+      // (scale.x / alpha na this.body) działała bez zmian. Tor animacji wybiera update().
+      this.sheet = sheet;
+      const sprite = new AnimatedSprite(sheet.animations.idle);
+      sprite.anchor.set(0.5, SPRITE_FOOT_ANCHOR);
+      sprite.scale.set(isPeon ? SPRITE_SCALE * 0.8 : SPRITE_SCALE);
+      sprite.animationSpeed = 0.15;
+      sprite.play();
+      this.animated = sprite;
+      this.body = new Container();
+      this.body.addChild(sprite);
+    } else {
+      this.body = buildUnitBody(teamColor(colorIndex), isPeon);
+    }
 
     this.aura.circle(0, -12, 18).fill({ color: 0x7f77dd, alpha: 0.25 });
     this.aura.visible = false;
@@ -92,6 +116,16 @@ export class Unit {
   update(dtSeconds: number): void {
     this.elapsed += dtSeconds;
 
+    // Jednostka ze spritem: wybór toru animacji (placeholder ma proceduralny ruch niżej).
+    if (this.animated && this.sheet) {
+      const anim = stateToAnimation(this.state, this.moving);
+      const track = this.sheet.animations[anim];
+      if (track && this.animated.textures !== track) {
+        this.animated.textures = track;
+        this.animated.play();
+      }
+    }
+
     if (this.path.length > 0) {
       const target = this.path[0];
       const dx = target.gx - this.gx;
@@ -105,23 +139,30 @@ export class Unit {
       } else {
         this.gx += (dx / dist) * step;
         this.gy += (dy / dist) * step;
-        // zwrot w kierunku ruchu
+        // zwrot w kierunku ruchu (sprite i placeholder)
         this.body.scale.x = dx < -0.01 ? -1 : 1;
       }
-      // animacja kroku
-      this.body.rotation = Math.sin(this.elapsed * 14) * 0.06;
-      this.body.position.y = -Math.abs(Math.sin(this.elapsed * 14)) * 2;
+      // proceduralna animacja kroku — tylko placeholder (sprite ma własne klatki)
+      if (!this.animated) {
+        this.body.rotation = Math.sin(this.elapsed * 14) * 0.06;
+        this.body.position.y = -Math.abs(Math.sin(this.elapsed * 14)) * 2;
+      }
     } else {
-      this.body.rotation = 0;
-      if (this.state === 'working') {
-        // "praca": rytmiczne pochylenie (kucie/kopanie)
-        this.body.position.y = Math.abs(Math.sin(this.elapsed * 6)) * -1.5;
-        this.body.rotation = Math.sin(this.elapsed * 6) * 0.1;
-      } else if (this.state === 'thinking') {
+      // puls aury "thinking" działa dla obu wariantów (to nakładka silnika, nie body)
+      if (this.state === 'thinking') {
         this.aura.scale.set(1 + Math.sin(this.elapsed * 3) * 0.12);
-        this.body.position.y = 0;
-      } else {
-        this.body.position.y = Math.sin(this.elapsed * 1.5) * 0.8;
+      }
+      if (!this.animated) {
+        this.body.rotation = 0;
+        if (this.state === 'working') {
+          // "praca": rytmiczne pochylenie (kucie/kopanie)
+          this.body.position.y = Math.abs(Math.sin(this.elapsed * 6)) * -1.5;
+          this.body.rotation = Math.sin(this.elapsed * 6) * 0.1;
+        } else if (this.state === 'thinking') {
+          this.body.position.y = 0;
+        } else {
+          this.body.position.y = Math.sin(this.elapsed * 1.5) * 0.8;
+        }
       }
     }
 

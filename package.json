@@ -11,13 +11,17 @@
     "dev": "concurrently -n server,client -c blue,green \"npm run dev -w @agent-citadel/server\" \"npm run dev -w @agent-citadel/client\"",
     "demo": "concurrently -n server,client -c blue,green \"npm run dev -w @agent-citadel/server -- --demo\" \"npm run dev -w @agent-citadel/client\"",
     "assets": "node scripts/download-assets.mjs",
-    "test": "npm run test -w @agent-citadel/server",
+    "test": "npm run test -w @agent-citadel/server && npm run test -w @agent-citadel/client",
     "build": "npm run build -w @agent-citadel/shared && npm run build -w @agent-citadel/server && npm run build -w @agent-citadel/client"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "pngjs": "^7.0.0"
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "flyctl": "^1.2.8"
   }
 }

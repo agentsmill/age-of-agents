@@ -3,7 +3,7 @@ dist/
 *.log
 .DS_Store
 
-# Assety pobierane skryptem `npm run assets` — licencje (Tiny Swords, CraftPix)
-# zakazują redystrybucji surowych plików, więc nie trafiają do repo.
-packages/client/public/assets/
+# Surowe klatki pobierane offline z PixelLab (npm run assets) trafiają do downloads/;
+# do repo idą tylko spakowane atlasy z public/assets/ — to własne assety, pivot na
+# PixelLab zniósł ograniczenie licencyjne Tiny Swords/CraftPix.
 downloads/
