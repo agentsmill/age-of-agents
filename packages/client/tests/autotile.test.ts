@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cornerMask } from '../src/game/autotile';
+import { cornerMask, DUAL_GRID_LOOKUP, frameForMask } from '../src/game/autotile';
 
 // isUpper(gx,gy): czy komórka logiczna należy do terenu "upper" pary.
 // Siatka display ma wymiar (w+1)x(h+1); render-kafel (dx,dy) patrzy na
@@ -21,5 +21,17 @@ describe('cornerMask', () => {
     // render-kafel (0,0): NW(-1,-1),NE(0,-1),SW(-1,0) poza siatką, SE(0,0) upper
     const f = (gx: number, gy: number) => gx === 0 && gy === 0;
     expect(cornerMask(0, 0, f)).toBe(8);
+  });
+});
+
+describe('DUAL_GRID_LOOKUP', () => {
+  // Packer (pack-tileset.mjs) układa klatki t_0..t_15 wprost wg maski narożników,
+  // więc lookup jest tożsamościowy i pokrywa wszystkie 16 masek bez duplikatów.
+  it('pokrywa 16 masek bez duplikatów', () => {
+    expect(DUAL_GRID_LOOKUP).toHaveLength(16);
+    expect(new Set(DUAL_GRID_LOOKUP).size).toBe(16);
+  });
+  it('frameForMask tożsamościowy dla 0..15', () => {
+    for (let m = 0; m < 16; m++) expect(frameForMask(m)).toBe(m);
   });
 });
