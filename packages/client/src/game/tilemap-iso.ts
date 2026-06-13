@@ -1,6 +1,7 @@
 import { Assets, Container, Sprite, type Texture } from 'pixi.js';
 import type { ThemeDef } from '../theme/types';
-import { buildTerrainMap, biomeEdges } from './terrain-map';
+import { buildTerrainMap, terrainSampler, biomeEdges } from './terrain-map';
+import { isoFillRange, type WorldRect } from './iso-fill';
 
 const tiles = new Map<string, Texture>(); // TerrainId -> tekstura diamentu
 let loaded = false;
@@ -56,20 +57,42 @@ export function hasIsoTiles(): boolean {
  * ku wspólnej krawędzi. To proceduralna namiastka kafli przejściowych (np. brzeg
  * wody) bez generowania nowych assetów. Tint jitter (±5%) jak dotąd.
  */
-export function buildIsoTilemap(theme: ThemeDef): Container {
+export function buildIsoTilemap(theme: ThemeDef, worldRect?: WorldRect): Container {
   const root = new Container();
-  const map = buildTerrainMap(theme);
+  const map = buildTerrainMap(theme); // siatka rozgrywki (feather + kontur tylko tutaj)
+  const sample = terrainSampler(theme); // biom „dzikiej ziemi" poza siatką
   const { w, h } = theme.grid;
+
+  // Wymiary kafla z projekcji (toScreen(1,0) względem toScreen(0,0) = (tileW/2, tileH/2)).
+  const p00 = theme.projection.toScreen(0, 0);
+  const p10 = theme.projection.toScreen(1, 0);
+  const tileW = (p10.x - p00.x) * 2;
+  const tileH = (p10.y - p00.y) * 2;
+
+  // Zakres komórek: cały prostokąt świata (diamentowy zakres indeksów) lub —
+  // bez prostokąta — sama siatka rozgrywki (zachowanie jak dawniej).
   const cells: { gx: number; gy: number }[] = [];
-  for (let gy = 0; gy < h; gy++) for (let gx = 0; gx < w; gx++) cells.push({ gx, gy });
+  if (worldRect) {
+    const r = isoFillRange(tileW, tileH, worldRect);
+    for (let gy = r.gyMin; gy <= r.gyMax; gy++) for (let gx = r.gxMin; gx <= r.gxMax; gx++) cells.push({ gx, gy });
+  } else {
+    for (let gy = 0; gy < h; gy++) for (let gx = 0; gx < w; gx++) cells.push({ gx, gy });
+  }
   cells.sort((a, b) => a.gx + a.gy - (b.gx + b.gy)); // tył → przód
 
   for (const { gx, gy } of cells) {
-    const tex = tiles.get(map[gy][gx]);
-    if (!tex) continue;
     const p = theme.projection.toScreen(gx, gy);
+    // Culling: pomiń komórki, których diament nie dotyka prostokąta świata
+    // (isoFillRange daje diament opisany na prostokącie → ~2× nadmiar bez tego).
+    if (worldRect) {
+      if (p.x + tileW / 2 < worldRect.minX || p.x - tileW / 2 > worldRect.maxX) continue;
+      if (p.y + tileH / 2 < worldRect.minY || p.y - tileH / 2 > worldRect.maxY) continue;
+    }
+    const inGrid = gx >= 0 && gy >= 0 && gx < w && gy < h;
+    const tex = tiles.get(inGrid ? map[gy][gx] : sample(gx, gy));
+    if (!tex) continue;
     const j = jitter01(gx, gy);
-    const edges = biomeEdges(map, gx, gy);
+    const edges = inGrid ? biomeEdges(map, gx, gy) : []; // feather/kontur tylko w obszarze gry
 
     const s = new Sprite(tex);
     s.anchor.set(0.5, 0.5);

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { GameView } from './game/view';
+import { installCameraGuards } from './game/camera-guards';
 import { getTheme } from './theme';
 import { useSettings } from './settings';
 
@@ -13,6 +14,7 @@ export function GameCanvas() {
     if (!host) return;
     let view: GameView | undefined;
     let observer: ResizeObserver | undefined;
+    const uninstallGuards = installCameraGuards(host); // zoom tylko mapy, nie strony
 
     // Inicjalizacja dopiero gdy host ma realny rozmiar — start przy
     // szerokości 1 px (np. ukryta karta) psułby dopasowanie kamery.
@@ -28,6 +30,7 @@ export function GameCanvas() {
 
     return () => {
       observer?.disconnect();
+      uninstallGuards();
       view?.destroy();
     };
     // Zmiana motywu LUB języka przebudowuje scenę (etykiety budynków z i18n).

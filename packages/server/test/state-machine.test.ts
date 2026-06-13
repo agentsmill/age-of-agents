@@ -60,6 +60,28 @@ describe('SessionTracker', () => {
     expect(['idle', 'error']).toContain(world.getHero('sesja-1')?.state);
   });
 
+  it('nazwa pomija konwersacyjny opener i bierze pierwszy sensowny prompt', () => {
+    const { world, tracker } = setup();
+    tracker.apply({ kind: 'prompt', text: 'ok', ts: '2026-06-13T10:00:00.000Z' });
+    expect(world.getHero('sesja-1')?.title).not.toBe('ok');
+    tracker.apply({ kind: 'prompt', text: 'Zaimplementuj nazwy sesji jak w grze', ts: '2026-06-13T10:00:05.000Z' });
+    expect(world.getHero('sesja-1')?.title).toBe('Zaimplementuj nazwy sesji jak w grze');
+  });
+
+  it('nazwa z pierwszego sensownego promptu jest stabilna (nie skacze co turę)', () => {
+    const { world, tracker } = setup();
+    tracker.apply({ kind: 'prompt', text: 'Dodaj logowanie', ts: '2026-06-13T10:00:00.000Z' });
+    tracker.apply({ kind: 'prompt', text: 'dawaj', ts: '2026-06-13T10:01:00.000Z' });
+    tracker.apply({ kind: 'prompt', text: 'I jeszcze druga rzecz proszę', ts: '2026-06-13T10:02:00.000Z' });
+    expect(world.getHero('sesja-1')?.title).toBe('Dodaj logowanie');
+  });
+
+  it('czyści markery markdown w nazwie', () => {
+    const { world, tracker } = setup();
+    tracker.apply({ kind: 'prompt', text: '# Zadanie: Napraw zoom mapy', ts: '2026-06-13T10:00:00.000Z' });
+    expect(world.getHero('sesja-1')?.title).toBe('Napraw zoom mapy');
+  });
+
   it('tick usypia bezczynnego bohatera i usuwa martwego', () => {
     const { world, tracker } = setup();
     tracker.apply({ kind: 'turn-end', ts: new Date(Date.now() - DEFAULT_THRESHOLDS.sleepAfterMs - 1000).toISOString() });

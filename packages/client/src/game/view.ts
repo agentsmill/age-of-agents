@@ -22,6 +22,11 @@ import type { Lang } from '../settings';
 /** Docelowa szerokość dekoracji w kaflach (do skalowania sprite'a). */
 const DECO_W: Record<DecoKind, number> = { tree: 1.1, rock: 0.8, bush: 0.75, flower: 0.7 };
 
+/** Margines „dzikiej ziemi" (kafle poza siatką rozgrywki) wypełniający rogi ekranu. */
+const WORLD_MARGIN_TILES = 4;
+/** Górny limit przybliżenia (kontrolki/kółko). Dolny = „cover" liczony dynamicznie. */
+const MAX_ZOOM = 5;
+
 interface Particle {
   g: Graphics;
   vx: number;
@@ -67,6 +72,9 @@ export class GameView {
   private retiring = new Map<string, { unit: Unit; deadline: number }>();
   private targets = new Map<string, string>();
   private worldOffset = { x: 0, y: 0 };
+  private worldWidth = 0;
+  private worldHeight = 0;
+  private userZoomed = false; // wheel/pinch/kontrolki — wstrzymuje auto-dopasowanie przy resize
   private particles: Particle[] = [];
   private emitters = new Map<BuildingId, FxEmitter>();
   private elapsed = 0;
@@ -101,21 +109,26 @@ export class GameView {
     }
     host.appendChild(this.app.canvas);
 
-    // Granice świata z projekcji (izo ma ujemne X i inną wysokość niż top-down).
+    // Granice świata = bbox obszaru gry + margines „dzikiej ziemi" (kafle poza
+    // siatką rozgrywki). Teren wypełni dokładnie ten prostokąt → brak czarnych rogów.
     const projection = this.theme.projection;
+    const M = WORLD_MARGIN_TILES;
+    const { w: gw, h: gh } = this.theme.grid;
     const corners = [
-      projection.toScreen(0, 0),
-      projection.toScreen(this.theme.grid.w, 0),
-      projection.toScreen(0, this.theme.grid.h),
-      projection.toScreen(this.theme.grid.w, this.theme.grid.h),
+      projection.toScreen(-M, -M),
+      projection.toScreen(gw + M, -M),
+      projection.toScreen(-M, gh + M),
+      projection.toScreen(gw + M, gh + M),
     ];
-    const pad = 60;
-    const minX = Math.min(...corners.map((c) => c.x)) - pad;
-    const maxX = Math.max(...corners.map((c) => c.x)) + pad;
-    const minY = Math.min(...corners.map((c) => c.y)) - pad;
-    const maxY = Math.max(...corners.map((c) => c.y)) + pad;
+    const minX = Math.min(...corners.map((c) => c.x));
+    const maxX = Math.max(...corners.map((c) => c.x));
+    const minY = Math.min(...corners.map((c) => c.y));
+    const maxY = Math.max(...corners.map((c) => c.y));
     const worldWidth = maxX - minX;
     const worldHeight = maxY - minY;
+    this.worldWidth = worldWidth;
+    this.worldHeight = worldHeight;
+    const worldRect = { minX, minY, maxX, maxY };
 
     this.viewport = new Viewport({
       events: this.app.renderer.events,
@@ -128,19 +141,20 @@ export class GameView {
     this.viewport.clamp({ direction: 'all', underflow: 'center' });
     this.app.stage.addChild(this.viewport);
 
-    let userZoomed = false;
-    this.viewport.on('wheel-scroll', () => (userZoomed = true));
-    this.viewport.on('pinch-start', () => (userZoomed = true));
+    this.viewport.on('wheel-scroll', () => (this.userZoomed = true));
+    this.viewport.on('pinch-start', () => (this.userZoomed = true));
 
     const refit = () => {
       const screenW = this.app.screen.width;
       const screenH = this.app.screen.height;
       if (screenW < 50 || screenH < 50) return;
       this.viewport.resize(screenW, screenH, worldWidth, worldHeight);
-      const fitScale = Math.min(screenW / worldWidth, screenH / worldHeight);
-      this.viewport.clampZoom({ minScale: Math.min(0.5, fitScale * 0.9), maxScale: 3 });
-      if (!userZoomed) {
-        this.viewport.setZoom(fitScale * 0.96, true);
+      // cover (Math.max): teren ZAWSZE wypełnia ekran — koniec letterboxa/czarnych rogów.
+      // Przybliżać można do MAX_ZOOM; oddalać nie da się poza „cover" (brak pustki).
+      const cover = Math.max(screenW / worldWidth, screenH / worldHeight);
+      this.viewport.clampZoom({ minScale: cover, maxScale: Math.max(MAX_ZOOM, cover * 1.2) });
+      if (!this.userZoomed) {
+        this.viewport.setZoom(cover, true);
         this.viewport.moveCenter(worldWidth / 2, worldHeight / 2);
       }
     };
@@ -167,7 +181,7 @@ export class GameView {
     if (this.theme.style === 'topdown' && hasTilemaps()) {
       worldLayer.addChild(buildTilemap(this.theme)); // niesortowana warstwa tła pod unitLayer
     } else if (this.theme.style === 'iso' && hasIsoTiles()) {
-      worldLayer.addChild(buildIsoTilemap(this.theme));
+      worldLayer.addChild(buildIsoTilemap(this.theme, worldRect));
     } else {
       worldLayer.addChild(drawTerrain(this.theme, projection));
     }
@@ -249,6 +263,33 @@ export class GameView {
   centerOnUnit(id: string): void {
     const unit = this.units.get(id);
     if (unit) this.centerOn(unit.gx, unit.gy);
+  }
+
+  /** Mnożnik zoomu (kontrolki HUD +/−). Trzymany w granicach clampZoom (cover … MAX_ZOOM). */
+  zoomBy(factor: number): void {
+    const cover = this.coverScale();
+    const max = Math.max(MAX_ZOOM, cover * 1.2);
+    const target = Math.min(max, Math.max(cover, this.viewport.scale.x * factor));
+    this.userZoomed = true;
+    this.viewport.animate({ scale: target, time: 160, ease: 'easeInOutSine' });
+  }
+
+  /** Reset kamery: maksymalne oddalenie (cover) + wycentrowanie na świecie. */
+  resetView(): void {
+    this.userZoomed = false;
+    this.viewport.animate({
+      scale: this.coverScale(),
+      position: { x: this.worldWidth / 2, y: this.worldHeight / 2 },
+      time: 320,
+      ease: 'easeInOutSine',
+    });
+  }
+
+  /** Skala „cover" — teren wypełnia ekran (dolna granica zoomu). */
+  private coverScale(): number {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    return Math.max(sw / this.worldWidth, sh / this.worldHeight);
   }
 
   /** Pozycje jednostek do minimapy. */

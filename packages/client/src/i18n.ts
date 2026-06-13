@@ -35,6 +35,9 @@ export interface UiStrings {
   month: string;
   attribution: string;
   langLabel: string; // tekst przycisku przełącznika (pokazuje język DOCELOWY)
+  zoomIn: string;
+  zoomOut: string;
+  zoomReset: string;
 }
 
 const EN: UiStrings = {
@@ -72,6 +75,9 @@ const EN: UiStrings = {
   attribution:
     'Estimated from each session’s activity. Work is credited to the building that matches what the agent was doing (counted in the AI’s units of text).',
   langLabel: 'PL',
+  zoomIn: 'Zoom in',
+  zoomOut: 'Zoom out',
+  zoomReset: 'Reset view',
 };
 
 const PL: UiStrings = {
@@ -109,6 +115,9 @@ const PL: UiStrings = {
   attribution:
     'Szacowane z aktywności każdej sesji. Pracę przypisujemy do budynku pasującego do tego, co agent robił (liczone w jednostkach tekstu AI).',
   langLabel: 'EN',
+  zoomIn: 'Przybliż',
+  zoomOut: 'Oddal',
+  zoomReset: 'Wycentruj',
 };
 
 const UI: Record<Lang, UiStrings> = { en: EN, pl: PL };

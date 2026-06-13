@@ -6,6 +6,7 @@ import { ResourceBar } from './hud/ResourceBar';
 import { SidePanel } from './hud/SidePanel';
 import { BuildingPanel } from './hud/BuildingPanel';
 import { ThemeSwitch } from './hud/ThemeSwitch';
+import { ZoomControls } from './hud/ZoomControls';
 import './hud/hud.css';
 
 export function App() {
@@ -18,6 +19,7 @@ export function App() {
       <SidePanel />
       <BuildingPanel />
       <Portraits />
+      <ZoomControls />
       <Minimap />
     </div>
   );

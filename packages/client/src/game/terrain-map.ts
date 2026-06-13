@@ -36,40 +36,38 @@ const WATER_BELOW = 0.25; // niskie zagłębienia szumu → stawy
 const ROCK_ABOVE = 0.78; // wysokie grzbiety → połacie skał
 
 /**
- * Proceduralna, estetyczna mapa biomów (deterministyczna).
+ * Próbnik biomu dla DOWOLNEJ komórki (także o ujemnych/nadmiarowych indeksach).
+ * Zamknięty na krzywych dróg (policzone raz). Reguły jak w buildTerrainMap:
+ * water = zagłębienia szumu; rock = grzbiety z buforem 1 komórki trawy od wody;
+ * dirt = ścieżki wzdłuż dróg (poza układem dróg — brak dirt → naturalna ziemia);
+ * grass = baza. Używany do renderu „dzikiej ziemi" poza siatką rozgrywki.
+ */
+export function terrainSampler(theme: ThemeDef): (gx: number, gy: number) => TerrainId {
+  const curves = themeRoadCurves(theme);
+  const isWater = (gx: number, gy: number) => fbm(gx, gy, 1) < WATER_BELOW;
+  return (gx, gy) => {
+    if (isWater(gx, gy)) return 'water';
+    if (fbm(gx, gy, 7) > ROCK_ABOVE) {
+      const nearWater =
+        isWater(gx - 1, gy) || isWater(gx + 1, gy) || isWater(gx, gy - 1) || isWater(gx, gy + 1);
+      if (!nearWater) return 'rock';
+    }
+    if (pointOnRoad(curves, gx + 0.5, gy + 0.5)) return 'dirt';
+    return 'grass';
+  };
+}
+
+/**
+ * Proceduralna, estetyczna mapa biomów (deterministyczna) dla siatki rozgrywki.
  * grass = baza; water = spójne stawy (value-noise); rock = połacie z buforem
  * trawy od wody (brak styków woda-skała → czysty autotiling Wang); dirt =
- * ścieżki wzdłuż dróg (theme.edges), tylko na trawie.
+ * ścieżki wzdłuż dróg (theme.edges), tylko na trawie. Te same reguły co
+ * terrainSampler (jedno źródło prawdy o biomach).
  */
 export function buildTerrainMap(theme: ThemeDef): TerrainId[][] {
   const { w, h } = theme.grid;
-  const map: TerrainId[][] = Array.from({ length: h }, () => Array.from({ length: w }, () => 'grass' as TerrainId));
-
-  const isWater = (gx: number, gy: number) => fbm(gx, gy, 1) < WATER_BELOW;
-
-  // 1. woda + skała (skała z buforem 1 komórki od wody)
-  for (let gy = 0; gy < h; gy++) {
-    for (let gx = 0; gx < w; gx++) {
-      if (isWater(gx, gy)) { map[gy][gx] = 'water'; continue; }
-      if (fbm(gx, gy, 7) > ROCK_ABOVE) {
-        const nearWater =
-          isWater(gx - 1, gy) || isWater(gx + 1, gy) || isWater(gx, gy - 1) || isWater(gx, gy + 1);
-        if (!nearWater) map[gy][gx] = 'rock';
-      }
-    }
-  }
-
-  // 2. ścieżki ziemne wzdłuż dróg — tylko na trawie (nie zatapiają wody/skał).
-  // Te same krzywe (roads.ts) co render w drawRoads → pas ziemi pokrywa się z drogą.
-  const curves = themeRoadCurves(theme);
-  for (let gy = 0; gy < h; gy++) {
-    for (let gx = 0; gx < w; gx++) {
-      if (map[gy][gx] !== 'grass') continue;
-      if (pointOnRoad(curves, gx + 0.5, gy + 0.5)) map[gy][gx] = 'dirt';
-    }
-  }
-
-  return map;
+  const sample = terrainSampler(theme);
+  return Array.from({ length: h }, (_, gy) => Array.from({ length: w }, (_, gx) => sample(gx, gy)));
 }
 
 /** Iso-sąsiad o innym biomie (jedna z 4 krawędzi diamentu) — do feather/AO w izo-terenie. */
