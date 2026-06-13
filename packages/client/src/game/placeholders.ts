@@ -1,4 +1,4 @@
-import { Container, Graphics, Sprite, Text, TextStyle, type Spritesheet } from 'pixi.js';
+import { Container, Graphics, Sprite, Text, TextStyle, type Texture } from 'pixi.js';
 import type { BuildingDef, ThemeDef } from '../theme/types';
 import type { Projection } from './projection';
 import { getBuildingSprite } from './building-sprites';
@@ -54,17 +54,16 @@ export function drawRoads(theme: ThemeDef, projection: Projection, segments: [nu
 }
 
 export function buildBuilding(def: BuildingDef, theme: ThemeDef, projection: Projection): Container {
-  const sheet = getBuildingSprite(def.id);
-  if (sheet) return buildBuildingSprite(def, theme, projection, sheet);
+  const tex = getBuildingSprite(def.id);
+  if (tex) return buildBuildingSprite(def, theme, projection, tex);
   return theme.style === 'iso'
     ? buildIsoBlock(def, theme, projection)
     : buildTopdownHouse(def, theme, projection);
 }
 
 /** Generowany sprite budynku: kotwica w stopie footprintu, skala do szerokości w kaflach. */
-function buildBuildingSprite(def: BuildingDef, theme: ThemeDef, projection: Projection, sheet: Spritesheet): Container {
+function buildBuildingSprite(def: BuildingDef, theme: ThemeDef, projection: Projection, tex: Texture): Container {
   const container = new Container();
-  const tex = sheet.textures[Object.keys(sheet.textures)[0]];
   const sprite = new Sprite(tex);
   sprite.anchor.set(0.5, 1); // stopa = dolny środek (PixelLab nie daje metadanych kotwicy)
   sprite.scale.set((def.w * theme.tile) / tex.width);

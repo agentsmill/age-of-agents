@@ -1,4 +1,4 @@
-import { Assets, Container, Sprite, type Spritesheet, type Texture } from 'pixi.js';
+import { Assets, Container, Sprite, type Texture } from 'pixi.js';
 import type { ThemeDef } from '../theme/types';
 import { buildTerrainMap } from './terrain-map';
 
@@ -15,8 +15,7 @@ export async function loadIsoTiles(themeId: string): Promise<void> {
     const idx: { ids: string[] } = await res.json();
     for (const id of idx.ids) {
       try {
-        const sheet = await Assets.load<Spritesheet>(`/assets/${themeId}/tilemap-iso/${id}.json`);
-        tiles.set(id, sheet.textures[Object.keys(sheet.textures)[0]]);
+        tiles.set(id, await Assets.load<Texture>(`/assets/${themeId}/tilemap-iso/${id}.png`));
       } catch {
         /* pojedynczy brak — pomijamy */
       }

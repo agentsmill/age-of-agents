@@ -174,10 +174,9 @@ export class GameView {
     // Atlasy + tilesety PixelLab ładujemy zanim powstaną jednostki/teren.
     await Promise.all([
       loadThemeSprites(this.theme.id),
-      loadTilemaps(this.theme.id),
       loadBuildingSprites(this.theme.id),
       loadDecorationSprites(this.theme.id),
-      loadIsoTiles(this.theme.id),
+      this.theme.style === 'topdown' ? loadTilemaps(this.theme.id) : loadIsoTiles(this.theme.id),
     ]);
 
     this.unsubscribe = useWorld.subscribe((state) => this.reconcile(state.heroes, state.peons, state.missions));

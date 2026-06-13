@@ -1,4 +1,4 @@
-import { topdown } from '../game/projection';
+import { isometric } from '../game/projection';
 import type { ThemeDef } from './types';
 
 /**
@@ -9,9 +9,9 @@ import type { ThemeDef } from './types';
 export const FANTASY: ThemeDef = {
   id: 'fantasy',
   name: 'Twierdza (fantasy)',
-  style: 'topdown',
-  projection: topdown(48),
-  tile: 48,
+  style: 'iso',
+  projection: isometric(64, 32),
+  tile: 64,
   grid: { w: 40, h: 26 },
   buildings: [
     { id: 'citadel', label: 'Twierdza', gx: 16.5, gy: 9, w: 4, h: 3, door: { gx: 19.5, gy: 14.5 }, placeholderColor: 0x8a8a85 },
