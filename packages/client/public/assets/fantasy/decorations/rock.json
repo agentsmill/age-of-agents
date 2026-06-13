@@ -1,0 +1,31 @@
+{
+  "frames": {
+    "main": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 52,
+        "h": 49
+      },
+      "sourceSize": {
+        "w": 52,
+        "h": 49
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 52,
+        "h": 49
+      }
+    }
+  },
+  "meta": {
+    "image": "rock.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 52,
+      "h": 49
+    },
+    "scale": "1"
+  }
+}

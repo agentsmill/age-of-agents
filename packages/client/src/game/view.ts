@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, TextureStyle } from 'pixi.js';
+import { Application, Container, Graphics, Sprite, TextureStyle } from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
 import type { HeroSnapshot, MissionSnapshot, PeonSnapshot } from '@agent-citadel/shared';
 import { useWorld } from '../store';
@@ -11,6 +11,12 @@ import { getHeroSheet, getPeonSheet, loadThemeSprites } from './sprites';
 import { sessionToArchetypeKey } from './archetype';
 import { loadTilemaps, hasTilemaps, buildTilemap } from './tilemap';
 import { loadBuildingSprites } from './building-sprites';
+import { loadDecorationSprites, getDecorationTexture } from './decoration-sprites';
+import { scatterDecorations, type DecoKind } from './decorations';
+import { buildTerrainMap } from './terrain-map';
+
+/** Docelowa szerokość dekoracji w kaflach (do skalowania sprite'a). */
+const DECO_W: Record<DecoKind, number> = { tree: 1.1, rock: 0.8, bush: 0.75, flower: 0.7 };
 
 interface Particle {
   g: Graphics;
@@ -130,6 +136,28 @@ export class GameView {
     // w izometrii jednostka może zniknąć ZA budynkiem.
     this.unitLayer.sortableChildren = true;
     for (const def of this.theme.buildings) this.unitLayer.addChild(buildBuilding(def, this.theme, projection));
+
+    // Dekoracje: kwiaty/krzaki płasko pod jednostkami (worldLayer, przed unitLayer),
+    // drzewa/skały zasłaniające w unitLayer z głębokością (jak budynki/jednostki).
+    if (this.theme.style === 'topdown') {
+      const terrain = buildTerrainMap(this.theme);
+      for (const p of scatterDecorations(this.theme, terrain)) {
+        const tex = getDecorationTexture(p.kind);
+        if (!tex) continue;
+        const sprite = new Sprite(tex);
+        sprite.anchor.set(0.5, 1);
+        sprite.scale.set((this.theme.tile * DECO_W[p.kind]) / tex.width);
+        const s = projection.toScreen(p.gx, p.gy);
+        sprite.position.set(s.x, s.y);
+        if (p.kind === 'tree' || p.kind === 'rock') {
+          sprite.zIndex = projection.depth(p.gx, p.gy);
+          this.unitLayer.addChild(sprite);
+        } else {
+          worldLayer.addChild(sprite);
+        }
+      }
+    }
+
     worldLayer.addChild(this.unitLayer);
     worldLayer.addChild(this.fxLayer);
 
@@ -141,7 +169,12 @@ export class GameView {
     });
 
     // Atlasy + tilesety PixelLab ładujemy zanim powstaną jednostki/teren.
-    await Promise.all([loadThemeSprites(this.theme.id), loadTilemaps(this.theme.id), loadBuildingSprites(this.theme.id)]);
+    await Promise.all([
+      loadThemeSprites(this.theme.id),
+      loadTilemaps(this.theme.id),
+      loadBuildingSprites(this.theme.id),
+      loadDecorationSprites(this.theme.id),
+    ]);
 
     this.unsubscribe = useWorld.subscribe((state) => this.reconcile(state.heroes, state.peons, state.missions));
     const { heroes, peons, missions } = useWorld.getState();

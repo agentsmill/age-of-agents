@@ -1,0 +1,31 @@
+{
+  "frames": {
+    "main": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 60,
+        "h": 77
+      },
+      "sourceSize": {
+        "w": 60,
+        "h": 77
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 60,
+        "h": 77
+      }
+    }
+  },
+  "meta": {
+    "image": "tree.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 60,
+      "h": 77
+    },
+    "scale": "1"
+  }
+}

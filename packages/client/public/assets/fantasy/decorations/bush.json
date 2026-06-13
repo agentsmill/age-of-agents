@@ -1,0 +1,31 @@
+{
+  "frames": {
+    "main": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 46,
+        "h": 47
+      },
+      "sourceSize": {
+        "w": 46,
+        "h": 47
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 46,
+        "h": 47
+      }
+    }
+  },
+  "meta": {
+    "image": "bush.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 46,
+      "h": 47
+    },
+    "scale": "1"
+  }
+}

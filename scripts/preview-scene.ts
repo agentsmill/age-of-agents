@@ -6,10 +6,13 @@ import { join } from 'node:path';
 import { buildTerrainMap, type TerrainId } from '../packages/client/src/game/terrain-map.ts';
 import { cornerMask } from '../packages/client/src/game/autotile.ts';
 import { FANTASY } from '../packages/client/src/theme/fantasy.ts';
+import { scatterDecorations, type DecoKind } from '../packages/client/src/game/decorations.ts';
 
 const T = 32; // px na kafel (proporcje budynek:teren jak w grze)
 const tileDir = 'packages/client/public/assets/fantasy/tilemap';
 const bldDir = 'packages/client/public/assets/fantasy/buildings';
+const decoDir = 'packages/client/public/assets/fantasy/decorations';
+const DECO_W: Record<DecoKind, number> = { tree: 1.1, rock: 0.8, bush: 0.75, flower: 0.7 };
 const PAIRS: { pair: string; upper: TerrainId }[] = [
   { pair: 'water', upper: 'water' }, { pair: 'dirt', upper: 'dirt' }, { pair: 'rock', upper: 'rock' },
 ];
@@ -48,14 +51,13 @@ for (const { pair, upper } of PAIRS) {
   }
 }
 
-// budynki: sortowane po głębokości (gy+h), kotwica dolny-środek footprintu
-const blds = [...FANTASY.buildings].sort((a, b) => (a.gy + a.h) - (b.gy + b.h));
-for (const def of blds) {
-  const src = PNG.sync.read(readFileSync(join(bldDir, `${def.id}.png`)));
-  const scale = (def.w * T) / src.width;
+// helper: rysuj obiekt z kotwicą w stopie (footGx,footGy), szerokość targetTilesW kafli
+const objCache: Record<string, PNG> = {};
+const loadObj = (p: string) => (objCache[p] ??= PNG.sync.read(readFileSync(p)));
+function drawObj(src: PNG, footGx: number, footGy: number, targetTilesW: number) {
+  const scale = (targetTilesW * T) / src.width;
   const dw = Math.round(src.width * scale), dh = Math.round(src.height * scale);
-  const footX = (def.gx + def.w / 2) * T, footY = (def.gy + def.h) * T;
-  const ox = Math.round(footX - dw / 2), oy = Math.round(footY - dh);
+  const ox = Math.round(footGx * T - dw / 2), oy = Math.round(footGy * T - dh);
   for (let y = 0; y < dh; y++) for (let x = 0; x < dw; x++) {
     const sxp = Math.floor(x / scale), syp = Math.floor(y / scale);
     const si = (syp * src.width + sxp) * 4;
@@ -63,6 +65,20 @@ for (const def of blds) {
   }
 }
 
+const decos = scatterDecorations(FANTASY, map);
+// płaskie dekoracje (kwiaty/krzaki) pod spodem
+for (const p of decos)
+  if (p.kind === 'flower' || p.kind === 'bush') drawObj(loadObj(join(decoDir, `${p.kind}.png`)), p.gx, p.gy, DECO_W[p.kind]);
+// sortowane po głębokości: budynki (gy+h) + zasłaniające dekoracje (gy)
+type Item = { depth: number; draw: () => void };
+const items: Item[] = [];
+for (const def of FANTASY.buildings)
+  items.push({ depth: def.gy + def.h, draw: () => drawObj(loadObj(join(bldDir, `${def.id}.png`)), def.gx + def.w / 2, def.gy + def.h, def.w) });
+for (const p of decos)
+  if (p.kind === 'tree' || p.kind === 'rock') items.push({ depth: p.gy, draw: () => drawObj(loadObj(join(decoDir, `${p.kind}.png`)), p.gx, p.gy, DECO_W[p.kind]) });
+items.sort((a, b) => a.depth - b.depth);
+for (const it of items) it.draw();
+
 mkdirSync('downloads', { recursive: true });
 writeFileSync('downloads/scene-preview.png', PNG.sync.write(out));
-console.log(`scene-preview.png ${out.width}x${out.height} (${blds.length} budynków)`);
+console.log(`scene-preview.png ${out.width}x${out.height} (${FANTASY.buildings.length} budynków, ${decos.length} dekoracji)`);
