@@ -22,7 +22,11 @@ function openBrowser(url: string): void {
   const cmd = platform === 'darwin' ? 'open' : platform === 'win32' ? 'cmd' : 'xdg-open';
   const args = platform === 'win32' ? ['/c', 'start', '', url] : [url];
   try {
-    spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
+    const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+    // ENOENT (brak `open`/`xdg-open`, np. headless Linux) leci jako async event
+    // 'error', nie wyjątek — bez tego handlera proces by się wywalił po starcie.
+    child.on('error', () => {});
+    child.unref();
   } catch {
     // Brak przeglądarki / środowisko bez GUI — ignorujemy, URL i tak jest wypisany.
   }
