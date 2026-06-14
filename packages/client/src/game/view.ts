@@ -14,6 +14,7 @@ import { loadBuildingSprites, getBuildingSprite } from './building-sprites';
 import { loadDecorationSprites, getDecorationTexture } from './decoration-sprites';
 import { loadIsoTiles, hasIsoTiles, buildIsoTilemap } from './tilemap-iso';
 import { scatterDecorations, type DecoKind } from './decorations';
+import { peonSpawnScatter } from './scatter';
 import { buildTerrainMap } from './terrain-map';
 import { BUILDING_FX, collectActiveBuildings, type WorkerSample } from './building-fx';
 import { buildingText } from '../i18n';
@@ -351,8 +352,12 @@ export class GameView {
       seen.add(peon.agentId);
       let unit = this.units.get(peon.agentId);
       if (!unit) {
-        // Minioni rekrutowani z Hangaru (Koszar) — wychodzą z drzwi i biegną do pracy.
-        const start = this.building('barracks').door;
+        // Minioni rekrutowani z Hangaru (Koszar): wychodzą ROZSIANI wokół drzwi
+        // (per-peon jitter), nie z jednego punktu — inaczej 8 sprite'ów stoi na sobie
+        // i widać „2 zamiast 8" (krótkożyciowi peoni nie zdążą się rozejść).
+        const door = this.building('barracks').door;
+        const o = peonSpawnScatter(peon.agentId);
+        const start = { gx: door.gx + o.dx, gy: door.gy + o.dy };
         unit = new Unit(peon.agentId, this.parentColor(peon, heroes), true, clipName(peon.description ?? 'peon', 22), start, this.theme.projection, getPeonSheet());
         unit.container.eventMode = 'static';
         unit.container.cursor = 'pointer';
