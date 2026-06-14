@@ -12,10 +12,14 @@
     "demo": "concurrently -n server,client -c blue,green \"npm run dev -w @agent-citadel/server -- --demo\" \"npm run dev -w @agent-citadel/client\"",
     "assets": "node scripts/download-assets.mjs",
     "test": "npm run test -w @agent-citadel/server && npm run test -w @agent-citadel/client",
-    "build": "npm run build -w @agent-citadel/shared && npm run build -w @agent-citadel/server && npm run build -w @agent-citadel/client"
+    "build:web": "npm run build -w @agent-citadel/client",
+    "build:server": "node scripts/build-server.mjs",
+    "build": "npm run build:web && npm run build:server",
+    "prepublishOnly": "npm run build && npm test"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
+    "esbuild": "^0.28.1",
     "pngjs": "^7.0.0"
   },
   "engines": {
