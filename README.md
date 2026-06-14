@@ -1,4 +1,6 @@
-# Agent Citadel
+# AI of Agents
+
+> Pakiet npm: **`ai-of-agents`** (alias komendy: `aioa`).
 
 Wizualizacja sesji agentów Claude Code jako gra RTS w pixel-arcie — inspirowana
 [AgentCraft](https://www.getagentcraft.com). Każda sesja to bohater wychodzący
@@ -7,6 +9,23 @@ decyduje, do którego budynku jednostka maszeruje (kuźnia = edycja kodu,
 wieża maga = research w sieci, kopalnia = terminal…).
 
 Dwa motywy: **fantasy** (top-down) i **sci-fi** (izometria).
+
+## Instalacja przez npm
+
+Po publikacji pakiet uruchamia się bez instalacji:
+
+```bash
+npx ai-of-agents          # podgląda sesje z ~/.claude/projects, wypisuje URL
+npx ai-of-agents --demo   # tryb demo (sztuczne dane)
+npx ai-of-agents --open   # dodatkowo otwiera przeglądarkę
+```
+
+Albo globalnie (komendy `ai-of-agents` i krótszy alias `aioa`):
+
+```bash
+npm i -g ai-of-agents
+aioa --open
+```
 
 ## Szybki start
 
