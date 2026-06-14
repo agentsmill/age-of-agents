@@ -84,7 +84,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   wss.on('connection', (socket) => {
     send(socket, { type: 'snapshot', ...world.snapshot() });
   });
-  world.onEvent((event) => {
+  const offEvent = world.onEvent((event) => {
     for (const socket of wss.clients) send(socket, event);
   });
 
@@ -93,12 +93,15 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     startDemo(world);
   }
 
-  const url = `http://localhost:${actualPort}`;
+  const url = `http://${host === '0.0.0.0' ? 'localhost' : host}:${actualPort}`;
   return {
     url,
     port: actualPort,
     close: async () => {
-      wss.close();
+      offEvent();
+      await new Promise<void>((resolve, reject) =>
+        wss.close((err) => (err ? reject(err) : resolve())),
+      );
       await app.close();
     },
   };
