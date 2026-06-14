@@ -1,4 +1,5 @@
 import { Assets, type Spritesheet } from 'pixi.js';
+import { archetypeKeyChain } from './archetype';
 
 const heroSheets = new Map<string, Spritesheet>();
 let peonSheet: Spritesheet | null = null;
@@ -30,9 +31,17 @@ export async function loadThemeSprites(themeId: string): Promise<void> {
   }
 }
 
-/** Spritesheet bohatera dla klucza archetypu, albo null (→ placeholder). */
+/**
+ * Spritesheet bohatera dla klucza archetypu. Degraduje brakujący wariant trybu do
+ * atlasu `<model>-default` (a potem globalnego fallbacku), więc bohater w trybie ≠
+ * default dostaje sprite SWOJEGO modelu zamiast placeholdera. null → placeholder.
+ */
 export function getHeroSheet(key: string): Spritesheet | null {
-  return heroSheets.get(key) ?? null;
+  for (const k of archetypeKeyChain(key)) {
+    const sheet = heroSheets.get(k);
+    if (sheet) return sheet;
+  }
+  return null;
 }
 
 /** Spritesheet peona (Faza 1: brak → null → placeholder). */

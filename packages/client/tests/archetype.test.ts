@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sessionToArchetypeKey, stateToAnimation } from '../src/game/archetype';
+import { sessionToArchetypeKey, stateToAnimation, archetypeKeyChain } from '../src/game/archetype';
 import type { HeroSnapshot } from '@agent-citadel/shared';
 
 const hero = (model?: string, permissionMode?: string): HeroSnapshot => ({
@@ -23,6 +23,18 @@ describe('sessionToArchetypeKey', () => {
   });
   it('pełne id modelu (substring) → "<model>-<mode>"', () => {
     expect(sessionToArchetypeKey(hero('claude-opus-4-8[1m]', 'acceptEdits'))).toBe('opus-acceptEdits');
+  });
+});
+
+describe('archetypeKeyChain (degradacja brakującego wariantu trybu → atlas modelu)', () => {
+  it('tryb ≠ default degraduje do <model>-default, potem globalny fallback', () => {
+    expect(archetypeKeyChain('opus-acceptEdits')).toEqual(['opus-acceptEdits', 'opus-default', 'sonnet-default']);
+  });
+  it('default → bez duplikatu <model>-default', () => {
+    expect(archetypeKeyChain('haiku-default')).toEqual(['haiku-default', 'sonnet-default']);
+  });
+  it('globalny fallback sam dla siebie', () => {
+    expect(archetypeKeyChain('sonnet-default')).toEqual(['sonnet-default']);
   });
 });
 

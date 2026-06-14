@@ -29,6 +29,17 @@ export function sessionToArchetypeKey(hero: HeroSnapshot): string {
 }
 
 /**
+ * Kolejność szukania atlasu dla klucza archetypu: dokładny → wariant `<model>-default`
+ * → globalny fallback. Warianty trybów (plan/acceptEdits/bypassPermissions) to Faza 2 —
+ * na razie istnieją tylko atlasy `<model>-default`, więc bez tej degradacji bohater w
+ * trybie ≠ default spadałby na placeholder. Tu zachowujemy sprite JEGO modelu (typy!).
+ */
+export function archetypeKeyChain(key: string): string[] {
+  const model = key.split('-')[0];
+  return [...new Set([key, `${model}-default`, ARCHETYPE_FALLBACK])]; // dedup, kolejność zachowana
+}
+
+/**
  * WKŁAD USERA (learning) — który tor animacji odtwarzać.
  * working → 'work'; jednostka w ruchu lub state 'returning' → 'walk';
  * idle/thinking/awaiting-input/error/sleeping → 'idle'.
