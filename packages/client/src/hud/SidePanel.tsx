@@ -4,6 +4,7 @@ import { useWorld } from '../store';
 import { useSettings } from '../settings';
 import { useUi, buildingText } from '../i18n';
 import { teamColorHex } from '../game/placeholders';
+import { getGameView } from '../game/view';
 import { clip, formatK, relTime } from '../util';
 import { StatTile } from './StatTile';
 
@@ -48,6 +49,8 @@ export function SidePanel() {
   const missionsMap = useWorld((s) => s.missions);
   const lines = useWorld((s) => (selected ? s.transcripts[selected] ?? NO_LINES : NO_LINES));
   const select = useWorld((s) => s.select);
+  const autofollow = useWorld((s) => s.autofollow);
+  const setAutofollow = useWorld((s) => s.setAutofollow);
   const themeId = useSettings((s) => s.themeId);
   const lang = useSettings((s) => s.lang);
   const t = useUi();
@@ -115,9 +118,27 @@ export function SidePanel() {
             </div>
           </div>
         </div>
-        <button className="ghost" onClick={() => select(undefined)}>
-          ✕
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flex: 'none' }}>
+          <button className="ghost" onClick={() => select(undefined)}>
+            ✕
+          </button>
+          <label
+            className="px"
+            title={t.autofollow}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: 'pointer', opacity: 0.85, whiteSpace: 'nowrap' }}
+          >
+            <input
+              type="checkbox"
+              checked={autofollow}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setAutofollow(next);
+                if (next && selected) getGameView()?.focusOnUnit(selected);
+              }}
+            />
+            {t.autofollow}
+          </label>
+        </div>
       </div>
 
       <div

@@ -49,6 +49,7 @@ export interface UiStrings {
   notif: Record<NotifReason, string>;
   notifClose: string;
   notifJump: string;
+  autofollow: string;
 }
 
 const EN: UiStrings = {
@@ -103,6 +104,7 @@ const EN: UiStrings = {
   },
   notifClose: 'Close',
   notifJump: 'click to jump',
+  autofollow: 'Follow',
 };
 
 const PL: UiStrings = {
@@ -157,6 +159,7 @@ const PL: UiStrings = {
   },
   notifClose: 'Zamknij',
   notifJump: 'kliknij, by skoczyć',
+  autofollow: 'Podążaj',
 };
 
 const UI: Record<Lang, UiStrings> = { en: EN, pl: PL };

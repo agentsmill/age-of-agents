@@ -31,6 +31,10 @@ export function Portraits() {
               select(hero.sessionId);
               getGameView()?.centerOnUnit(hero.sessionId);
             }}
+            onDoubleClick={() => {
+              select(hero.sessionId);
+              getGameView()?.focusOnUnit(hero.sessionId);
+            }}
           >
             <div className="face" style={{ background: cssColor }}>
               {hero.title.slice(0, 1).toUpperCase()}
