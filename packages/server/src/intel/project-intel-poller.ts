@@ -32,38 +32,26 @@ interface ProjectCache {
   lastError?: string;
 }
 
-function safeReadJsonl(filePath: string): BeadsIssue[] {
-  // Czytamy plik .beads/issues.jsonl linia-po-linii. Każda linia to osobny JSON.
-  // Pomijamy linie puste i te, które nie są JSONem (np. komentarze bd).
-  const content = readFileSync(filePath, 'utf8');
+/** Parsuje treść `.beads/issues.jsonl` (JSONL: jedna linia = jeden JSON).
+ *  Pomija linie puste i komentarze (#), ignoruje linie nie-JSON.
+ *  Eksportowane do testów jednostkowych (czysta funkcja, bez I/O). */
+export function parseBeadsJsonl(content: string): BeadsIssue[] {
   const out: BeadsIssue[] = [];
   for (const raw of content.split('\n')) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
     try {
-      const obj = JSON.parse(line) as Record<string, unknown>;
-      // `bd ready --json` shape jest w pełni flat — issue_type, priority, status, etc.
-      // Normalizujemy nazwy pól: snake_case → camelCase, filtrujemy do naszego typu.
-      const id = String(obj.id ?? '');
-      if (!id) continue;
-      const dep = (obj.dependencies as Array<{ type: string; id: string }> | undefined) ?? [];
-      out.push({
-        id,
-        title: String(obj.title ?? '(untitled)'),
-        status: String(obj.status ?? 'open'),
-        priority: Number(obj.priority ?? 2),
-        issueType: String(obj.issue_type ?? obj.type ?? 'task'),
-        assignee: obj.assignee ? String(obj.assignee) : undefined,
-        blocksCount: dep.filter((d) => d.type === 'blocks').length,
-        blockedByCount: dep.filter((d) => d.type === 'blocked_by').length,
-        createdAt: obj.created_at ? Number(obj.created_at) : undefined,
-        updatedAt: obj.updated_at ? Number(obj.updated_at) : undefined,
-      });
+      const issue = bdRowToIssue(JSON.parse(line) as Record<string, unknown>);
+      if (issue) out.push(issue);
     } catch {
       // Ignoruj linie, które nie są poprawnym JSONem
     }
   }
   return out;
+}
+
+function safeReadJsonl(filePath: string): BeadsIssue[] {
+  return parseBeadsJsonl(readFileSync(filePath, 'utf8'));
 }
 
 async function readBeads(projectDir: string): Promise<{ available: boolean; issues: BeadsIssue[]; error?: string }> {
@@ -111,7 +99,9 @@ async function readBeads(projectDir: string): Promise<{ available: boolean; issu
   }
 }
 
-function bdRowToIssue(row: Record<string, unknown>): BeadsIssue | null {
+/** Mapuje wiersz z `bd list --json` (snake_case) na BeadsIssue (camelCase).
+ *  Zwraca null gdy brak id. Eksportowane do testów. */
+export function bdRowToIssue(row: Record<string, unknown>): BeadsIssue | null {
   const id = String(row.id ?? '');
   if (!id) return null;
   const dep = (row.dependencies as Array<{ type: string; id: string }> | undefined) ?? [];
