@@ -94,7 +94,7 @@ Run several projects at once and each becomes its own **city** in the top bar �
 Select a city to open the **Architect's Hall**, a side panel that surfaces two optional, third-party signals about that project — read-only and entirely opt-in:
 
 - **📜 Beads** — open tasks from [Beads](https://github.com/steveyegge/beads), an AI-native issue tracker that lives in your repo. Age of Agents reads `.beads/issues.jsonl` (falling back to `bd list --json`). Turn it on in a project with `bd init`.
-- **🌳 Graph** — a code knowledge graph from [Graphify](https://github.com/safishamsi/graphify): symbol, edge and community counts plus the most-connected "god-nodes". Age of Agents reads `graphify-out/graph.json`.
+- **🌳 Graph** — a code knowledge graph: symbol, edge and community counts plus the most-connected "god-nodes". Age of Agents reads `graphify-out/graph.json`. Generate it with the **bundled, dependency-free generator** — run `npm run graphify` in a project (or `node scripts/graphify.mjs <dir>`) to scan relative imports and write `graphify-out/graph.json`. You can also use the external [Graphify](https://github.com/safishamsi/graphify) tool; the schema is the same.
 
 Neither tool is bundled or required. If a project has no `.beads/` or `graphify-out/`, the panel just reads "not initialized"; it polls every few seconds, so intel appears as soon as the files do.
 

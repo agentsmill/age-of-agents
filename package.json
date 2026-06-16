@@ -36,6 +36,7 @@
     "dev": "concurrently -n server,client -c blue,green \"npm run dev -w @agent-citadel/server\" \"npm run dev -w @agent-citadel/client\"",
     "demo": "concurrently -n server,client -c blue,green \"npm run dev -w @agent-citadel/server -- --demo\" \"npm run dev -w @agent-citadel/client\"",
     "assets": "node scripts/download-assets.mjs",
+    "graphify": "node scripts/graphify.mjs",
     "test": "npm run test -w @agent-citadel/server && npm run test -w @agent-citadel/client",
     "build:web": "npm run build -w @agent-citadel/client",
     "build:server": "node scripts/build-server.mjs",
