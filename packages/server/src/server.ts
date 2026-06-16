@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import { WebSocketServer, WebSocket } from 'ws';
 import { WS_PATH, type GameEvent } from '@agent-citadel/shared';
 import { World } from './world.js';
+import { OpenCodePoller } from './sources/opencode-poller.js';
 
 export interface StartServerOptions {
   /** Port HTTP. Podaj 0, by system wybrał wolny (przydatne w testach). */
@@ -39,6 +40,9 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     const watchers = SOURCES.map((source) => new SourceWatcher(world, source));
     // Hooki HTTP są kanałem Claude → kierujemy je do watchera Claude.
     const claudeWatcher = watchers.find((w) => w.id === 'claude') ?? watchers[0];
+    
+    // OpenCode używa SQLite zamiast JSONL - uruchom poller
+    const opencodePoller = new OpenCodePoller(world);
 
     app.get('/building-stats', async () => getBuildingStats());
     app.post('/hooks', async (request) => {
@@ -58,6 +62,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
 
     app.addHook('onReady', async () => {
       for (const w of watchers) w.start();
+      await opencodePoller.start();
       app.log.info(`Source watchers active: ${watchers.map((w) => w.id).join(', ')}`);
     });
   }

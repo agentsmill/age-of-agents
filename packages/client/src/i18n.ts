@@ -3,8 +3,9 @@ import type { NotifReason } from './notifications';
 import { useSettings, type Lang } from './settings';
 
 /**
- * Lekkie i18n bez bibliotek. Domyślny język = angielski (EN), polski (PL) jako
- * przełącznik. Dwie warstwy: UI (chrome HUD) i BUILDINGS (nazwy + opisy budynków).
+ * Lekkie i18n bez bibliotek. Domyślny język = angielski (EN), polski (PL) i
+ * włoski (IT) jako przełączniki. Dwie warstwy: UI (chrome HUD) i BUILDINGS
+ * (nazwy + opisy budynków).
  *
  * Ton: język LAICKI — dla bystrych, ale niekoniecznie technicznych osób.
  * Unikamy surowego żargonu (nazw narzędzi, „tokenów", „hooków") na rzecz
@@ -165,7 +166,63 @@ const PL: UiStrings = {
   autofollowHint: 'Kamera podąża za bohaterem',
 };
 
-const UI: Record<Lang, UiStrings> = { en: EN, pl: PL };
+const IT: UiStrings = {
+  fantasy: 'Fantasy',
+  scifi: 'Sci-Fi',
+  hooksOn: '⚡ live: on',
+  hooksOff: '⚡ live: off',
+  hooksTitle: "Aggiorna il mondo nell'istante in cui le tue sessioni fanno qualcosa (altrimenti c'è un ritardo di ~1s)",
+  hooksInstall:
+    "Attivare gli aggiornamenti in tempo reale?\n\nIl mondo reagirà nell'istante in cui le tue sessioni Claude Code faranno qualcosa, invece di avere un ritardo di ~1 secondo. Verrà aggiunta una piccola voce al file delle impostazioni di Claude Code (prima viene salvato un backup). Le tue impostazioni esistenti restano intatte.",
+  hooksUninstall: 'Disattivare gli aggiornamenti in tempo reale? (le altre impostazioni restano intatte)',
+  tokensOut: 'Lavoro totale prodotto dagli agenti',
+  tokensIn: "Quantità totale che gli agenti hanno letto",
+  connecting: '○ connessione…',
+  missions: 'Missioni',
+  states: {
+    thinking: 'sta pensando',
+    working: 'al lavoro',
+    'awaiting-input': 'ti serve!',
+    idle: 'in attesa',
+    sleeping: 'addormentato',
+    error: 'ha incontrato un problema',
+    returning: 'sta tornando',
+  },
+  modelUnknown: 'modello sconosciuto',
+  transcriptHint: 'La conversazione apparirà qui quando la sessione inizierà a lavorare.',
+  tok: 'k prodotti',
+  workingNow: 'Qui si lavora',
+  sessions: 'sessioni',
+  peons: 'aiutanti',
+  tokenUsage: 'Lavoro svolto qui',
+  today: 'Oggi',
+  week: 'Ultimi 7 giorni',
+  month: 'Ultimi 30 giorni',
+  attribution:
+    "Stimato dall'attività di ogni sessione. Il lavoro è accreditato all'edificio che corrisponde a ciò che l'agente stava facendo (contato nelle unità di testo dell'IA).",
+  langLabel: 'PL',
+  zoomIn: 'Zoom avanti',
+  zoomOut: 'Zoom indietro',
+  zoomReset: 'Reimposta vista',
+  produced: 'Prodotto',
+  read: 'Letto',
+  active: 'Attivo',
+  currentTask: 'Compito attuale',
+  recentActions: 'Azioni recenti',
+  now: 'ora',
+  notif: {
+    'needs-you': 'ha bisogno di te',
+    error: 'ha incontrato un problema',
+    'mission-done': 'missione completata',
+    'new-session': 'nuova sessione',
+  },
+  notifClose: 'Chiudi',
+  notifJump: 'clicca per saltare',
+  autofollow: 'Segui',
+  autofollowHint: 'La telecamera segue questo eroe',
+};
+
+const UI: Record<Lang, UiStrings> = { en: EN, pl: PL, it: IT };
 
 /** Reaktywny hook: zwraca napisy UI dla aktualnego języka. */
 export function useUi(): UiStrings {
@@ -191,6 +248,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
         label: 'Twierdza',
         desc: 'Baza domowa. Sesja odpoczywa tu między zadaniami — planuje kolejny krok i przemyśliwa sprawy, zanim ruszy do pracy.',
       },
+      it: {
+        label: 'Cittadella',
+        desc: 'La base. Una sessione riposa qui tra un compito e l\'altro — pianifica la prossima mossa e riflette prima di uscire a lavorare.',
+      },
     },
     tower: {
       en: {
@@ -200,6 +261,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
       pl: {
         label: 'Wieża Maga',
         desc: 'Punkt obserwacyjny świata zewnętrznego. Agenci przychodzą tu przeszukiwać internet i czytać strony, zbierając wiedzę, której nie ma w Twoim projekcie.',
+      },
+      it: {
+        label: 'Torre del Mago',
+        desc: 'L\'osservatorio sul mondo esterno. Gli agenti vengono qui per cercare su internet e leggere pagine, raccogliendo conoscenze che non sono nel tuo progetto.',
       },
     },
     forge: {
@@ -211,6 +276,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
         label: 'Kuźnia',
         desc: 'Warsztat. To tutaj agenci naprawdę piszą i przerabiają kod — tworzą nowe funkcje i naprawiają to, co nie działa w Twoim programie.',
       },
+      it: {
+        label: 'Fucina',
+        desc: 'L\'officina. È qui che gli agenti scrivono e riscrivono davvero il codice — creando nuove funzionalità e correggendo ciò che non funziona nel tuo programma.',
+      },
     },
     library: {
       en: {
@@ -220,6 +289,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
       pl: {
         label: 'Biblioteka',
         desc: 'Czytelnia. Agenci przeglądają i przeszukują pliki projektu, by zrozumieć, jak wszystko się łączy, zanim cokolwiek zmienią.',
+      },
+      it: {
+        label: 'Biblioteca',
+        desc: 'La sala di lettura. Gli agenti sfogliano e cercano tra i file del progetto per capire come si incastrano i pezzi, prima di cambiare qualcosa.',
       },
     },
     mine: {
@@ -231,6 +304,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
         label: 'Kopalnia',
         desc: 'Maszynownia. Agenci uruchamiają tu polecenia i testy — budują projekt i sprawdzają, czy praca naprawdę działa. Najcięższa robota.',
       },
+      it: {
+        label: 'Miniera',
+        desc: 'La sala macchine. Gli agenti eseguono comandi e test qui — compilano il progetto e verificano che il lavoro funzioni davvero. Il lavoro pesante.',
+      },
     },
     barracks: {
       en: {
@@ -240,6 +317,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
       pl: {
         label: 'Koszary',
         desc: 'Plac zbiórki. Gdy zadanie jest duże, agent wzywa tu pomocników — mniejszych asystentów, z których każdy bierze na siebie część pracy naraz.',
+      },
+      it: {
+        label: 'Caserma',
+        desc: 'Il punto di raduno. Quando un lavoro è grande, un agente chiama qui gli aiutanti — assistenti più piccoli che ognuno prende una parte del compito in parallelo.',
       },
     },
     market: {
@@ -251,6 +332,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
         label: 'Targ',
         desc: 'Nabrzeże wysyłkowe. Stąd wychodzi gotowa praca — zapis zmian i ich publikacja, by trafiły do reszty zespołu (albo do działającej aplikacji).',
       },
+      it: {
+        label: 'Mercato',
+        desc: 'Il molo di spedizione. Da qui parte il lavoro finito — salvataggio delle modifiche e pubblicazione, così il resto del team (o l\'app live) le riceve.',
+      },
     },
     guild: {
       en: {
@@ -260,6 +345,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
       pl: {
         label: 'Gildia',
         desc: 'Węzeł połączeń. Agenci łączą się tu z zewnętrznymi narzędziami i usługami — wtyczkami i integracjami, które poszerzają ich możliwości.',
+      },
+      it: {
+        label: 'Gilda',
+        desc: 'Il nodo delle connessioni. Gli agenti si collegano qui a strumenti e servizi esterni — plugin e integrazioni che estendono ciò che possono fare.',
       },
     },
   },
@@ -273,6 +362,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
         label: 'Centrum dowodzenia',
         desc: 'Baza domowa. Sesja odpoczywa tu między zadaniami — planuje kolejny krok i przemyśliwa sprawy, zanim ruszy do pracy.',
       },
+      it: {
+        label: 'Centro di Comando',
+        desc: 'La base. Una sessione riposa qui tra un compito e l\'altro — pianifica la prossima mossa e riflette prima di uscire a lavorare.',
+      },
     },
     tower: {
       en: {
@@ -282,6 +375,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
       pl: {
         label: 'Laboratorium',
         desc: 'Punkt obserwacyjny świata zewnętrznego. Agenci przychodzą tu przeszukiwać internet i czytać strony, zbierając wiedzę, której nie ma w Twoim projekcie.',
+      },
+      it: {
+        label: 'Laboratorio',
+        desc: 'L\'osservatorio sul mondo esterno. Gli agenti vengono qui per cercare su internet e leggere pagine, raccogliendo conoscenze che non sono nel tuo progetto.',
       },
     },
     forge: {
@@ -293,6 +390,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
         label: 'Fabryka dronów',
         desc: 'Warsztat. To tutaj agenci naprawdę piszą i przerabiają kod — tworzą nowe funkcje i naprawiają to, co nie działa w Twoim programie.',
       },
+      it: {
+        label: 'Fabbrica di Droni',
+        desc: 'L\'officina. È qui che gli agenti scrivono e riscrivono davvero il codice — creando nuove funzionalità e correggendo ciò che non funziona nel tuo programma.',
+      },
     },
     library: {
       en: {
@@ -302,6 +403,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
       pl: {
         label: 'Archiwum danych',
         desc: 'Czytelnia. Agenci przeglądają i przeszukują pliki projektu, by zrozumieć, jak wszystko się łączy, zanim cokolwiek zmienią.',
+      },
+      it: {
+        label: 'Archivio Dati',
+        desc: 'La sala di lettura. Gli agenti sfogliano e cercano tra i file del progetto per capire come si incastrano i pezzi, prima di cambiare qualcosa.',
       },
     },
     mine: {
@@ -313,6 +418,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
         label: 'Rafineria',
         desc: 'Maszynownia. Agenci uruchamiają tu polecenia i testy — budują projekt i sprawdzają, czy praca naprawdę działa. Najcięższa robota.',
       },
+      it: {
+        label: 'Raffineria',
+        desc: 'La sala macchine. Gli agenti eseguono comandi e test qui — compilano il progetto e verificano che il lavoro funzioni davvero. Il lavoro pesante.',
+      },
     },
     barracks: {
       en: {
@@ -322,6 +431,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
       pl: {
         label: 'Hangar',
         desc: 'Plac zbiórki. Gdy zadanie jest duże, agent wzywa tu pomocników — mniejszych asystentów, z których każdy bierze na siebie część pracy naraz.',
+      },
+      it: {
+        label: 'Hangar',
+        desc: 'Il punto di raduno. Quando un lavoro è grande, un agente chiama qui gli aiutanti — assistenti più piccoli che ognuno prende una parte del compito in parallelo.',
       },
     },
     market: {
@@ -333,6 +446,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
         label: 'Port kosmiczny',
         desc: 'Nabrzeże wysyłkowe. Stąd wychodzi gotowa praca — zapis zmian i ich publikacja, by trafiły do reszty zespołu (albo do działającej aplikacji).',
       },
+      it: {
+        label: 'Porto Spaziale',
+        desc: 'Il molo di spedizione. Da qui parte il lavoro finito — salvataggio delle modifiche e pubblicazione, così il resto del team (o l\'app live) le riceve.',
+      },
     },
     guild: {
       en: {
@@ -342,6 +459,10 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
       pl: {
         label: 'Stacja łączności',
         desc: 'Węzeł połączeń. Agenci łączą się tu z zewnętrznymi narzędziami i usługami — wtyczkami i integracjami, które poszerzają ich możliwości.',
+      },
+      it: {
+        label: 'Stazione di Comunicazione',
+        desc: 'Il nodo delle connessioni. Gli agenti si collegano qui a strumenti e servizi esterni — plugin e integrazioni che estendono ciò che possono fare.',
       },
     },
   },

@@ -39,6 +39,8 @@ const BUILDING_EMOJI: Record<BuildingId, string> = {
 const AGENT_BADGE: Record<AgentKind, { label: string; color: string } | undefined> = {
   claude: undefined, // domyślny agent — bez odznaki, żeby nie zaśmiecać
   codex: { label: 'Codex', color: '#10a37f' },
+  opencode: { label: 'OpenCode', color: '#f59e0b' }, // amber-500
+  koda: { label: 'Koda', color: '#8b5cf6' }, // violet-500
 };
 
 /** Panel wybranej sesji: karta pionka (stan, statystyki, zadanie, ostatnie akcje) + transkrypt. */
