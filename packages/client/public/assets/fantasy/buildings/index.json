@@ -1,12 +1,15 @@
 {
   "ids": [
+    "arena",
     "barracks",
     "citadel",
     "forge",
+    "garden",
     "guild",
     "library",
     "market",
     "mine",
+    "tavern",
     "tower"
   ]
 }

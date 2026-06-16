@@ -20,3 +20,6 @@ packages/client/public/assets/*/wyrmsun/
 packages/client/public/assets/*/acdrnx-mech/
 packages/client/public/assets/*/lunar-battle/
 koda-memory.md
+
+# Local-only asset generation scripts (consume Pixellab credits)
+scripts/generate-*.py
