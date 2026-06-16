@@ -54,7 +54,7 @@ export class OpenCodePoller {
     try {
       // Dynamic import better-sqlite3 (opcjonalna zależność)
       const mod = await import('better-sqlite3');
-      const Database = mod.default ?? mod.Database;
+      const Database = mod.default; // better-sqlite3 (CJS) eksportuje konstruktor jako default
       if (!Database || typeof Database !== 'function') {
         throw new Error('better-sqlite3 did not export a Database constructor');
       }
