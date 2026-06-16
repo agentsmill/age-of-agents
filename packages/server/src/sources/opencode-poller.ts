@@ -12,7 +12,15 @@ import type { Fact } from '../transcript/facts.js';
  */
 
 const POLL_INTERVAL_MS = 1000;
+/** Ile dni wstecz pobieramy istniejceju sesje przy starcie / po restarcie.
+ * Wystarczajco, by uzupenić statystyki 'Today / 7d / 30d' zanim jeszcze sesja
+ * zdąży cokolwiek nowego zrobić. */
+const HISTORICAL_WINDOW_DAYS = 31;
+const HISTORICAL_WINDOW_MS = HISTORICAL_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minut bez aktywności = sesja nieaktywna
+/** Granica ważności danych: sesje starsze niż to usuwamy ze zbioru, by nie
+ * rosnąć w pamięci w nieskończoność. = HISTORICAL_WINDOW_MS. */
+const SESSION_RETENTION_MS = HISTORICAL_WINDOW_MS;
 
 interface SessionState {
   tracker: SessionTracker;
@@ -75,8 +83,10 @@ export class OpenCodePoller {
     if (!this.db || !this.isRunning) return;
 
     try {
-      // Pobierz aktywne sesje (z aktywnością w ostatnich 10 minutach)
-      const cutoffTime = Date.now() - SESSION_TIMEOUT_MS;
+      // Pobierz sesje z całego okna statystyk (domyślnie 31 dni). To zapewnia,
+      // że po restarcie klienta okno 'Today / 7d / 30d' ma dane, a nie czeka,
+      // aż sesja znowu stanie się aktywna.
+      const cutoffTime = Date.now() - HISTORICAL_WINDOW_MS;
       
       const sessions = this.db.prepare(`
         SELECT 
@@ -84,7 +94,14 @@ export class OpenCodePoller {
           s.title,
           s.directory,
           s.model,
+          s.time_created,
           s.time_updated,
+          s.tokens_input,
+          s.tokens_output,
+          s.tokens_reasoning,
+          s.tokens_cache_read,
+          s.tokens_cache_write,
+          s.cost,
           p.id as project_id,
           p.name as project_name
         FROM session s
@@ -97,7 +114,7 @@ export class OpenCodePoller {
         await this.processSession(session);
       }
 
-      // Usuń nieaktywne sesje
+      // Usuń sesje starsze niż okno retencji, by nie rosnąć w pamięci
       this.sweep();
     } catch (err) {
       console.error('[OpenCode] Poll error:', err);
@@ -109,6 +126,7 @@ export class OpenCodePoller {
     const projectDir = String(sessionRow.project_name ?? sessionRow.directory ?? 'unknown');
     const title = String(sessionRow.title ?? 'Untitled');
     const timeUpdated = Number(sessionRow.time_updated);
+    const timeCreated = Number(sessionRow.time_created);
     
     let state = this.sessions.get(sessionId);
     
@@ -131,17 +149,28 @@ export class OpenCodePoller {
         kind: 'meta',
         model: meta.model,
         cwd: meta.cwd,
-        ts: new Date().toISOString(),
+        ts: new Date(timeCreated || Date.now()).toISOString(),
       });
       
       state.tracker.apply({
         kind: 'title',
         title,
-        ts: new Date().toISOString(),
+        ts: new Date(timeCreated || Date.now()).toISOString(),
       });
+      
+      // Wyślij zagregowane tokeny z tabeli session (OpenCode trzyma je w sesji).
+      // 'usage-total' ustawia (nie dodaje), więc wystarczy raz przy pierwszym
+      // widzeniu sesji - tracker zainicjalizuje statystyki.
+      this.applySessionTokens(state, sessionRow);
+    } else {
+      // Sesja znana - aktualizuj tokeny (sesja mogła dostać nowe dane w międzyczasie)
+      this.applySessionTokens(state, sessionRow);
+      state.projectDir = projectDir;
+      state.title = title;
     }
 
-    // Pobierz nowe części (parts) dla tej sesji
+    // Pobierz nowe części (parts) dla tej sesji - tylko jeśli coś się
+    // zmieniło od ostatniego razu.
     const parts = this.db.prepare(`
       SELECT 
         p.id,
@@ -171,17 +200,37 @@ export class OpenCodePoller {
       }
     }
 
-    // Aktualizuj stan
-    state.projectDir = projectDir;
-    state.title = title;
-    state.lastPartTime = timeUpdated;
+    // Upewnij się, że lastPartTime nie jest starsze niż time_updated,
+    // bo to go używamy do "kiedy ostatnio widziano sesję".
+    if (timeUpdated > state.lastPartTime) {
+      state.lastPartTime = timeUpdated;
+    }
+  }
+
+  /** Wysyła usage-total tylko gdy zagregowane tokeny w sesji wzrosły.
+   * Zapobiega cofaniu licznika (usage-total SET, nie ADD). */
+  private applySessionTokens(state: SessionState, row: Record<string, unknown>): void {
+    const tokensInput = Number(row.tokens_input ?? 0);
+    const tokensOutput = Number(row.tokens_output ?? 0);
+    const tokensReasoning = Number(row.tokens_reasoning ?? 0);
+    const tokensCacheRead = Number(row.tokens_cache_read ?? 0);
+    const tokensCacheWrite = Number(row.tokens_cache_write ?? 0);
+    const totalIn = tokensInput + tokensCacheRead + tokensCacheWrite;
+    const totalOut = tokensOutput + tokensReasoning;
+    if (totalIn <= 0 && totalOut <= 0) return;
+    const current = state.tracker.tokens;
+    if (totalIn > current.input || totalOut > current.output) {
+      state.tracker.apply({ kind: 'usage-total', input: totalIn, output: totalOut });
+    }
   }
 
   private sweep(): void {
     const now = Date.now();
     for (const [sessionId, state] of this.sessions) {
-      if (now - state.lastPartTime > DEFAULT_THRESHOLDS.removeAfterMs) {
-        // Sesja nieaktywna - usuń
+      // Usuwamy sesje starsze niż okno retencji (domyślnie 31 dni).
+      // To zapobiega niekontrolowanemu wzrostowi pamięci dla klientów,
+      // którzy używają agenta od miesięcy.
+      if (now - state.lastPartTime > SESSION_RETENTION_MS) {
         state.tracker.apply({ kind: 'turn-end', ts: new Date().toISOString() });
         this.sessions.delete(sessionId);
       }
