@@ -23,6 +23,17 @@ export const FANTASY: ThemeDef = {
     { id: 'barracks', label: 'Barracks', gx: 9, gy: 20, w: 3, h: 2, door: { gx: 11, gy: 19.5 }, placeholderColor: 0x1d9e75 },
     { id: 'market', label: 'Market', gx: 26, gy: 20, w: 3, h: 2, door: { gx: 28, gy: 19.5 }, placeholderColor: 0xba7517 },
     { id: 'guild', label: 'Guild', gx: 17, gy: 20.5, w: 3, h: 2, door: { gx: 19.5, gy: 20 }, placeholderColor: 0xd4537e },
+    // Punti di raccolta per distribuire le sessioni sulla mappa (raggruppamento
+    // per progetto: vedi view.ts → homeBuilding()). Posizionati lungo il bordo
+    // settentrionale e meridionale, lontani dalla piazza della cittadella.
+    { id: 'arena', label: 'Arena', gx: 22, gy: 4.5, w: 2, h: 2, door: { gx: 23, gy: 8 }, placeholderColor: 0xc77728 },
+    { id: 'tavern', label: 'Tavern', gx: 14, gy: 4.5, w: 2, h: 2, door: { gx: 15, gy: 8 }, placeholderColor: 0x6b4a2a },
+    { id: 'garden', label: 'Garden', gx: 14, gy: 22, w: 2, h: 2, door: { gx: 15, gy: 21 }, placeholderColor: 0x5a8a4f },
+    // Quarti punti di raccolta: bar (NW, tra torre e arena) e shrine (NE, tra
+    // arena e forge). Insieme ad arena/tavern/garden danno 5 gathering spot
+    // tematici per distribuire le sessioni di progetti diversi sulla mappa.
+    { id: 'bar', label: 'Bar', gx: 7, gy: 6, w: 2, h: 2, door: { gx: 8, gy: 9.5 }, placeholderColor: 0x9a4a6a },
+    { id: 'shrine', label: 'Shrine', gx: 28, gy: 6, w: 2, h: 2, door: { gx: 29, gy: 9.5 }, placeholderColor: 0xc0a8e0 },
   ],
   crossroads: [
     { id: 'x-center', gx: 19.5, gy: 16.5 },
@@ -44,6 +55,12 @@ export const FANTASY: ThemeDef = {
     ['x-east', 'door:mine'],
     ['x-east', 'x-ne'],
     ['x-ne', 'door:forge'],
+    // Strade minori verso i punti di raccolta
+    ['x-nw', 'door:arena'],
+    ['x-nw', 'door:tavern'],
+    ['x-nw', 'door:bar'],
+    ['x-ne', 'door:shrine'],
+    ['x-center', 'door:garden'],
   ],
   terrain: { base: 0x4f7a3a, alt: 0x568344, path: 0xa8916a },
 };

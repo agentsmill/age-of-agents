@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "age_of_agents",
+  "project_id": "2a8ec88f-5053-4950-98cf-8db304d13fb3"
+}

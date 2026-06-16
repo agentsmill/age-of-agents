@@ -15,7 +15,7 @@ await build({
   // Shebang dla pliku `bin`; cli.ts NIE ma własnego shebanga, by nie zdublować.
   banner: { js: '#!/usr/bin/env node' },
   // Deps z natywnymi/dynamicznymi require — zostają w node_modules konsumenta.
-  external: ['fastify', '@fastify/static', 'ws', 'chokidar'],
+  external: ['fastify', '@fastify/static', 'ws', 'chokidar', 'better-sqlite3'],
   logLevel: 'info',
 });
 

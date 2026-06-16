@@ -14,10 +14,11 @@ import { loadBuildingSprites, getBuildingSprite } from './building-sprites';
 import { loadDecorationSprites, getDecorationTexture } from './decoration-sprites';
 import { loadIsoTiles, hasIsoTiles, buildIsoTilemap } from './tilemap-iso';
 import { scatterDecorations, type DecoKind } from './decorations';
-import { peonSpawnScatter } from './scatter';
+import { peonSpawnScatter, heroSpawnScatter } from './scatter';
 import { buildTerrainMap } from './terrain-map';
 import { BUILDING_FX, collectActiveBuildings, type WorkerSample } from './building-fx';
 import { buildingText } from '../i18n';
+import { homeBuilding } from './home-building';
 import type { Lang } from '../settings';
 
 /** Docelowa szerokość dekoracji w kaflach (do skalowania sprite'a). */
@@ -269,9 +270,11 @@ export class GameView {
       this.updateParticles(dt);
     });
 
-    this.unsubscribe = useWorld.subscribe((state) => this.reconcile(state.heroes, state.peons, state.missions));
-    const { heroes, peons, missions } = useWorld.getState();
-    this.reconcile(heroes, peons, missions);
+    this.unsubscribe = useWorld.subscribe((state) =>
+      this.reconcile(state.heroes, state.peons, state.missions, state.selectedProjectDir),
+    );
+    const { heroes, peons, missions, selectedProjectDir } = useWorld.getState();
+    this.reconcile(heroes, peons, missions, selectedProjectDir);
     activeView = this;
   }
 
@@ -380,7 +383,19 @@ export class GameView {
     heroes: Record<string, HeroSnapshot>,
     peons: Record<string, PeonSnapshot>,
     missions: Record<string, MissionSnapshot> = {},
+    projectFilter?: string,
   ): void {
+    // Filtruj bohaterów i peonów po wybranym projekcie (miasto).
+    // Peony mają parentSessionId — kierujemy się projektem rodzica.
+    const heroList = projectFilter
+      ? Object.values(heroes).filter((h) => h.projectDir === projectFilter)
+      : Object.values(heroes);
+    const projectHeroIds = new Set(heroList.map((h) => h.sessionId));
+    const peonList = projectFilter
+      ? Object.values(peons).filter((p) => projectHeroIds.has(p.parentSessionId))
+      : Object.values(peons);
+    // Dalej rysujemy WSZYSTKIE budynki, dekoracje itd. — filtr dotyczy
+    // tylko jednostek (kto jest w tej chwili widoczny).
     const seen = new Set<string>();
 
     // Fajerwerki przy przejściu misji active -> completed.
@@ -393,11 +408,20 @@ export class GameView {
       this.missionStatus.set(mission.id, mission.status);
     }
 
-    for (const hero of Object.values(heroes)) {
+    for (const hero of heroList) {
       seen.add(hero.sessionId);
       let unit = this.units.get(hero.sessionId);
       if (!unit) {
-        const door = this.building('citadel').door;
+        // La piazza della cittadella si intasa se ogni nuova sessione spawna
+        // sulla sua porta. Le nuove sessioni di uno stesso progetto vanno invece
+        // a un "punto di raccolta" coerente con il tema (arena/tavern/garden
+        // per fantasy; holodeck/mess/hydroponics per sci-fi), scelto da un hash
+        // stabile del nome del progetto. La citadella resta la destinazione
+        // per le sessioni senza progetto riconoscibile.
+        const homeId = homeBuilding(this.theme, hero);
+        const home = this.building(homeId);
+        const o = heroSpawnScatter(hero.sessionId);
+        const door = { gx: home.door.gx + o.dx, gy: home.door.gy + o.dy };
         const sheet = getHeroSheet(sessionToArchetypeKey(hero));
         unit = new Unit(hero.sessionId, hero.teamColor, false, clipName(hero.title), door, this.theme.projection, sheet, hero.agent ?? 'claude', this.theme.heroSprite.scale, this.theme.heroSprite.footAnchor);
         unit.container.eventMode = 'static';
@@ -406,13 +430,17 @@ export class GameView {
         unit.container.on('pointertap', () => useWorld.getState().select(sessionId));
         this.units.set(hero.sessionId, unit);
         this.unitLayer.addChild(unit.container);
+        // Zapamiętaj budynek „domowy" — w przeciwnym razie idle/thinking
+        // bohaterowie wracają do Twierdzy (fallback w steer/wanderIdle) i stoi
+        // ich w piazza. Z domem pamiętanym wracają pod właściwy punkt zbiórki.
+        this.lastBuilding.set(hero.sessionId, homeId);
       }
       unit.setName(clipName(hero.title));
       unit.setState(hero.state, hero.state === 'working' ? hero.toolDetail ?? hero.currentTool : undefined);
       this.steer(unit, hero.state, hero.currentTool, hero.toolDetail, hero.teamColor);
     }
 
-    for (const peon of Object.values(peons)) {
+    for (const peon of peonList) {
       seen.add(peon.agentId);
       let unit = this.units.get(peon.agentId);
       if (!unit) {

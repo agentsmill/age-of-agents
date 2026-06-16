@@ -13,8 +13,13 @@ const BUBBLE_TTL = 7;
 const SPRITE_SCALE = 0.8;
 /** Domyślna kotwica Y stopy (fantasy/standard: wiersz 57-59/68 → 0.87). Nadpisywana per motyw. */
 const SPRITE_FOOT_ANCHOR = 0.87;
-/** Kolor odznaki Codeksa (zielony OpenAI). Claude nie dostaje odznaki. */
-const CODEX_BADGE = 0x10a37f;
+/** Kolory odznak agentów (Claude nie dostaje odznaki). */
+const AGENT_BADGE_COLORS: Record<AgentKind, number | undefined> = {
+  claude: undefined,
+  codex: 0x10a37f, // zielony OpenAI
+  opencode: 0xf59e0b, // amber-500
+  koda: 0x8b5cf6, // violet-500
+};
 
 /**
  * Jednostka na mapie (bohater lub peon): pozycja na siatce logicznej,
@@ -239,14 +244,20 @@ function clip(text: string, max: number): string {
 
 /** Mała odznaka pochodzenia agenta (tylko nie-Claude). Rysowana proceduralnie — bez assetów. */
 function buildAgentBadge(agent: AgentKind): Container | undefined {
-  if (agent === 'claude') return undefined;
+  const color = AGENT_BADGE_COLORS[agent];
+  if (!color) return undefined;
+  
   const c = new Container();
   const g = new Graphics();
-  g.circle(0, 0, 7).fill({ color: CODEX_BADGE }).stroke({ color: 0x0b0b0a, width: 1.5 });
+  g.circle(0, 0, 7).fill({ color }).stroke({ color: 0x0b0b0a, width: 1.5 });
   c.addChild(g);
-  const letter = new Text({ text: 'C', style: { ...labelStyle, fontSize: 9, fill: 0xffffff } });
+  
+  // Litera per agent
+  const letterText = agent === 'codex' ? 'C' : agent === 'opencode' ? 'O' : agent === 'koda' ? 'K' : '?';
+  const letter = new Text({ text: letterText, style: { ...labelStyle, fontSize: 9, fill: 0xffffff } });
   letter.anchor.set(0.5);
   c.addChild(letter);
+  
   c.position.set(10, -30); // przy głowie, prawy-górny róg jednostki
   return c;
 }

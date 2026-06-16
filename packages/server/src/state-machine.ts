@@ -37,7 +37,11 @@ export const DEFAULT_THRESHOLDS: StateThresholds = {
  */
 export class SessionTracker {
   private seenUsage = new Set<string>();
-  private tokens = { input: 0, output: 0 };
+  private _tokens = { input: 0, output: 0 };
+  /** Publiczny getter do porównywania z nowymi wartościami (np. w OpenCode pollerze). */
+  get tokens(): { input: number; output: number } {
+    return this._tokens;
+  }
   private missionCounter = 0;
   private activeMissionId?: string;
   private errorUntil = 0;
@@ -163,18 +167,18 @@ export class SessionTracker {
       case 'usage':
         if (!this.seenUsage.has(fact.messageId)) {
           this.seenUsage.add(fact.messageId);
-          this.tokens = {
+          this._tokens = {
             input: this.tokens.input + fact.input,
             output: this.tokens.output + fact.output,
           };
-          this.patch({ tokens: this.tokens });
+          this.patch({ tokens: this._tokens });
         }
         break;
 
       case 'usage-total':
         // Codex: token_count jest kumulatywny → USTAW, nie dodawaj.
-        this.tokens = { input: fact.input, output: fact.output };
-        this.patch({ tokens: this.tokens });
+        this._tokens = { input: fact.input, output: fact.output };
+        this.patch({ tokens: this._tokens });
         break;
 
       case 'tool-result':

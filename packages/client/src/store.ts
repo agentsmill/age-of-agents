@@ -4,6 +4,7 @@ import type {
   HeroSnapshot,
   MissionSnapshot,
   PeonSnapshot,
+  ProjectIntel,
   TranscriptLine,
 } from '@agent-citadel/shared';
 import { deriveNotification, DEDUP_WINDOW, MAX_VISIBLE, type Notification } from './notifications';
@@ -21,11 +22,24 @@ interface WorldStore {
   selectedBuildingId?: string;
   /** Czy kamera ma śledzić wybranego bohatera (opt-in per agent; reset przy zmianie zaznaczenia). */
   autofollow: boolean;
+  /**
+   * Inteligentny layer „salonu architekta": klucz = projectDir, wartość
+   * = aktualny snapshot (beads issues + graphify stats). Puste gdy
+   * serwer jeszcze nie wysłał żadnego update dla tego katalogu.
+   */
+  projectIntel: Record<string, ProjectIntel>;
+  /**
+   * Wybrany projekt (miasto). `undefined` = pokaż wszystkie (overlay).
+   * Wpływa na panel boczny: Architect Hall pokazuje tylko wybrany projekt,
+   * mapa filtruje agentów po projectDir.
+   */
+  selectedProjectDir?: string;
   setConnected(connected: boolean): void;
   select(sessionId?: string): void;
   selectBuilding(buildingId?: string): void;
   setAutofollow(on: boolean): void;
   dismissNotification(id: string): void;
+  selectProject(projectDir?: string): void;
   apply(event: GameEvent): void;
 }
 
@@ -49,6 +63,7 @@ export const useWorld = create<WorldStore>((set) => ({
   transcripts: {},
   notifications: [],
   autofollow: false,
+  projectIntel: {},
   setConnected: (connected) => set({ connected }),
   // Wybór jednostki i budynku wzajemnie się wykluczają (jeden panel po prawej).
   // Reset autofollow tylko przy ZMIANIE celu (opt-in per agent): ponowny klik w już
@@ -63,6 +78,7 @@ export const useWorld = create<WorldStore>((set) => ({
   setAutofollow: (autofollow) => set({ autofollow }),
   dismissNotification: (id) =>
     set((state) => ({ notifications: state.notifications.filter((n) => n.id !== id) })),
+  selectProject: (selectedProjectDir) => set({ selectedProjectDir }),
   apply: (event) =>
     set((state) => {
       switch (event.type) {
@@ -113,6 +129,11 @@ export const useWorld = create<WorldStore>((set) => ({
               ...state.transcripts,
               [event.line.sessionId]: [...lines, event.line].slice(-TRANSCRIPT_BUFFER),
             },
+          };
+        }
+        case 'project-intel-updated': {
+          return {
+            projectIntel: { ...state.projectIntel, [event.intel.projectDir]: event.intel },
           };
         }
         default:

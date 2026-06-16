@@ -45,6 +45,22 @@ export class World {
     };
   }
 
+  /** Zwraca unikalne, aktywne katalogi projektów (w tej chwili pracujących sesji).
+   * Używane przez project-intel-poller do wykrycia, dla których katalogów
+   * czytać `.beads/` i `graphify-out/`. */
+  activeProjectDirs(): string[] {
+    const dirs = new Set<string>();
+    for (const hero of this.heroes.values()) {
+      if (hero.projectDir) dirs.add(hero.projectDir);
+    }
+    return [...dirs];
+  }
+
+  /** Zwraca snapshot sesji należących do danego projektu. */
+  heroesByProject(projectDir: string): HeroSnapshot[] {
+    return [...this.heroes.values()].filter((h) => h.projectDir === projectDir);
+  }
+
   claimTeamColor(): number {
     return this.nextTeamColor++;
   }
@@ -93,5 +109,11 @@ export class World {
 
   emitTranscriptLine(line: GameEvent & { type: 'transcript-line' }): void {
     this.emit(line);
+  }
+
+  /** Publiczny emit dla zdarzeń niestandardowych (np. project-intel-updated
+   * z pollerów, które nie są źródłem agentów). */
+  emitCustom(event: GameEvent): void {
+    this.emit(event);
   }
 }

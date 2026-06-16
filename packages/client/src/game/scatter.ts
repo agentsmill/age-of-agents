@@ -17,3 +17,22 @@ export function peonSpawnScatter(id: string): { dx: number; dy: number } {
   const radius = 0.9 + ((Math.floor(h / 1000) % 100) / 100) * 0.9; // 0.9–1.79
   return { dx: Math.cos(angle) * radius, dy: Math.sin(angle) * radius };
 }
+
+/**
+ * Rozsianie spawnu bohaterów wokół drzwi budynku „home".
+ *
+ * Analogicznie do peonów: bohaterowie jednego projektu trafiają do tego samego
+ * punktu zbiórki (5 budynków per temat, wybór djb2 na projectName), ale wielu
+ * agentów tego samego projektu BEZ rozrzutu stoi na sobie i wygląda jak jeden.
+ * Promień 0.5–1.4 kafla — bliżej niż peony, bo bohaterowie są więksi.
+ */
+export function heroSpawnScatter(id: string): { dx: number; dy: number } {
+  let h = 2166136261 >>> 0; // FNV-1a 32-bit
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  const angle = ((h % 1000) / 1000) * Math.PI * 2;
+  const radius = 0.5 + ((Math.floor(h / 1000) % 100) / 100) * 0.9; // 0.5–1.39
+  return { dx: Math.cos(angle) * radius, dy: Math.sin(angle) * radius };
+}

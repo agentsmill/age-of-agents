@@ -1,7 +1,7 @@
 /** Protokół WebSocket Agent Citadel — wspólne typy serwera i klienta. */
 
 /** Który CLI wygenerował sesję — steruje odznaką bohatera i mapowaniem narzędzi. */
-export type AgentKind = 'claude' | 'codex'; // | 'opencode' (Faza 2)
+export type AgentKind = 'claude' | 'codex' | 'opencode' | 'koda';
 
 export type HeroStateKind =
   | 'thinking'
@@ -89,10 +89,111 @@ export type GameEvent =
   | { type: 'peon-completed'; agentId: string }
   | { type: 'mission-started'; mission: MissionSnapshot }
   | { type: 'mission-completed'; mission: MissionSnapshot }
-  | { type: 'transcript-line'; line: TranscriptLine };
+  | { type: 'transcript-line'; line: TranscriptLine }
+  | { type: 'project-intel-updated'; intel: ProjectIntel };
 
 export const SERVER_PORT = 8123;
 export const WS_PATH = '/ws';
+
+// ─── Beads + Graphify types (Project Intel) ───
+
+/** Pojedynczy task z beads (subset Dolt fields, kompatybilny z `bd list --json`). */
+export interface BeadsIssue {
+  id: string;
+  title: string;
+  status: string;
+  priority: number;
+  issueType: string;
+  assignee?: string;
+  blocksCount: number;
+  blockedByCount: number;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+/** Statystyki z graphify code graph (subset graph.json stats section). */
+export interface GraphifySummary {
+  nodeCount: number;
+  edgeCount: number;
+  communityCount: number;
+  topHubs: Array<{ symbol: string; degree: number }>;
+  generatedAt?: string;
+}
+
+/** Inteligentny snapshot jednego projektu (= jedno miasto w Age of Agents). */
+export interface ProjectIntel {
+  projectDir: string;
+  projectName: string;
+  activeSessions: number;
+  activeAgents: AgentKind[];
+  beads: { available: boolean; issues: BeadsIssue[]; error?: string };
+  graphify: { available: boolean; summary: GraphifySummary | null; error?: string };
+  refreshedAt: number;
+}
+
+/**
+ * Inteligentny layer „salonu architekta": beads issues + graphify code graph
+ * per projekt monitorowany. Serwer polluje `.beads/issues.jsonl` i
+ * `graphify-out/graph.json` z katalogu projektu każdego znanego bohatera
+ * i emette `project-intel-updated` event do klienta.
+ */
+
+/** Pojedynczy task z beads (subset Dolt fields, kompatybilny z `bd list --json`). */
+export interface BeadsIssue {
+  /** Unikalne id (np. "bd-1") — link do .beads/issues.jsonl. */
+  id: string;
+  title: string;
+  /** status: 'open' | 'in_progress' | 'closed' | 'deferred'. */
+  status: string;
+  /** priority 0..4, 0=critical, 4=backlog. */
+  priority: number;
+  /** issue_type: 'bug' | 'feature' | 'task' | 'epic' | 'chore'. */
+  issueType: string;
+  /** Kto ma to zrobione (z Bd `assignee` field). */
+  assignee?: string;
+  /** Ile issue'ów blokuje to — 0 = liść. */
+  blocksCount: number;
+  /** Ile issue'ów jest zablokowane przez to. */
+  blockedByCount: number;
+  /** unix timestamp (created_at) — do sortowania/age. */
+  createdAt?: number;
+  /** unix timestamp (updated_at) — do badge „świeży". */
+  updatedAt?: number;
+}
+
+/** Statystyki z graphify code graph (subset graph.json stats section). */
+export interface GraphifySummary {
+  /** Ile symboli (funkcji, klas, zmiennych) w grafie. */
+  nodeCount: number;
+  /** Ile krawędzi (imports, calls, refs). */
+  edgeCount: number;
+  /** Ile wykrytych wspólnot (modułów). */
+  communityCount: number;
+  /** Top 5 god-nodes (najczęściej importowane) — wzbogaca UI. */
+  topHubs: Array<{ symbol: string; degree: number }>;
+  /** Ostatnia aktualizacja graphify-out/. */
+  generatedAt?: string;
+}
+
+/**
+ * Inteligentny snapshot jednego projektu (= jedno miasto w Age of Agents).
+ * Serwer emituje to po wykryciu bohatera z danym `projectDir` lub co poll.
+ */
+export interface ProjectIntel {
+  /** Absolutna ścieżka katalogu projektu (cwd bohatera) — unikalny klucz miasta. */
+  projectDir: string;
+  /** Krótka, czytelna nazwa (basename projectDir lub package.json name). */
+  projectName: string;
+  /** Ile aktywnych sesji AI pracuje w tym projekcie (do nagłówka miasta). */
+  activeSessions: number;
+  /** Ile unikalnych agentów (claude/codex/opencode/koda). */
+  activeAgents: AgentKind[];
+  /** Status źródeł intel: czy beads + graphify istnieją. */
+  beads: { available: boolean; issues: BeadsIssue[]; error?: string };
+  graphify: { available: boolean; summary: GraphifySummary | null; error?: string };
+  /** Kiedy ostatnio odświeżono. */
+  refreshedAt: number;
+}
 
 // ─── Budynki + mapowanie narzędzie→budynek (serce metafory gry) ───
 // Kanoniczne w shared, bo potrzebują tego ZARÓWNO klient (placement jednostek)
@@ -106,7 +207,17 @@ export type BuildingId =
   | 'mine'
   | 'barracks'
   | 'market'
-  | 'guild';
+  | 'guild'
+  | 'arena'
+  | 'tavern'
+  | 'garden'
+  | 'bar'
+  | 'shrine'
+  | 'holodeck'
+  | 'mess'
+  | 'hydroponics'
+  | 'lounge'
+  | 'medbay';
 
 const TOOL_BUILDING: Record<string, BuildingId> = {
   WebSearch: 'tower',

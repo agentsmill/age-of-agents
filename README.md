@@ -28,7 +28,7 @@ Age of Agents (npm package **`age-of-agents`**) runs as a small local web app
 alongside your normal CLI workflow. It watches your agent session transcripts and
 renders them as a calm, real-time strategy realm:
 
-- **Each session → a settler.** Start a Claude Code or Codex session and a settler walks out of the keep, carrying your prompt as its task.
+- **Each session → a settler.** Start a Claude Code, Codex, or OpenCode session and a settler walks out of the keep, carrying your prompt as its task.
 - **Tools → workshops.** The settler heads to the building that matches the work — the forge for code edits, the mage tower for web research, the mine for the terminal.
 - **Subagents → workers.** When a session spawns subagents (e.g. the Task tool), they appear as little workers around their settler.
 - **Tokens → harvest.** Tokens read and produced fill the storehouse. Settlers ponder while thinking, rest when waiting, and stroll home when the day's work is done.
@@ -53,7 +53,7 @@ A glanceable, second-monitor view of what your agents are quietly up to.
 Run it instantly, no install:
 
 ```bash
-npx age-of-agents          # watches ~/.claude & ~/.codex sessions, prints the URL
+npx age-of-agents          # watches ~/.claude, ~/.codex & ~/.opencode sessions, prints the URL
 npx age-of-agents --demo   # calm demo mode (fake sessions)
 npx age-of-agents --open   # also open the browser
 ```
@@ -100,7 +100,7 @@ A small npm-workspaces monorepo, published as the single `age-of-agents` CLI:
 | Package | Stack | Responsibility |
 | --- | --- | --- |
 | `packages/shared` | TypeScript | WebSocket protocol types (`GameEvent`, snapshots) |
-| `packages/server` | Node + Fastify + `ws` | transcript watcher, state machine, hooks endpoint, demo generator, CLI |
+| `packages/server` | Node + Fastify + `ws` + SQLite | transcript watcher, state machine, hooks endpoint, demo generator, CLI |
 | `packages/client` | Vite + React 19 + PixiJS v8 | the game realm, HUD, minimap, side panel |
 
 ```bash

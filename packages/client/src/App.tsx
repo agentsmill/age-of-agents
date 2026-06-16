@@ -8,6 +8,8 @@ import { SidePanel } from './hud/SidePanel';
 import { BuildingPanel } from './hud/BuildingPanel';
 import { ThemeSwitch } from './hud/ThemeSwitch';
 import { ZoomControls } from './hud/ZoomControls';
+import { ProjectSwitcher } from './hud/ProjectSwitcher';
+import { ArchitectHall } from './hud/ArchitectHall';
 import './hud/hud.css';
 
 export function App() {
@@ -20,6 +22,8 @@ export function App() {
       <NotificationFeed />
       <SidePanel />
       <BuildingPanel />
+      <ProjectSwitcher />
+      <ArchitectHall />
       <Portraits />
       <ZoomControls />
       <Minimap />

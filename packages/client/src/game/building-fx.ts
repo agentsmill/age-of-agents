@@ -37,6 +37,24 @@ export const BUILDING_FX: Record<BuildingId, BuildingFxStyle> = {
   barracks: { color: 0x5fd08a, spark: 0xb6f0cf, rate: 7, rise: 28, spread: 12, glow: 0.18 },
   market: { color: 0xf0c050, spark: 0xfff0c0, rate: 8, rise: 26, spread: 14, glow: 0.20 },
   guild: { color: 0xd86fae, spark: 0xf6c8e2, rate: 8, rise: 30, spread: 10, glow: 0.20 },
+  // Punti di raccolta (fantasy): arena = polvere da combattimento, tavern =
+  // fumo di camino, garden = lucciole.
+  arena: { color: 0xe9b860, spark: 0xfff1c2, rate: 9, rise: 30, spread: 14, glow: 0.20 },
+  tavern: { color: 0xc88a3a, spark: 0xf3d9a0, rate: 6, rise: 22, spread: 12, glow: 0.16 },
+  garden: { color: 0x9be07a, spark: 0xe2f7c1, rate: 5, rise: 18, spread: 14, glow: 0.14 },
+  // Punti di raccolta aggiuntivi (fantasy): bar = scintille di calici, shrine
+  // = lanterne fluttuanti. Insieme ad arena/tavern/garden: 5 gathering spot.
+  bar: { color: 0xe08aac, spark: 0xffd0e0, rate: 7, rise: 26, spread: 12, glow: 0.18 },
+  shrine: { color: 0xc0a8e0, spark: 0xe8d8ff, rate: 4, rise: 16, spread: 10, glow: 0.14 },
+  // Punti di raccolta (sci-fi): holodeck = scarica elettrica, mess = vapore
+  // dalla mensa, hydroponics = bollicine di nutrient solution.
+  holodeck: { color: 0x6fc1ff, spark: 0xd6ecff, rate: 10, rise: 32, spread: 12, glow: 0.22 },
+  mess: { color: 0xd9b27a, spark: 0xf2dcaa, rate: 5, rise: 20, spread: 14, glow: 0.14 },
+  hydroponics: { color: 0x7be0a0, spark: 0xc2f1d2, rate: 6, rise: 18, spread: 12, glow: 0.16 },
+  // Punti di raccolta aggiuntivi (sci-fi): lounge = luci soffuse, medbay = bagliore di
+  // monitor medicali. Insieme a holodeck/mess/hydroponics: 5 gathering spot.
+  lounge: { color: 0xd070c0, spark: 0xf0b8e0, rate: 6, rise: 22, spread: 12, glow: 0.16 },
+  medbay: { color: 0xe06080, spark: 0xffc0d0, rate: 8, rise: 24, spread: 10, glow: 0.20 },
 };
 
 /** Jak blisko drzwi (w kaflach) musi być pracująca jednostka, by liczyć się jako „przy budynku". */
