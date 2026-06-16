@@ -59,6 +59,12 @@ export interface UiStrings {
   symbols: string;
   edges: string;
   communities: string;
+  arsenal: string;
+  skills: string;
+  connectors: string;
+  hooks: string;
+  subagents: string;
+  usedThisSession: string;
 }
 
 const EN: UiStrings = {
@@ -122,6 +128,12 @@ const EN: UiStrings = {
   symbols: 'Symbols',
   edges: 'Edges',
   communities: 'Communities',
+  arsenal: 'Arsenal',
+  skills: 'Skills',
+  connectors: 'Connectors',
+  hooks: 'Hooks',
+  subagents: 'Subagents',
+  usedThisSession: 'used',
 };
 
 const PL: UiStrings = {
@@ -185,6 +197,12 @@ const PL: UiStrings = {
   symbols: 'Symbole',
   edges: 'Krawędzie',
   communities: 'Społeczności',
+  arsenal: 'Arsenał',
+  skills: 'Skille',
+  connectors: 'Konektory',
+  hooks: 'Hooki',
+  subagents: 'Subagenci',
+  usedThisSession: 'użyto',
 };
 
 const IT: UiStrings = {
@@ -248,6 +266,12 @@ const IT: UiStrings = {
   symbols: 'Simboli',
   edges: 'Archi',
   communities: 'Comunità',
+  arsenal: 'Arsenale',
+  skills: 'Skill',
+  connectors: 'Connettori',
+  hooks: 'Hook',
+  subagents: 'Subagenti',
+  usedThisSession: 'usato',
 };
 
 const UI: Record<Lang, UiStrings> = { en: EN, pl: PL, it: IT };
