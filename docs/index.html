@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Age of Agents — watch your AI coding sessions grow a peaceful pixel realm</title>
-<meta name="description" content="Age of Agents turns every Claude Code and Codex session into a settler in a calm, Age-of-Empires-style pixel realm. Tools become workshops, subagents become workers, tokens become harvest. Run it with npx age-of-agents.">
+<meta name="description" content="Age of Agents turns every Claude Code, Codex, OpenCode and Koda session into a settler in a calm, Age-of-Empires-style pixel realm. Tools become workshops, subagents become workers, tokens become harvest. Run it with npx age-of-agents.">
 <meta name="theme-color" content="#0e1410">
 <meta property="og:title" content="Age of Agents">
 <meta property="og:description" content="Watch your AI coding sessions grow a peaceful pixel-art realm.">
@@ -175,7 +175,7 @@
 <main>
   <section class="hero">
     <div class="wrap">
-      <div class="ornament rv"><span class="rule"></span><span class="eyebrow">A peaceful RTS for Claude Code &amp; Codex</span><span class="rule r"></span></div>
+      <div class="ornament rv"><span class="rule"></span><span class="eyebrow">A peaceful RTS for Claude Code, Codex, OpenCode &amp; Koda</span><span class="rule r"></span></div>
       <h1 class="rv" data-d="1">Age of<span class="em">Agents</span></h1>
       <p class="lede rv" data-d="2">Watch your AI coding sessions grow a calm, living pixel realm. Every session is a settler that walks out of the keep, gathers and builds; the tool it runs decides which workshop it visits, subagents become workers, and tokens fill the storehouse. No combat — just a quiet kingdom of work, at a glance.</p>
       <div class="npx rv" data-d="3"><span class="pr">❯</span><code class="cmd" id="npxCmd">npx age-of-agents</code><button class="copy" id="copyBtn" type="button" aria-label="Copy command">copy</button></div>
@@ -201,7 +201,7 @@
         <p>A calm, second-monitor view of what your agents are quietly doing — no change to how you use the CLI.</p>
       </div>
       <div class="grid">
-        <div class="card rv" data-d="1"><span class="ic">🧑‍🌾</span><h3>Session → Settler</h3><p>Start a Claude Code or Codex session and a settler walks out of the keep, carrying your prompt as its task for the day.</p></div>
+        <div class="card rv" data-d="1"><span class="ic">🧑‍🌾</span><h3>Session → Settler</h3><p>Start a Claude Code, Codex, OpenCode or Koda session and a settler walks out of the keep, carrying your prompt as its task for the day.</p></div>
         <div class="card rv" data-d="2"><span class="ic">🏚️</span><h3>Tools → Workshops</h3><p>The settler heads to the building that matches the work — the forge for edits, the mage tower for web research, the mine for the terminal.</p></div>
         <div class="card rv" data-d="3"><span class="ic">⛏️</span><h3>Subagents → Workers</h3><p>When a session spawns subagents, they appear as little workers busying themselves around their settler.</p></div>
         <div class="card rv" data-d="4"><span class="ic">🌾</span><h3>Tokens → Harvest</h3><p>Tokens read and produced fill the storehouse. Settlers ponder while thinking, rest when waiting, and stroll home when the day's work is done.</p></div>
@@ -236,7 +236,7 @@
         <p>Read-only, local, calm. The server knows <em>what</em> a session is doing; the client decides <em>where</em> each settler goes.</p>
       </div>
       <div class="pipe">
-        <div class="node rv" data-d="1"><div class="k">01 · source</div><h4>Transcript</h4><p>Tails session JSONL from <code>~/.claude</code> &amp; <code>~/.codex</code></p></div>
+        <div class="node rv" data-d="1"><div class="k">01 · source</div><h4>Transcript</h4><p>Reads sessions from <code>~/.claude</code>, <code>~/.codex</code>, <code>~/.opencode</code> &amp; <code>~/.koda</code></p></div>
         <div class="node rv" data-d="2"><div class="k">02 · server</div><h4>State machine</h4><p>Facts → thinking / working / resting / idle</p></div>
         <div class="node rv" data-d="3"><div class="k">03 · wire</div><h4>WebSocket</h4><p>Broadcasts a HeroSnapshot per session</p></div>
         <div class="node rv" data-d="4"><div class="k">04 · client</div><h4>PixiJS realm</h4><p>Renders settlers, HUD, minimap &amp; panels</p></div>
@@ -272,7 +272,7 @@
       </div>
       <div class="term rv" data-d="1">
         <div class="top"><i style="background:#8fc065"></i><i style="background:#e0b64a"></i><i style="background:#7fb6c4"></i><span class="t">zsh — age-of-agents</span></div>
-<pre><span class="c"># run it instantly — watches ~/.claude &amp; ~/.codex sessions</span>
+<pre><span class="c"># run it instantly — watches ~/.claude, ~/.codex, ~/.opencode &amp; ~/.koda sessions</span>
 <span class="p">❯</span> <span class="cmd">npx <span class="g">age-of-agents</span></span>            <span class="c"># prints the URL</span>
 <span class="p">❯</span> <span class="cmd">npx age-of-agents <span class="g">--demo</span></span>     <span class="c"># calm demo, fake sessions</span>
 <span class="p">❯</span> <span class="cmd">npx age-of-agents <span class="g">--open</span></span>     <span class="c"># open the browser too</span>

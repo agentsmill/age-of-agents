@@ -4,7 +4,7 @@
 
 **Watch your AI coding sessions grow a peaceful pixel-art realm.**
 
-Every Claude Code or Codex session becomes a settler walking out of the keep.
+Every Claude Code, Codex, OpenCode or Koda session becomes a settler walking out of the keep.
 The tool it runs decides which workshop it visits, subagents become workers,
 and tokens fill the storehouse — a calm, Age-of-Empires-style kingdom of your work.
 No combat, just a quiet realm you can watch at a glance.
@@ -28,7 +28,7 @@ Age of Agents (npm package **`age-of-agents`**) runs as a small local web app
 alongside your normal CLI workflow. It watches your agent session transcripts and
 renders them as a calm, real-time strategy realm:
 
-- **Each session → a settler.** Start a Claude Code, Codex, or OpenCode session and a settler walks out of the keep, carrying your prompt as its task.
+- **Each session → a settler.** Start a Claude Code, Codex, OpenCode or Koda session and a settler walks out of the keep, carrying your prompt as its task.
 - **Tools → workshops.** The settler heads to the building that matches the work — the forge for code edits, the mage tower for web research, the mine for the terminal.
 - **Subagents → workers.** When a session spawns subagents (e.g. the Task tool), they appear as little workers around their settler.
 - **Tokens → harvest.** Tokens read and produced fill the storehouse. Settlers ponder while thinking, rest when waiting, and stroll home when the day's work is done.
@@ -54,7 +54,7 @@ A glanceable, second-monitor view of what your agents are quietly up to.
 Run it instantly, no install:
 
 ```bash
-npx age-of-agents          # watches ~/.claude, ~/.codex & ~/.opencode sessions, prints the URL
+npx age-of-agents          # watches ~/.claude, ~/.codex, ~/.opencode & ~/.koda sessions, prints the URL
 npx age-of-agents --demo   # calm demo mode (fake sessions)
 npx age-of-agents --open   # also open the browser
 ```
