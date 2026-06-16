@@ -37,9 +37,13 @@ export class OpenCodePoller {
     
     try {
       // Dynamic import better-sqlite3 (opcjonalna zależność)
-      const { Database } = await import('better-sqlite3');
+      const mod = await import('better-sqlite3');
+      const Database = mod.default ?? mod.Database;
+      if (!Database || typeof Database !== 'function') {
+        throw new Error('better-sqlite3 did not export a Database constructor');
+      }
       const dbPath = getOpencodeDbPath();
-      this.db = new Database(dbPath, { readonly: true });
+      this.db = new (Database as any)(dbPath, { readonly: true });
       
       // Przygotuj zapytania
       this.isRunning = true;
@@ -176,7 +180,7 @@ export class OpenCodePoller {
   private sweep(): void {
     const now = Date.now();
     for (const [sessionId, state] of this.sessions) {
-      if (now - state.lastPartTime > this.thresholds.removeAfterMs) {
+      if (now - state.lastPartTime > DEFAULT_THRESHOLDS.removeAfterMs) {
         // Sesja nieaktywna - usuń
         state.tracker.apply({ kind: 'turn-end', ts: new Date().toISOString() });
         this.sessions.delete(sessionId);
