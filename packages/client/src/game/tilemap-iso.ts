@@ -5,6 +5,7 @@ import { isoFillRange, type WorldRect } from './iso-fill';
 
 const tiles = new Map<string, Texture>(); // TerrainId -> tekstura diamentu
 let loaded = false;
+let currentTheme = '';
 
 // Zmiękczanie styków biomów (look — łatwy do strojenia). 0 wyłącza efekt.
 const FEATHER_ALPHA = 0.45; // krycie nakładki tekstury sąsiada
@@ -24,22 +25,41 @@ function grayTint(factor: number): number {
 
 /** Ładuje kafle izometryczne terenu (jeden diament per TerrainId). Brak → drawTerrain fallback. */
 export async function loadIsoTiles(themeId: string): Promise<void> {
+  // Wyrzuć z cache Pixi stare kafle poprzedniego tematu — inaczej Pixi może
+  // odpowiedzieć starą teksturą po zmianie motywu i nigdy nie wczytać nowej.
+  if (currentTheme && currentTheme !== themeId) {
+    for (const id of tiles.keys()) {
+      try { await Assets.unload(`/assets/${currentTheme}/tilemap-iso/${id}.png`); } catch { /* ignore */ }
+    }
+  }
   tiles.clear();
   loaded = false;
+  currentTheme = themeId;
   try {
     const res = await fetch(`/assets/${themeId}/tilemap-iso/index.json`);
-    if (!res.ok) return;
+    if (!res.ok) {
+      console.warn(`[tilemap-iso] No index.json for ${themeId} (${res.status})`);
+      return;
+    }
     const idx: { ids: string[] } = await res.json();
+    console.log(`[tilemap-iso] Loading ${themeId}:`, idx.ids);
     for (const id of idx.ids) {
       try {
-        tiles.set(id, await Assets.load<Texture>(`/assets/${themeId}/tilemap-iso/${id}.png`));
-      } catch {
-        /* pojedynczy brak — pomijamy */
+        const t = await Assets.load<Texture>(`/assets/${themeId}/tilemap-iso/${id}.png`);
+        if (t) {
+          tiles.set(id, t);
+          console.log(`[tilemap-iso]   ✓ ${id} ${t.width}x${t.height}`);
+        } else {
+          console.warn(`[tilemap-iso]   ✗ ${id} returned null`);
+        }
+      } catch (err) {
+        console.warn(`[tilemap-iso]   ✗ ${id} failed:`, err);
       }
     }
     loaded = tiles.size > 0;
-  } catch {
-    /* brak indeksu — fallback */
+    console.log(`[tilemap-iso] ${themeId} loaded:`, tiles.size, 'tiles');
+  } catch (err) {
+    console.warn(`[tilemap-iso] Fetch failed for ${themeId}:`, err);
   }
 }
 
