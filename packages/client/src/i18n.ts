@@ -66,6 +66,7 @@ export interface UiStrings {
   subagents: string;
   usedThisSession: string;
   scanningProject: string;
+  context: string;
 }
 
 const EN: UiStrings = {
@@ -136,6 +137,7 @@ const EN: UiStrings = {
   subagents: 'Subagents',
   usedThisSession: 'used',
   scanningProject: 'Scanning project…',
+  context: 'Context',
 };
 
 const PL: UiStrings = {
@@ -206,6 +208,7 @@ const PL: UiStrings = {
   subagents: 'Subagenci',
   usedThisSession: 'użyto',
   scanningProject: 'Skanuję projekt…',
+  context: 'Kontekst',
 };
 
 const IT: UiStrings = {
@@ -276,6 +279,7 @@ const IT: UiStrings = {
   subagents: 'Subagenti',
   usedThisSession: 'usato',
   scanningProject: 'Scansione progetto…',
+  context: 'Contesto',
 };
 
 const UI: Record<Lang, UiStrings> = { en: EN, pl: PL, it: IT };

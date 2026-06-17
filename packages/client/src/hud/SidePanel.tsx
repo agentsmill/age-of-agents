@@ -7,6 +7,7 @@ import { teamColorHex } from '../game/placeholders';
 import { getGameView } from '../game/view';
 import { clip, formatK, relTime } from '../util';
 import { StatTile } from './StatTile';
+import { ContextBar } from './ContextBar';
 
 // Stała referencja — selektor zwracający świeże [] przy każdym wywołaniu
 // wprawiłby useSyncExternalStore w nieskończoną pętlę renderów.
@@ -179,6 +180,10 @@ export function SidePanel() {
         <StatTile label={t.active} value={fmtDuration(hero.startedAt, now)} />
         <StatTile label={t.peons} value={String(helpers)} />
       </div>
+
+      {typeof hero.contextTokens === 'number' && (
+        <ContextBar tokens={hero.contextTokens} model={hero.model} label={t.context} />
+      )}
 
       {mission && (
         <div>
