@@ -13,11 +13,14 @@ export interface StartServerOptions {
   demo: boolean;
   /** Katalog ze zbudowanym klientem (dist/web). Gdy podany — serwer serwuje SPA. */
   webRoot?: string;
+  /** Czy uruchomić lokalny proxy OpenAI-compatible (Ollama/oMLX) — domyślnie tak poza demo. */
+  localLlmProxy?: boolean;
 }
 
 export interface RunningServer {
   url: string;
   port: number;
+  localLlmProxyUrl?: string;
   close: () => Promise<void>;
 }
 
@@ -117,15 +120,28 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     startDemo(world);
   }
 
+  let localLlmProxy: { url: string; close: () => Promise<void> } | undefined;
+  if (!opts.demo && (opts.localLlmProxy ?? true)) {
+    const { startLocalLlmProxy } = await import('./proxy/local-llm-proxy.js');
+    try {
+      localLlmProxy = await startLocalLlmProxy({ port: process.env.LLM_PROXY_PORT ? Number(process.env.LLM_PROXY_PORT) : 11435 });
+      app.log.info(`Local LLM proxy active: ${localLlmProxy.url} -> ${process.env.LLM_BASE_URL ?? 'http://localhost:11434/v1'}`);
+    } catch (err) {
+      app.log.warn({ err }, 'Local LLM proxy failed to start — local LLM sessions will not be visualized');
+    }
+  }
+
   const url = `http://${host === '0.0.0.0' ? 'localhost' : host}:${actualPort}`;
   return {
     url,
     port: actualPort,
+    localLlmProxyUrl: localLlmProxy?.url,
     close: async () => {
       offEvent();
       await new Promise<void>((resolve, reject) =>
         wss.close((err) => (err ? reject(err) : resolve())),
       );
+      await localLlmProxy?.close();
       await app.close();
     },
   };

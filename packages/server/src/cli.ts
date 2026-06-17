@@ -59,8 +59,11 @@ async function main(): Promise<void> {
   for (let attempt = 0; attempt < 10; attempt++) {
     try {
       const server = await startServer({ port, demo: opts.demo, webRoot });
+      const proxyLine = server.localLlmProxyUrl
+        ? `  ▸ Local LLM proxy (Ollama/oMLX): ${server.localLlmProxyUrl}\n`
+        : '';
       process.stdout.write(
-        `\n  ▸ Age of Agents is running: ${server.url}\n    (Ctrl+C to stop)\n\n`,
+        `\n  ▸ Age of Agents is running: ${server.url}\n${proxyLine}    (Ctrl+C to stop)\n\n`,
       );
       const open = shouldOpenBrowser(opts.open, {
         ci: Boolean(process.env.CI),

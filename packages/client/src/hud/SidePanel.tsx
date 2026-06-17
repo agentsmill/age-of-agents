@@ -52,6 +52,7 @@ const AGENT_BADGE: Record<AgentKind, { label: string; color: string } | undefine
   codex: { label: 'Codex', color: '#10a37f' },
   opencode: { label: 'OpenCode', color: '#f59e0b' }, // amber-500
   koda: { label: 'Koda', color: '#8b5cf6' }, // violet-500
+  'local-llm': { label: 'Local LLM', color: '#22d3ee' }, // cyan-400
 };
 
 /** Panel wybranej sesji: karta pionka (stan, statystyki, zadanie, ostatnie akcje) + transkrypt. */

@@ -19,6 +19,7 @@ const AGENT_BADGE_COLORS: Record<AgentKind, number | undefined> = {
   codex: 0x10a37f, // zielony OpenAI
   opencode: 0xf59e0b, // amber-500
   koda: 0x8b5cf6, // violet-500
+  'local-llm': 0x22d3ee, // cyan-400
 };
 
 /**
@@ -253,7 +254,8 @@ function buildAgentBadge(agent: AgentKind): Container | undefined {
   c.addChild(g);
   
   // Litera per agent
-  const letterText = agent === 'codex' ? 'C' : agent === 'opencode' ? 'O' : agent === 'koda' ? 'K' : '?';
+  const letterText =
+    agent === 'codex' ? 'C' : agent === 'opencode' ? 'O' : agent === 'koda' ? 'K' : agent === 'local-llm' ? 'L' : '?';
   const letter = new Text({ text: letterText, style: { ...labelStyle, fontSize: 9, fill: 0xffffff } });
   letter.anchor.set(0.5);
   c.addChild(letter);

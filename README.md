@@ -4,7 +4,7 @@
 
 **Watch your AI coding sessions grow a peaceful pixel-art realm.**
 
-Every Claude Code, Codex, OpenCode or Koda session becomes a settler walking out of the keep.
+Every Claude Code, Codex, OpenCode, Koda, or local-LLM (Ollama/oMLX) session becomes a settler walking out of the keep.
 The tool it runs decides which workshop it visits, subagents become workers,
 and tokens fill the storehouse — a calm, Age-of-Empires-style kingdom of your work.
 No combat, just a quiet realm you can watch at a glance.
@@ -28,7 +28,7 @@ Age of Agents (npm package **`age-of-agents`**) runs as a small local web app
 alongside your normal CLI workflow. It watches your agent session transcripts and
 renders them as a calm, real-time strategy realm:
 
-- **Each session → a settler.** Start a Claude Code, Codex, OpenCode or Koda session and a settler walks out of the keep, carrying your prompt as its task.
+- **Each session → a settler.** Start a Claude Code, Codex, OpenCode, Koda, or local-LLM (Ollama/oMLX, via the [built-in proxy](#-local-llms-ollama--omlx)) session and a settler walks out of the keep, carrying your prompt as its task.
 - **Tools → workshops.** The settler heads to the building that matches the work — the forge for code edits, the mage tower for web research, the mine for the terminal.
 - **Subagents → workers.** When a session spawns subagents (e.g. the Task tool), they appear as little workers around their settler.
 - **Tokens → harvest.** Tokens read and produced fill the storehouse. Settlers ponder while thinking, rest when waiting, and stroll home when the day's work is done.
@@ -54,7 +54,7 @@ A glanceable, second-monitor view of what your agents are quietly up to.
 Run it instantly, no install:
 
 ```bash
-npx age-of-agents          # watches ~/.claude, ~/.codex, ~/.opencode & ~/.koda sessions, prints the URL
+npx age-of-agents          # watches ~/.claude, ~/.codex, ~/.opencode, ~/.koda sessions & the local-LLM proxy, prints the URL
 npx age-of-agents --demo   # calm demo mode (fake sessions)
 npx age-of-agents --open   # also open the browser
 ```
@@ -77,6 +77,52 @@ npm run demo     # server (demo) + client (Vite) → http://localhost:5173
 npm run dev      # visualize your real sessions
 ```
 
+### 🦙 Local LLMs (Ollama / oMLX)
+
+Age of Agents only ever *watches* transcripts — Claude Code, Codex, OpenCode and
+Koda each write their own. To visualize an agent driven by a **local** model
+(Ollama, oMLX, or anything else exposing an OpenAI-compatible
+`/v1/chat/completions` endpoint), point your agent's client at the small proxy
+Age of Agents starts alongside the server instead of talking to the local
+model directly. The proxy forwards every request to your real backend and
+writes a transcript that the new `local-llm` source picks up, so those
+sessions appear in the realm exactly like any other agent.
+
+```
+your agent CLI ──▶ Age of Agents proxy (http://localhost:11435/v1) ──▶ LLM_BASE_URL (Ollama/oMLX) ──▶ ...
+                                  │
+                                  └─▶ writes a session transcript ──▶ local-llm source ──▶ settler in the realm
+```
+
+1. Start Ollama (or oMLX) as usual, e.g. `ollama serve` (default `http://localhost:11434/v1`).
+2. Start Age of Agents — it starts the proxy automatically on port `11435`:
+
+   ```bash
+   npx age-of-agents --open
+   ```
+
+3. Point your agent at the proxy instead of the model directly. Most
+   OpenAI-compatible clients just need a base URL override, e.g.:
+
+   ```bash
+   export OPENAI_BASE_URL=http://localhost:11435/v1
+   export OPENAI_API_KEY=ollama   # any non-empty value, Ollama/oMLX ignore it
+   ```
+
+Configuration (all optional, set before starting `age-of-agents`):
+
+| Env var            | Default                          | Purpose                                                      |
+| ------------------- | --------------------------------- | -------------------------------------------------------------- |
+| `LLM_BASE_URL`      | `http://localhost:11434/v1`      | Upstream OpenAI-compatible endpoint (Ollama, oMLX, ...).        |
+| `LLM_MODEL`         | _(none)_                          | Force a model name on every proxied request, overriding the client's choice. |
+| `LLM_API_KEY`       | _(none)_                          | Forwarded as `Authorization: Bearer ...` to the upstream, if it requires one. |
+| `LLM_PROXY_PORT`    | `11435`                           | Port the local proxy listens on.                                |
+| `LOCAL_LLM_SESSIONS_DIR` | `~/.age-of-agents/local-llm/sessions` | Where session transcripts are written/watched.           |
+
+This is a drop-in replacement: your agent talks the same OpenAI chat-completions
+protocol it always did, just through the proxy, and Age of Agents never sees or
+stores your prompts beyond the same local transcript files the other sources use.
+
 ## 🧭 How it works
 
 ```
@@ -89,7 +135,7 @@ agent session transcript ──▶ server (watcher + state machine) ──▶ We
 
 ## 🏛️ Project intel (optional)
 
-Run several projects at once and each becomes its own **city** in the top bar — switch between them, or pick **All** to see every settler together. A city shows how many agents are active and which kind (Claude, Codex, OpenCode, Koda).
+Run several projects at once and each becomes its own **city** in the top bar — switch between them, or pick **All** to see every settler together. A city shows how many agents are active and which kind (Claude, Codex, OpenCode, Koda, Local LLM).
 
 Select a city to open the **Architect's Hall**, a side panel that surfaces two optional, third-party signals about that project — read-only and entirely opt-in:
 

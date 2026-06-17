@@ -9,6 +9,7 @@ const AGENT_BADGE: Record<AgentKind, { label: string; color: string } | undefine
   codex: { label: 'C', color: '#10a37f' },
   opencode: { label: 'O', color: '#f59e0b' },
   koda: { label: 'K', color: '#8b5cf6' },
+  'local-llm': { label: 'L', color: '#22d3ee' },
 };
 
 /** Emoji per stato agente (gadżet wizualny w przyciskach miast). */
