@@ -15,6 +15,7 @@ export default defineConfig({
       '/hooks': 'http://127.0.0.1:8123',
       '/health': 'http://127.0.0.1:8123',
       '/building-stats': 'http://127.0.0.1:8123',
+      '/tool-mapping': 'http://127.0.0.1:8123',
     },
   },
 });

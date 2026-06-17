@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useSettings, type Lang } from '../settings';
 import { useUi } from '../i18n';
 import { HooksPanel } from './HooksPanel';
+import { SettingsPanel } from './SettingsPanel';
 import { useMenuKeyboard } from './useMenuKeyboard';
 
 /** Lista języków do dropdownu: endonimy (nazwa w danym języku) + flaga + krótki kod. */
@@ -20,6 +21,8 @@ export function ThemeSwitch() {
   const t = useUi();
 
   const [langOpen, setLangOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const gearRef = useRef<HTMLButtonElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
   const langTriggerRef = useRef<HTMLButtonElement>(null);
   const langMenuRef = useRef<HTMLDivElement>(null);
@@ -115,6 +118,28 @@ export function ThemeSwitch() {
           </div>
         )}
       </div>
+
+      {/* ── Trybik: ustawienia (reakcje budynków) ── */}
+      <button
+        ref={gearRef}
+        className="ghost"
+        onClick={() => setSettingsOpen(true)}
+        title={t.settings}
+        aria-label={t.settings}
+        aria-haspopup="dialog"
+        aria-expanded={settingsOpen}
+        style={{ display: 'inline-flex', alignItems: 'center' }}
+      >
+        ⚙
+      </button>
+      {settingsOpen && (
+        <SettingsPanel
+          onClose={() => {
+            setSettingsOpen(false);
+            gearRef.current?.focus(); // przywróć fokus na trybik (a11y)
+          }}
+        />
+      )}
     </div>
   );
 }

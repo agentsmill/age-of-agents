@@ -66,6 +66,29 @@ export interface UiStrings {
   subagents: string;
   usedThisSession: string;
   scanningProject: string;
+  // Panel ustawień (reakcje budynków)
+  settings: string;
+  buildingReactions: string;
+  buildingReactionsHint: string;
+  addTrigger: string;
+  kindName: string;
+  kindPattern: string;
+  kindCondition: string;
+  coverage: string;
+  covCovered: string;
+  covUnassigned: string;
+  covConflicts: string;
+  assign: string;
+  socialBuildings: string;
+  jsonSynced: string;
+  jsonInvalid: string;
+  restoreDefaults: string;
+  addCondition: string;
+  addPattern: string;
+  toolName: string;
+  pattern: string;
+  remove: string;
+  addTriggerConfirm: string;
 }
 
 const EN: UiStrings = {
@@ -136,6 +159,28 @@ const EN: UiStrings = {
   subagents: 'Subagents',
   usedThisSession: 'used',
   scanningProject: 'Scanning project…',
+  settings: 'Settings',
+  buildingReactions: 'Building reactions',
+  buildingReactionsHint: 'Pick which live-log tools each building reacts to. Edit visually or as JSON below — both stay in sync.',
+  addTrigger: 'add (, or ;)',
+  kindName: 'name',
+  kindPattern: 'pattern',
+  kindCondition: 'condition',
+  coverage: 'Coverage',
+  covCovered: 'working buildings covered',
+  covUnassigned: 'tools fall to home base',
+  covConflicts: 'conflicts',
+  assign: 'assign',
+  socialBuildings: 'Social buildings — driven by session state, no tool triggers.',
+  jsonSynced: 'JSON — kept in sync with the panel',
+  jsonInvalid: 'Invalid config — not applied',
+  restoreDefaults: 'Restore defaults',
+  addCondition: '+ condition',
+  addPattern: '+ pattern',
+  toolName: 'tool',
+  pattern: 'regex',
+  remove: 'Remove',
+  addTriggerConfirm: 'Add trigger',
 };
 
 const PL: UiStrings = {
@@ -206,6 +251,28 @@ const PL: UiStrings = {
   subagents: 'Subagenci',
   usedThisSession: 'użyto',
   scanningProject: 'Skanuję projekt…',
+  settings: 'Ustawienia',
+  buildingReactions: 'Reakcje budynków',
+  buildingReactionsHint: 'Wybierz, na jakie narzędzia z żywych logów reaguje każdy budynek. Edytuj wizualnie albo jako JSON poniżej — oba są zsynchronizowane.',
+  addTrigger: 'dodaj (, lub ;)',
+  kindName: 'nazwa',
+  kindPattern: 'wzorzec',
+  kindCondition: 'warunek',
+  coverage: 'Pokrycie',
+  covCovered: 'budynków roboczych pokrytych',
+  covUnassigned: 'narzędzi spada do Twierdzy',
+  covConflicts: 'konfliktów',
+  assign: 'przypisz',
+  socialBuildings: 'Budynki socjalne — sterowane stanem sesji, bez wyzwalaczy narzędzi.',
+  jsonSynced: 'JSON — synchronizowany z panelem',
+  jsonInvalid: 'Niepoprawny config — niezastosowany',
+  restoreDefaults: 'Przywróć domyślne',
+  addCondition: '+ warunek',
+  addPattern: '+ wzorzec',
+  toolName: 'narzędzie',
+  pattern: 'regex',
+  remove: 'Usuń',
+  addTriggerConfirm: 'Dodaj wyzwalacz',
 };
 
 const IT: UiStrings = {
@@ -276,6 +343,28 @@ const IT: UiStrings = {
   subagents: 'Subagenti',
   usedThisSession: 'usato',
   scanningProject: 'Scansione progetto…',
+  settings: 'Impostazioni',
+  buildingReactions: 'Reazioni degli edifici',
+  buildingReactionsHint: 'Scegli a quali strumenti dei log dal vivo reagisce ogni edificio. Modifica visivamente o come JSON qui sotto — restano sincronizzati.',
+  addTrigger: 'aggiungi (, o ;)',
+  kindName: 'nome',
+  kindPattern: 'pattern',
+  kindCondition: 'condizione',
+  coverage: 'Copertura',
+  covCovered: 'edifici operativi coperti',
+  covUnassigned: 'strumenti finiscono al Centro',
+  covConflicts: 'conflitti',
+  assign: 'assegna',
+  socialBuildings: 'Edifici sociali — guidati dallo stato della sessione, senza trigger di strumenti.',
+  jsonSynced: 'JSON — sincronizzato con il pannello',
+  jsonInvalid: 'Config non valido — non applicato',
+  restoreDefaults: 'Ripristina predefiniti',
+  addCondition: '+ condizione',
+  addPattern: '+ pattern',
+  toolName: 'strumento',
+  pattern: 'regex',
+  remove: 'Rimuovi',
+  addTriggerConfirm: 'Aggiungi trigger',
 };
 
 const UI: Record<Lang, UiStrings> = { en: EN, pl: PL, it: IT };

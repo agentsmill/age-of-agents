@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import { WebSocketServer, WebSocket } from 'ws';
 import { WS_PATH, type GameEvent } from '@agent-citadel/shared';
 import { World } from './world.js';
+import { registerMappingRoutes } from './mapping-routes.js';
 import { OpenCodePoller } from './sources/opencode-poller.js';
 import { ArsenalPoller } from './arsenal/arsenal-poller.js';
 
@@ -33,11 +34,13 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     app.post('/hooks', async () => ({ ok: true }));
     app.get('/hooks/status', async () => ({ installed: false, demo: true }));
     app.get('/building-stats', async () => ({ updatedAt: new Date().toISOString(), buildings: {} }));
+    // Mapa narzędzie→budynek: w demo nie persystujemy (PUT tylko waliduje, GET = domyślna).
+    registerMappingRoutes(app, { persist: false });
   } else {
     const { SourceWatcher } = await import('./watcher.js');
     const { SOURCES } = await import('./sources/index.js');
     const { translateHook, hooksInstalled, installHooks, uninstallHooks } = await import('./hooks.js');
-    const { getBuildingStats } = await import('./building-stats.js');
+    const { getBuildingStats, invalidateBuildingStatsCache } = await import('./building-stats.js');
     const watchers = SOURCES.map((source) => new SourceWatcher(world, source));
     // Hooki HTTP są kanałem Claude → kierujemy je do watchera Claude.
     const claudeWatcher = watchers.find((w) => w.id === 'claude') ?? watchers[0];
@@ -46,6 +49,9 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     const opencodePoller = new OpenCodePoller(world);
 
     app.get('/building-stats', async () => getBuildingStats());
+    // Mapa narzędzie→budynek: lokalny serwer = źródło prawdy (plik na dysku usera);
+    // zapis invaliduje cache statystyk, by liczby nadążały za nową mapą.
+    registerMappingRoutes(app, { persist: true, onSaved: invalidateBuildingStatsCache });
     app.post('/hooks', async (request) => {
       const translated = translateHook((request.body ?? {}) as never);
       if (translated) claudeWatcher.applyExternalFacts(translated.sessionId, translated.projectDir, translated.facts);

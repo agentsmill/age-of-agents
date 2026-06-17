@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { toolToBuilding, type BuildingId, type BuildingStatsResponse, type BuildingWindowStats } from '@agent-citadel/shared';
+import { resolveBuilding, type BuildingId, type BuildingStatsResponse, type BuildingWindowStats } from '@agent-citadel/shared';
 import { useWorld } from '../store';
+import { useMapping } from '../mapping-store';
 import { useSettings } from '../settings';
 import { useUi, buildingText } from '../i18n';
 import { clip, formatK, relTime } from '../util';
@@ -17,6 +18,7 @@ export function BuildingPanel() {
   const select = useWorld((s) => s.selectBuilding);
   const themeId = useSettings((s) => s.themeId);
   const lang = useSettings((s) => s.lang);
+  const mapping = useMapping((s) => s.mapping); // re-render gdy user przemapuje narzędzia
   const t = useUi();
   const [stats, setStats] = useState<BuildingStatsResponse | undefined>();
   const [loading, setLoading] = useState(false);
@@ -49,10 +51,10 @@ export function BuildingPanel() {
 
   // "Teraz pracuje" — na żywo ze stanu świata (bohaterowie + peony przy tym budynku).
   const workerHeroes = Object.values(heroes).filter(
-    (h) => h.state === 'working' && toolToBuilding(h.currentTool, h.toolDetail) === buildingId,
+    (h) => h.state === 'working' && resolveBuilding(h.currentTool, h.toolDetail, mapping) === buildingId,
   );
   const workerPeons = Object.values(peons).filter(
-    (p) => p.state === 'working' && toolToBuilding(p.currentTool) === buildingId,
+    (p) => p.state === 'working' && resolveBuilding(p.currentTool, undefined, mapping) === buildingId,
   );
   const workingNow = workerHeroes.length + workerPeons.length;
 
@@ -61,7 +63,7 @@ export function BuildingPanel() {
   const now = Date.now();
   const activity = Object.values(heroes)
     .flatMap((h) => (h.recentActions ?? []).map((a) => ({ a, hero: h })))
-    .filter(({ a }) => toolToBuilding(a.tool, a.detail) === buildingId)
+    .filter(({ a }) => resolveBuilding(a.tool, a.detail, mapping) === buildingId)
     .sort((x, y) => y.a.ts.localeCompare(x.a.ts))
     .slice(0, 8);
 

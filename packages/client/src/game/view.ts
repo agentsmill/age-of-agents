@@ -2,7 +2,7 @@ import { Application, Container, Graphics, Sprite, TextureStyle } from 'pixi.js'
 import { Viewport } from 'pixi-viewport';
 import type { HeroSnapshot, MissionSnapshot, PeonSnapshot } from '@agent-citadel/shared';
 import { useWorld } from '../store';
-import { toolToBuilding } from '../theme/mapping';
+import { resolveBuildingLive, useMapping } from '../mapping-store';
 import type { BuildingDef, BuildingId, ThemeDef } from '../theme/types';
 import { WaypointGraph } from './pathfind';
 import { buildBuilding, drawRoads, drawTerrain, TEAM_COLORS } from './placeholders';
@@ -99,6 +99,7 @@ export class GameView {
   private missionStatus = new Map<string, string>();
   private graph: WaypointGraph;
   private unsubscribe?: () => void;
+  private unsubscribeMapping?: () => void;
   private ready = false; // app.init() rozwiązane — wolno wołać app.destroy()
   private destroyed = false; // strażnik wyścigu init()↔destroy() (zmiana motywu w trakcie ładowania)
 
@@ -273,6 +274,14 @@ export class GameView {
     this.unsubscribe = useWorld.subscribe((state) =>
       this.reconcile(state.heroes, state.peons, state.missions, state.selectedProjectDir),
     );
+    // Zmiana mapy narzędzie→budynek wymusza ponowne wyznaczenie celów: jednostki
+    // przechodzą do nowych budynków na żywo (reconcile ma early-return per
+    // niezmieniony klucz, więc re-steer jest tani). Bez tego mapa „doganiałaby"
+    // edycję dopiero przy następnym evencie świata.
+    this.unsubscribeMapping = useMapping.subscribe(() => {
+      const w = useWorld.getState();
+      this.reconcile(w.heroes, w.peons, w.missions, w.selectedProjectDir);
+    });
     const { heroes, peons, missions, selectedProjectDir } = useWorld.getState();
     this.reconcile(heroes, peons, missions, selectedProjectDir);
     activeView = this;
@@ -283,6 +292,7 @@ export class GameView {
     this.destroyed = true;
     if (activeView === this) activeView = undefined;
     this.unsubscribe?.();
+    this.unsubscribeMapping?.();
     if (this.ready) this.app.destroy(true, { children: true }); // app.init() musiało się rozwiązać
   }
 
@@ -655,7 +665,7 @@ export class GameView {
   private steer(unit: Unit, state: string, tool?: string, detail?: string, slot = 0): void {
     let buildingId: BuildingId;
     if (state === 'working') {
-      buildingId = toolToBuilding(tool, detail);
+      buildingId = resolveBuildingLive(tool, detail);
       // Nieznane narzędzie daje fallback 'citadel'. Dla peona to zła stopa: cel=Twierdza
       // ⇒ pusta ścieżka ⇒ stoi. Kieruj go do Koszar, żeby faktycznie biegł.
       if (buildingId === 'citadel' && unit.isPeon) buildingId = 'barracks';

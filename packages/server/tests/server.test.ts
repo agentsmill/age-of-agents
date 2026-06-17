@@ -34,4 +34,37 @@ describe('startServer', () => {
     expect(spa.status).toBe(200);
     expect(await spa.text()).toContain('AIOA-TEST');
   });
+
+  it('GET /tool-mapping zwraca poprawny config', async () => {
+    running = await startServer({ port: 0, demo: true });
+    const res = await fetch(`http://localhost:${running.port}/tool-mapping`);
+    expect(res.status).toBe(200);
+    const cfg = await res.json();
+    expect(cfg.fallback).toBe('citadel');
+    expect(Array.isArray(cfg.rules)).toBe(true);
+    expect(cfg.rules.length).toBeGreaterThan(0);
+  });
+
+  it('PUT /tool-mapping odrzuca niepoprawny config (400)', async () => {
+    running = await startServer({ port: 0, demo: true });
+    const res = await fetch(`http://localhost:${running.port}/tool-mapping`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rules: [], fallback: 'nieistniejacy' }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBeTruthy();
+  });
+
+  it('PUT /tool-mapping akceptuje poprawny config (200, echo)', async () => {
+    running = await startServer({ port: 0, demo: true });
+    const cfg = { rules: [{ kind: 'exact', tool: 'Edit', building: 'library' }], fallback: 'citadel' };
+    const res = await fetch(`http://localhost:${running.port}/tool-mapping`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(cfg),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(cfg);
+  });
 });

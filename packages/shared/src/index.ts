@@ -128,6 +128,44 @@ export type BuildingId =
   | 'lounge'
   | 'medbay';
 
+/** Wszystkie kanoniczne id budynków jako tablica runtime (do walidacji + UI/coverage). */
+export const BUILDING_IDS = [
+  'citadel', 'tower', 'forge', 'library', 'mine', 'barracks', 'market', 'guild',
+  'arena', 'tavern', 'garden', 'bar', 'shrine',
+  'holodeck', 'mess', 'hydroponics', 'lounge', 'medbay',
+] as const satisfies readonly BuildingId[];
+
+// Strażnik kompletności: jeśli ktoś doda wartość do unii BuildingId, a zapomni
+// dopisać ją do BUILDING_IDS, poniższy typ przestanie być `never` → błąd kompilacji.
+type _MissingFromBuildingIds = Exclude<BuildingId, (typeof BUILDING_IDS)[number]>;
+const _buildingIdsComplete: _MissingFromBuildingIds extends never ? true : never = true;
+void _buildingIdsComplete;
+
+const BUILDING_ID_SET: ReadonlySet<string> = new Set(BUILDING_IDS);
+
+/** Czy string jest znanym BuildingId (runtime guard dla walidacji configu). */
+export function isBuildingId(value: unknown): value is BuildingId {
+  return typeof value === 'string' && BUILDING_ID_SET.has(value);
+}
+
+/**
+ * Jedna reguła mapowania narzędzie→budynek. Trzy „zakresy akcji":
+ *  - exact:  dokładna nazwa narzędzia (Edit → forge)
+ *  - prefix: prefiks nazwy (mcp__ → guild); przy kolizji wygrywa NAJDŁUŻSZY
+ *  - detail: narzędzie + regex na opisie (Bash gdy „git commit…" → market)
+ */
+export type MappingRule =
+  | { kind: 'exact'; tool: string; building: BuildingId }
+  | { kind: 'prefix'; prefix: string; building: BuildingId }
+  | { kind: 'detail'; tool: string; pattern: string; building: BuildingId };
+
+/** Edytowalna konfiguracja mapowania (DANE, nie kod). `fallback` = budynek-kosz. */
+export interface MappingConfig {
+  rules: MappingRule[];
+  fallback: BuildingId;
+}
+
+/** Źródło prawdy dla DEFAULT_MAPPING — zachowane jako czytelna tabela exact. */
 const TOOL_BUILDING: Record<string, BuildingId> = {
   WebSearch: 'tower',
   WebFetch: 'tower',
@@ -152,11 +190,126 @@ const TOOL_BUILDING: Record<string, BuildingId> = {
 /** Polecenia gitowe w Bash kierujemy na targ (karawana z towarem). */
 const GIT_RE = /\bgit\s+(commit|push|pull|merge|rebase)\b/;
 
+/**
+ * Wbudowana mapa = dotychczasowe zahardkodowane zachowanie wyrażone jako DANE.
+ * Resolve trzyma się tej samej precedencji co stara funkcja: detail (git) →
+ * prefix (mcp__) → exact (tabela) → fallback (citadel).
+ */
+export const DEFAULT_MAPPING: MappingConfig = {
+  rules: [
+    { kind: 'detail', tool: 'Bash', pattern: GIT_RE.source, building: 'market' },
+    { kind: 'prefix', prefix: 'mcp__', building: 'guild' },
+    ...Object.entries(TOOL_BUILDING).map(
+      ([tool, building]) => ({ kind: 'exact', tool, building }) as MappingRule,
+    ),
+  ],
+  fallback: 'citadel',
+};
+
+/**
+ * Konfigurowalny następca toolToBuilding. Precedencja wg SPECYFICZNOŚCI (nie
+ * kolejności w tablicy), żeby reguły szczegółowe biły ogólne bez ekspozycji
+ * „przeciągania kolejności" w UI:
+ *   1) detail (narzędzie + regex), 2) prefix (najdłuższy), 3) exact, 4) fallback.
+ * Niepoprawny regex w regule detail jest po cichu pomijany (gra się nie wywala).
+ */
+export function resolveBuilding(
+  tool: string | undefined,
+  detail: string | undefined,
+  config: MappingConfig,
+): BuildingId {
+  if (!tool) return config.fallback;
+
+  if (detail) {
+    for (const rule of config.rules) {
+      if (rule.kind !== 'detail' || rule.tool !== tool) continue;
+      try {
+        if (new RegExp(rule.pattern).test(detail)) return rule.building;
+      } catch {
+        /* niepoprawny regex → pomiń regułę */
+      }
+    }
+  }
+
+  let bestPrefix: { len: number; building: BuildingId } | undefined;
+  for (const rule of config.rules) {
+    if (rule.kind !== 'prefix' || !tool.startsWith(rule.prefix)) continue;
+    if (!bestPrefix || rule.prefix.length > bestPrefix.len) {
+      bestPrefix = { len: rule.prefix.length, building: rule.building };
+    }
+  }
+  if (bestPrefix) return bestPrefix.building;
+
+  for (const rule of config.rules) {
+    if (rule.kind === 'exact' && rule.tool === tool) return rule.building;
+  }
+
+  return config.fallback;
+}
+
+/** Cienki wrapper na DEFAULT_MAPPING — zgodność wsteczna ze wszystkimi importami. */
 export function toolToBuilding(tool: string | undefined, detail?: string): BuildingId {
-  if (!tool) return 'citadel';
-  if (tool === 'Bash' && detail && GIT_RE.test(detail)) return 'market';
-  if (tool.startsWith('mcp__')) return 'guild';
-  return TOOL_BUILDING[tool] ?? 'citadel';
+  return resolveBuilding(tool, detail, DEFAULT_MAPPING);
+}
+
+/**
+ * Waliduje surowy obiekt (np. z pliku / textarea JSON) na MappingConfig.
+ * Zwraca skonkretyzowany config przy sukcesie albo czytelny błąd po polsku.
+ */
+export function validateMapping(
+  input: unknown,
+): { ok: true; config: MappingConfig } | { ok: false; error: string } {
+  if (typeof input !== 'object' || input === null) {
+    return { ok: false, error: 'Config musi być obiektem.' };
+  }
+  const obj = input as Record<string, unknown>;
+  if (!Array.isArray(obj.rules)) {
+    return { ok: false, error: 'Brakuje tablicy "rules".' };
+  }
+  if (!isBuildingId(obj.fallback)) {
+    return { ok: false, error: `Nieznany "fallback": ${String(obj.fallback)}.` };
+  }
+  // Buduj CZYSTY config z wyłącznie znanych pól — żeby nadmiarowe klucze
+  // wstrzyknięte przez klienta nie trafiały trwale do pliku źródła prawdy.
+  const cleanRules: MappingRule[] = [];
+  for (let i = 0; i < obj.rules.length; i++) {
+    const raw = obj.rules[i];
+    if (typeof raw !== 'object' || raw === null) {
+      return { ok: false, error: `Reguła ${i}: nie jest obiektem.` };
+    }
+    const rule = raw as Record<string, unknown>;
+    if (!isBuildingId(rule.building)) {
+      return { ok: false, error: `Reguła ${i}: nieznany "building" ${String(rule.building)}.` };
+    }
+    if (rule.kind === 'exact') {
+      if (typeof rule.tool !== 'string' || !rule.tool) {
+        return { ok: false, error: `Reguła ${i}: "exact" wymaga niepustego "tool".` };
+      }
+      cleanRules.push({ kind: 'exact', tool: rule.tool, building: rule.building });
+    } else if (rule.kind === 'prefix') {
+      if (typeof rule.prefix !== 'string' || !rule.prefix) {
+        return { ok: false, error: `Reguła ${i}: "prefix" wymaga niepustego "prefix".` };
+      }
+      cleanRules.push({ kind: 'prefix', prefix: rule.prefix, building: rule.building });
+    } else if (rule.kind === 'detail') {
+      if (typeof rule.tool !== 'string' || !rule.tool) {
+        return { ok: false, error: `Reguła ${i}: "detail" wymaga niepustego "tool".` };
+      }
+      // Pusty pattern → new RegExp('') łapie KAŻDY detail (cichy catch-all). Odrzuć.
+      if (typeof rule.pattern !== 'string' || !rule.pattern) {
+        return { ok: false, error: `Reguła ${i}: "detail" wymaga niepustego "pattern".` };
+      }
+      try {
+        new RegExp(rule.pattern);
+      } catch {
+        return { ok: false, error: `Reguła ${i}: niepoprawny regex w "pattern".` };
+      }
+      cleanRules.push({ kind: 'detail', tool: rule.tool, pattern: rule.pattern, building: rule.building });
+    } else {
+      return { ok: false, error: `Reguła ${i}: nieznany "kind" ${String(rule.kind)}.` };
+    }
+  }
+  return { ok: true, config: { rules: cleanRules, fallback: obj.fallback } };
 }
 
 /** Zużycie tokenów (wyjściowych) budynku w oknach czasowych. */

@@ -411,3 +411,152 @@ button.ghost {
     transform: scaleX(0);
   }
 }
+
+/* ── Modal ustawień (reakcje budynków) ── */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 8, 6, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+  animation: notif-in 160ms ease-out;
+}
+.settings-dialog {
+  position: relative; /* nadpisuje absolutne pozycjonowanie .hud-panel */
+  width: 780px;
+  max-width: 94vw;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Pasek pokrycia. */
+.cov-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  background: #2a2926;
+  box-shadow: inset 1px 1px 0 #45443f, inset -1px -1px 0 #15140f;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.cov-strip .ok {
+  color: #5dcaa5;
+}
+.cov-strip .warn {
+  color: #ef9f27;
+}
+.cov-strip .bad {
+  color: #e24b4a;
+}
+
+/* Siatka kart budynków. */
+.bre-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 10px;
+}
+.bre-card {
+  display: flex;
+  gap: 10px;
+  background: #2a2926;
+  box-shadow: inset 1px 1px 0 #45443f, inset -1px -1px 0 #15140f;
+  padding: 10px;
+}
+.bre-thumb {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  background: #1f1e1b;
+  box-shadow: inset 0 0 0 1px #15140f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  image-rendering: pixelated;
+  object-fit: contain;
+  font-size: 20px;
+}
+
+/* Chipy-wyzwalacze. */
+.bre-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  padding: 3px 7px;
+  border-radius: 4px;
+}
+.bre-chip button {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.55;
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+}
+.bre-chip button:hover {
+  opacity: 1;
+}
+.bre-chip--exact {
+  background: #45443f;
+  color: #f1efe8;
+}
+.bre-chip--prefix {
+  background: #14314d;
+  color: #85b7eb;
+}
+.bre-chip--detail {
+  background: #4a3a10;
+  color: #fac775;
+}
+
+.bre-input {
+  font-size: 12px;
+  background: #1f1e1b;
+  border: 1px solid #555;
+  color: #f1efe8;
+  padding: 3px 7px;
+  border-radius: 4px;
+}
+.bre-input::placeholder {
+  color: #75736b;
+}
+.bre-addbtn {
+  font-size: 12px;
+  background: #1f1e1b;
+  border: 1px dashed #555;
+  color: #a8a69d;
+  padding: 3px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.bre-addbtn:hover {
+  color: #f1efe8;
+  border-color: #777;
+}
+
+.bre-json {
+  width: 100%;
+  min-height: 160px;
+  background: #15140f;
+  color: #cfcdc4;
+  border: 1px solid #3a3a36;
+  border-radius: 0;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.bre-json.invalid {
+  border-color: #e24b4a;
+}

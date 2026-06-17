@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { toolToBuilding, type AgentKind, type BuildingId, type HeroStateKind, type TranscriptLine } from '@agent-citadel/shared';
+import { resolveBuilding, type AgentKind, type BuildingId, type HeroStateKind, type TranscriptLine } from '@agent-citadel/shared';
 import { useWorld } from '../store';
+import { useMapping } from '../mapping-store';
 import { useSettings } from '../settings';
 import { useUi, buildingText } from '../i18n';
 import { teamColorHex } from '../game/placeholders';
@@ -66,6 +67,7 @@ export function SidePanel() {
   const setAutofollow = useWorld((s) => s.setAutofollow);
   const themeId = useSettings((s) => s.themeId);
   const lang = useSettings((s) => s.lang);
+  const mapping = useMapping((s) => s.mapping); // re-render gdy user przemapuje narzędzia
   const t = useUi();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -100,7 +102,7 @@ export function SidePanel() {
   // Destynacja: dokąd jednostka zmierza na mapie (praca → budynek narzędzia; powrót → Twierdza).
   const destId: BuildingId | undefined =
     hero.state === 'working'
-      ? toolToBuilding(hero.currentTool, hero.toolDetail)
+      ? resolveBuilding(hero.currentTool, hero.toolDetail, mapping)
       : hero.state === 'returning'
         ? 'citadel'
         : undefined;
@@ -192,7 +194,7 @@ export function SidePanel() {
           <Label text={t.recentActions} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
             {hero.recentActions.map((a, i) => {
-              const b = toolToBuilding(a.tool, a.detail);
+              const b = resolveBuilding(a.tool, a.detail, mapping);
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ width: 18, textAlign: 'center', flex: 'none' }}>{BUILDING_EMOJI[b]}</span>

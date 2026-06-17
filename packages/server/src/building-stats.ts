@@ -2,11 +2,14 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
-  toolToBuilding,
+  resolveBuilding,
+  DEFAULT_MAPPING,
   type BuildingId,
   type BuildingStatsResponse,
   type BuildingWindowStats,
+  type MappingConfig,
 } from '@agent-citadel/shared';
+import { loadMappingConfig } from './mapping-config.js';
 
 /**
  * Zużycie tokenów per budynek w oknach dzień/tydzień/30 dni.
@@ -49,13 +52,14 @@ export function accumulateMessage(
   now: number,
   dayStart: number,
   fallback: BuildingId = 'citadel',
+  config: MappingConfig = DEFAULT_MAPPING,
 ): void {
   if (msg.output <= 0) return;
   const age = now - msg.ts;
   if (age < 0 || age > MONTH) return; // poza oknem 30 dni
 
   const buildings = msg.tools.length
-    ? [...new Set(msg.tools.map((t) => toolToBuilding(t.name, t.detail)))]
+    ? [...new Set(msg.tools.map((t) => resolveBuilding(t.name, t.detail, config)))]
     : [fallback]; // samo rozumowanie → budynek bieżącej pracy sesji
   const share = msg.output / buildings.length;
 
@@ -85,7 +89,13 @@ function sampleFromRecord(rec: any): MsgSample | undefined {
   return { ts, output, tools };
 }
 
-async function scanFile(path: string, acc: Map<BuildingId, Bucket>, now: number, dayStart: number): Promise<void> {
+async function scanFile(
+  path: string,
+  acc: Map<BuildingId, Bucket>,
+  now: number,
+  dayStart: number,
+  config: MappingConfig,
+): Promise<void> {
   const content = await readFile(path, 'utf8');
   let current: BuildingId = 'citadel'; // budynek bieżącej pracy sesji (ostatnie narzędzie)
   for (const line of content.split('\n')) {
@@ -100,13 +110,17 @@ async function scanFile(path: string, acc: Map<BuildingId, Bucket>, now: number,
     if (!sample) continue;
     if (sample.tools.length) {
       const last = sample.tools[sample.tools.length - 1];
-      current = toolToBuilding(last.name, last.detail);
+      current = resolveBuilding(last.name, last.detail, config);
     }
-    accumulateMessage(acc, sample, now, dayStart, current);
+    accumulateMessage(acc, sample, now, dayStart, current, config);
   }
 }
 
-export async function computeBuildingStats(root: string, now: number): Promise<BuildingStatsResponse> {
+export async function computeBuildingStats(
+  root: string,
+  now: number,
+  config: MappingConfig = DEFAULT_MAPPING,
+): Promise<BuildingStatsResponse> {
   const ds = new Date(now);
   ds.setHours(0, 0, 0, 0);
   const dayStart = ds.getTime();
@@ -125,7 +139,7 @@ export async function computeBuildingStats(root: string, now: number): Promise<B
     try {
       const s = await stat(path);
       if (now - s.mtimeMs > MONTH) continue; // plik bez zdarzeń w oknie 30 dni
-      await scanFile(path, acc, now, dayStart);
+      await scanFile(path, acc, now, dayStart, config);
     } catch {
       /* pomiń nieczytelny plik */
     }
@@ -145,6 +159,17 @@ export async function computeBuildingStats(root: string, now: number): Promise<B
 // Cache: skan jest kosztowny (wiele sesji × 30 dni) → liczymy najwyżej raz/min.
 let cache: { at: number; data: BuildingStatsResponse } | undefined;
 let inflight: Promise<BuildingStatsResponse> | undefined;
+// Licznik epok: inwalidacja go bije; przelot zapisuje cache TYLKO gdy epoka
+// nie zmieniła się od jego startu. Inaczej PUT w trakcie skanu utrwaliłby wynik
+// policzony STARYM configiem na cały TTL.
+let epoch = 0;
+
+/** Po edycji mapy (PUT /tool-mapping) zrzuć cache, żeby liczby nadążyły za nowym configiem. */
+export function invalidateBuildingStatsCache(): void {
+  cache = undefined;
+  inflight = undefined; // porzuć trwający przelot — jego wynik jest już nieświeży
+  epoch++;
+}
 
 export async function getBuildingStats(
   root = join(homedir(), '.claude', 'projects'),
@@ -152,14 +177,19 @@ export async function getBuildingStats(
   const now = Date.now();
   if (cache && now - cache.at < CACHE_TTL) return cache.data;
   if (inflight) return inflight;
-  inflight = computeBuildingStats(root, now)
+  const startEpoch = epoch;
+  inflight = loadMappingConfig()
+    .then((config) => computeBuildingStats(root, now, config))
     .then((data) => {
-      cache = { at: Date.now(), data };
-      inflight = undefined;
+      // Zapisz cache tylko, jeśli w międzyczasie nie unieważniono mapy.
+      if (epoch === startEpoch) {
+        cache = { at: Date.now(), data };
+        inflight = undefined;
+      }
       return data;
     })
     .catch((err) => {
-      inflight = undefined;
+      if (epoch === startEpoch) inflight = undefined;
       throw err;
     });
   return inflight;
