@@ -56,6 +56,7 @@ export interface UiStrings {
   agents: string;
   allCities: string;
   language: string;
+  flipCity: string;
   symbols: string;
   edges: string;
   communities: string;
@@ -150,6 +151,7 @@ const EN: UiStrings = {
   agents: 'agents',
   allCities: 'All',
   language: 'Language',
+  flipCity: 'Mirror city horizontally',
   symbols: 'Symbols',
   edges: 'Edges',
   communities: 'Communities',
@@ -243,6 +245,7 @@ const PL: UiStrings = {
   agents: 'agentów',
   allCities: 'Wszystkie',
   language: 'Język',
+  flipCity: 'Odbij miasto poziomo',
   symbols: 'Symbole',
   edges: 'Krawędzie',
   communities: 'Społeczności',
@@ -336,6 +339,7 @@ const IT: UiStrings = {
   agents: 'agenti',
   allCities: 'Tutte',
   language: 'Lingua',
+  flipCity: 'Ribalta la citta in orizzontale',
   symbols: 'Simboli',
   edges: 'Archi',
   communities: 'Comunità',
