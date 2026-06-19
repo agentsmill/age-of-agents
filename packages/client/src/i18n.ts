@@ -90,6 +90,23 @@ export interface UiStrings {
   pattern: string;
   remove: string;
   addTriggerConfirm: string;
+  // Zakładka Modele
+  tabBuildingReactions: string;
+  tabModels: string;
+  models: string;
+  modelsHint: string;
+  spriteAndName: string;
+  contextWindowSection: string;
+  seenModels: string;
+  usesFallback: string;
+  matchExact: string;
+  matchPattern: string;
+  matchValue: string;
+  spriteLabel: string;
+  displayNameLabel: string;
+  windowLabel: string;
+  fallbackLabel: string;
+  addRow: string;
 }
 
 const EN: UiStrings = {
@@ -183,6 +200,22 @@ const EN: UiStrings = {
   pattern: 'regex',
   remove: 'Remove',
   addTriggerConfirm: 'Add trigger',
+  tabBuildingReactions: 'Building reactions',
+  tabModels: 'Models',
+  models: 'Models',
+  modelsHint: 'Tell the world how to recognize each model: which character it appears as, and how big its context window is. The 1M tag matters for the window. Edit visually or as JSON — both stay in sync.',
+  spriteAndName: 'Character & name',
+  contextWindowSection: 'Context window',
+  seenModels: 'Models in your sessions',
+  usesFallback: 'falls back to default',
+  matchExact: 'exact id',
+  matchPattern: 'contains',
+  matchValue: 'model text',
+  spriteLabel: 'character',
+  displayNameLabel: 'display name',
+  windowLabel: 'tokens',
+  fallbackLabel: 'Default (unmatched)',
+  addRow: '+ add',
 };
 
 const PL: UiStrings = {
@@ -276,6 +309,22 @@ const PL: UiStrings = {
   pattern: 'regex',
   remove: 'Usuń',
   addTriggerConfirm: 'Dodaj wyzwalacz',
+  tabBuildingReactions: 'Reakcje budynków',
+  tabModels: 'Modele',
+  models: 'Modele',
+  modelsHint: 'Powiedz światu, jak rozpoznać każdy model: jako który bohater się pokazuje i jak duże ma okno kontekstu. Tag 1M ma znaczenie dla okna. Edytuj wizualnie albo jako JSON — oba są zsynchronizowane.',
+  spriteAndName: 'Bohater i nazwa',
+  contextWindowSection: 'Okno kontekstu',
+  seenModels: 'Modele w Twoich sesjach',
+  usesFallback: 'spada na domyślne',
+  matchExact: 'dokładne id',
+  matchPattern: 'zawiera',
+  matchValue: 'tekst modelu',
+  spriteLabel: 'bohater',
+  displayNameLabel: 'nazwa',
+  windowLabel: 'tokeny',
+  fallbackLabel: 'Domyślne (niedopasowane)',
+  addRow: '+ dodaj',
 };
 
 const IT: UiStrings = {
@@ -369,6 +418,22 @@ const IT: UiStrings = {
   pattern: 'regex',
   remove: 'Rimuovi',
   addTriggerConfirm: 'Aggiungi trigger',
+  tabBuildingReactions: 'Reazioni degli edifici',
+  tabModels: 'Modelli',
+  models: 'Modelli',
+  modelsHint: 'Indica al mondo come riconoscere ogni modello: con quale personaggio appare e quanto è grande la sua finestra di contesto. Il tag 1M conta per la finestra. Modifica visivamente o come JSON — restano sincronizzati.',
+  spriteAndName: 'Personaggio e nome',
+  contextWindowSection: 'Finestra di contesto',
+  seenModels: 'Modelli nelle tue sessioni',
+  usesFallback: 'usa il predefinito',
+  matchExact: 'id esatto',
+  matchPattern: 'contiene',
+  matchValue: 'testo del modello',
+  spriteLabel: 'personaggio',
+  displayNameLabel: 'nome',
+  windowLabel: 'token',
+  fallbackLabel: 'Predefinito (non abbinato)',
+  addRow: '+ aggiungi',
 };
 
 const UI: Record<Lang, UiStrings> = { en: EN, pl: PL, it: IT };
