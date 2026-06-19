@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Sprite, TextureStyle } from 'pixi.js';
+import { Application, Container, Graphics, Sprite, Text, TextureStyle } from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
 import type { HeroSnapshot, MissionSnapshot, PeonSnapshot } from '@agent-citadel/shared';
 import { useWorld } from '../store';
@@ -90,7 +90,7 @@ export class GameView {
   private targets = new Map<string, string>();
   private lastBuilding = new Map<string, BuildingId>(); // ostatni warsztat — tu jednostka „mieszka", nie w Twierdzy
   private wanderAt = new Map<string, number>(); // elapsed następnego drobnego spaceru bezczynnego bohatera
-  private worldOffset = { x: 0, y: 0 };
+  private worldLayer!: Container;
   private worldWidth = 0;
   private worldHeight = 0;
   private userZoomed = false; // wheel/pinch/kontrolki — wstrzymuje auto-dopasowanie przy resize
@@ -107,6 +107,7 @@ export class GameView {
   constructor(
     private readonly theme: ThemeDef,
     private readonly lang: Lang = 'en',
+    private readonly flipped = false,
   ) {
     this.graph = new WaypointGraph(theme);
   }
@@ -195,9 +196,9 @@ export class GameView {
     refit();
 
     // Warstwa świata przesunięta tak, by współrzędne ujemne (izo) mieściły się w viewporcie.
-    const worldLayer = new Container();
-    worldLayer.position.set(-minX, -minY);
-    this.worldOffset = { x: -minX, y: -minY };
+    const worldLayer = (this.worldLayer = new Container());
+    worldLayer.scale.x = this.flipped ? -1 : 1;
+    worldLayer.position.set(this.flipped ? maxX : -minX, -minY);
     this.viewport.addChild(worldLayer);
 
     // Assety/tilesety PixelLab MUSZĄ być załadowane PRZED budową terenu/budynków/dekoracji.
@@ -226,6 +227,7 @@ export class GameView {
     for (const def of this.theme.buildings) {
       const label = buildingText(this.theme.id, def.id, this.lang).label;
       const node = buildBuilding(def, this.theme, projection, label);
+      if (this.flipped) this.flipTextNodes(node);
       node.eventMode = 'static';
       node.cursor = 'pointer';
       node.on('pointertap', () => useWorld.getState().selectBuilding(def.id));
@@ -301,7 +303,7 @@ export class GameView {
   centerOn(gx: number, gy: number): void {
     const { x, y } = this.theme.projection.toScreen(gx, gy);
     this.viewport.animate({
-      position: { x: x + this.worldOffset.x, y: y + this.worldOffset.y },
+      position: this.worldToViewport(x, y),
       time: 350,
       ease: 'easeInOutSine',
     });
@@ -329,7 +331,7 @@ export class GameView {
     }
     const { x, y } = this.theme.projection.toScreen(unit.gx, unit.gy);
     this.viewport.animate({
-      position: { x: x + this.worldOffset.x, y: y + this.worldOffset.y },
+      position: this.worldToViewport(x, y),
       scale: target,
       time: 350,
       ease: 'easeInOutSine',
@@ -341,7 +343,22 @@ export class GameView {
     const unit = this.units.get(id);
     if (!unit) return;
     const { x, y } = this.theme.projection.toScreen(unit.gx, unit.gy);
-    this.viewport.moveCenter(x + this.worldOffset.x, y + this.worldOffset.y);
+    const p = this.worldToViewport(x, y);
+    this.viewport.moveCenter(p.x, p.y);
+  }
+
+  private worldToViewport(sx: number, sy: number): { x: number; y: number } {
+    return {
+      x: this.worldLayer.position.x + this.worldLayer.scale.x * sx,
+      y: this.worldLayer.position.y + this.worldLayer.scale.y * sy,
+    };
+  }
+
+  private flipTextNodes(node: Container): void {
+    for (const child of node.children) {
+      if (child instanceof Text) child.scale.x = -1;
+      else this.flipTextNodes(child as Container);
+    }
   }
 
   /** Mnożnik zoomu (kontrolki HUD +/−). Trzymany w granicach clampZoom (cover … MAX_ZOOM). */
@@ -441,6 +458,7 @@ export class GameView {
         unit.container.on('pointertap', () => useWorld.getState().select(sessionId));
         this.units.set(hero.sessionId, unit);
         this.unitLayer.addChild(unit.container);
+        if (this.flipped) this.flipTextNodes(unit.container);
         // Zapamiętaj budynek „domowy" — w przeciwnym razie idle/thinking
         // bohaterowie wracają do Twierdzy (fallback w steer/wanderIdle) i stoi
         // ich w piazza. Z domem pamiętanym wracają pod właściwy punkt zbiórki.
@@ -468,6 +486,7 @@ export class GameView {
         unit.container.on('pointertap', () => useWorld.getState().select(parentId));
         this.units.set(peon.agentId, unit);
         this.unitLayer.addChild(unit.container);
+        if (this.flipped) this.flipTextNodes(unit.container);
       }
       unit.setState(peon.state, peon.currentTool);
       this.steer(unit, peon.state, peon.currentTool, undefined, 0);

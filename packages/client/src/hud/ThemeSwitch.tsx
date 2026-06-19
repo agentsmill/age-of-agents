@@ -18,6 +18,8 @@ export function ThemeSwitch() {
   const setTheme = useSettings((s) => s.setTheme);
   const lang = useSettings((s) => s.lang);
   const setLang = useSettings((s) => s.setLang);
+  const flipped = useSettings((s) => s.flipped);
+  const setFlipped = useSettings((s) => s.setFlipped);
   const t = useUi();
 
   const [langOpen, setLangOpen] = useState(false);
@@ -118,6 +120,16 @@ export function ThemeSwitch() {
           </div>
         )}
       </div>
+
+      <button
+        className="ghost"
+        style={flipped ? { background: '#3b3b35' } : undefined}
+        onClick={() => setFlipped(!flipped)}
+        aria-label={t.flipCity}
+        aria-pressed={flipped}
+      >
+        ⇄
+      </button>
 
       {/* ── Trybik: ustawienia (reakcje budynków) ── */}
       <button

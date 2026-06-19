@@ -7,6 +7,7 @@ import { useSettings } from './settings';
 export function GameCanvas() {
   const themeId = useSettings((s) => s.themeId);
   const lang = useSettings((s) => s.lang);
+  const flipped = useSettings((s) => s.flipped);
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -20,7 +21,7 @@ export function GameCanvas() {
     // szerokości 1 px (np. ukryta karta) psułby dopasowanie kamery.
     const tryInit = () => {
       if (view || host.clientWidth < 50 || host.clientHeight < 50) return;
-      view = new GameView(getTheme(themeId), lang);
+      view = new GameView(getTheme(themeId), lang, flipped);
       view.init(host).catch(console.error);
       observer?.disconnect();
     };
@@ -34,7 +35,7 @@ export function GameCanvas() {
       view?.destroy();
     };
     // Zmiana motywu LUB języka przebudowuje scenę (etykiety budynków z i18n).
-  }, [themeId, lang]);
+  }, [themeId, lang, flipped]);
 
   return <div ref={hostRef} style={{ position: 'absolute', inset: 0 }} />;
 }
