@@ -51,7 +51,7 @@ A glanceable, second-monitor view of what your agents are quietly up to.
 
 ## 🚀 Quick start
 
-Run it instantly, no install:
+**Quick run — `npx`.** No install, and it always fetches the latest release (handy since new versions ship often):
 
 ```bash
 npx age-of-agents          # watches ~/.claude, ~/.codex, ~/.opencode & ~/.koda sessions (+ Claude in local Docker containers), prints the URL
@@ -59,7 +59,7 @@ npx age-of-agents --demo   # calm demo mode (fake sessions)
 npx age-of-agents --open   # also open the browser
 ```
 
-Or install globally (commands `age-of-agents` and the shorter `aoa`):
+**Regular use — `npm i -g`.** Install it globally for a faster start and the short `aoa` command. You own the updates here, so run `npm update -g age-of-agents` now and then:
 
 ```bash
 npm i -g age-of-agents

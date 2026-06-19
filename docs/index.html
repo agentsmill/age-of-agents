@@ -291,10 +291,14 @@
       </div>
       <div class="term rv" data-d="1">
         <div class="top"><i style="background:#8fc065"></i><i style="background:#e0b64a"></i><i style="background:#7fb6c4"></i><span class="t">zsh — age-of-agents</span></div>
-<pre><span class="c"># run it instantly — watches ~/.claude, ~/.codex, ~/.opencode &amp; ~/.koda sessions</span>
+<pre><span class="c"># quick run with npx — no install, always the latest release</span>
 <span class="p">❯</span> <span class="cmd">npx <span class="g">age-of-agents</span></span>            <span class="c"># prints the URL</span>
 <span class="p">❯</span> <span class="cmd">npx age-of-agents <span class="g">--demo</span></span>     <span class="c"># calm demo, fake sessions</span>
 <span class="p">❯</span> <span class="cmd">npx age-of-agents <span class="g">--open</span></span>     <span class="c"># open the browser too</span>
+
+<span class="c"># regular use — install globally for the short `aoa` command</span>
+<span class="p">❯</span> <span class="cmd">npm i -g <span class="g">age-of-agents</span></span>
+<span class="p">❯</span> <span class="cmd">aoa <span class="g">--open</span></span>
 
 <span class="c"># or from source</span>
 <span class="p">❯</span> <span class="cmd">git clone https://github.com/agentsmill/age-of-agents</span>
