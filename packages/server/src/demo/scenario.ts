@@ -27,6 +27,7 @@ function makeHero(world: World, sessionId: string, title: string): HeroSnapshot 
     teamColor: world.claimTeamColor(),
     state: 'idle',
     tokens: { input: 0, output: 0 },
+    contextTokens: 24_000, // bieżący rozmiar kontekstu — pasek startuje widoczny, rośnie w patch()
     startedAt: now,
     lastActivityAt: now,
   };
@@ -49,6 +50,8 @@ function patch(
     toolDetail: undefined,
     ...fields,
     tokens,
+    // Symuluj rosnący kontekst (cap 900k), by pasek zapełniał się w trakcie pętli.
+    contextTokens: Math.min(900_000, (hero.contextTokens ?? 24_000) + 16_000),
     lastActivityAt: new Date().toISOString(),
   });
 }
