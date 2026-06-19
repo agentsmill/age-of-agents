@@ -315,6 +315,179 @@ export function validateMapping(
   return { ok: true, config: { rules: cleanRules, fallback: obj.fallback } };
 }
 
+// ── Rejestr modeli (DANE) — bliźniak MappingConfig ──────────────────────────
+// Dwie osie z RÓŻNYM dopasowaniem: tożsamość (sprite + nazwa) łapie BAZOWY model
+// i ignoruje tag [1m]; pojemność (okno kontekstu) honoruje [1m] (wariant 1M).
+// Każda tabela: pierwsze trafienie wygrywa (kolejność = priorytet).
+
+/** Pula dostępnych sprite'ów bohaterów — JEDNO źródło prawdy (klient importuje to). */
+export const SPRITE_IDS = ['opus', 'sonnet', 'haiku', 'fable'] as const;
+export type SpriteId = (typeof SPRITE_IDS)[number];
+
+const SPRITE_ID_SET: ReadonlySet<string> = new Set(SPRITE_IDS);
+/** Czy string jest znanym SpriteId (runtime guard dla walidacji). */
+export function isSpriteId(value: unknown): value is SpriteId {
+  return typeof value === 'string' && SPRITE_ID_SET.has(value);
+}
+
+/** Dopasowanie wpisu do stringa modelu w runtime. */
+export type ModelMatch =
+  | { kind: 'exact'; id: string }          // pełna równość (case-insensitive)
+  | { kind: 'pattern'; pattern: string };  // podciąg (case-insensitive)
+
+/** Reguła tożsamości: model → sprite (+ nazwa). Ignoruje [1m]. */
+export interface SpriteRule {
+  match: ModelMatch;
+  sprite: SpriteId;
+  displayName?: string;
+}
+
+/** Reguła pojemności: model → okno kontekstu w tokenach. [1m] ma tu znaczenie. */
+export interface WindowRule {
+  match: ModelMatch;
+  contextWindow: number;
+}
+
+/** Edytowalny rejestr modeli (DANE, nie kod). */
+export interface ModelConfig {
+  sprites: SpriteRule[];
+  windows: WindowRule[];
+  fallback: { sprite: SpriteId; contextWindow: number };
+}
+
+/** Rozwiązane metadane modelu (do renderu). */
+export interface ResolvedModel {
+  sprite: SpriteId;
+  displayName?: string;
+  contextWindow: number;
+}
+
+/** Czy `match` trafia w string modelu (case-insensitive). */
+export function matchModel(model: string, match: ModelMatch): boolean {
+  const m = model.toLowerCase();
+  if (match.kind === 'exact') return m === match.id.toLowerCase();
+  return m.includes(match.pattern.toLowerCase());
+}
+
+/** Tożsamość: pierwszy trafiony SpriteRule; inaczej fallback.sprite. */
+export function resolveSprite(
+  model: string | undefined,
+  cfg: ModelConfig,
+): { sprite: SpriteId; displayName?: string } {
+  if (model) {
+    for (const r of cfg.sprites) {
+      if (matchModel(model, r.match)) return { sprite: r.sprite, displayName: r.displayName };
+    }
+  }
+  return { sprite: cfg.fallback.sprite };
+}
+
+/** Pojemność: pierwszy trafiony WindowRule; inaczej fallback.contextWindow. */
+export function resolveContextWindow(model: string | undefined, cfg: ModelConfig): number {
+  if (model) {
+    for (const r of cfg.windows) {
+      if (matchModel(model, r.match)) return r.contextWindow;
+    }
+  }
+  return cfg.fallback.contextWindow;
+}
+
+/** Złączenie obu osi (wygoda konsumentów). */
+export function resolveModel(model: string | undefined, cfg: ModelConfig): ResolvedModel {
+  const { sprite, displayName } = resolveSprite(model, cfg);
+  return { sprite, displayName, contextWindow: resolveContextWindow(model, cfg) };
+}
+
+/**
+ * Wbudowany rejestr = dotychczasowe zachowanie paska (200k bazowo, 1M dla [1m])
+ * wyrażone jako DANE + presety tożsamości. Wartości okien Claude potwierdzone
+ * przez skill claude-api; modele nie-Claude lądują na fallbacku do konfiguracji.
+ */
+export const DEFAULT_MODEL_CONFIG: ModelConfig = {
+  sprites: [
+    { match: { kind: 'pattern', pattern: 'opus' }, sprite: 'opus', displayName: 'Opus 4.8' },
+    { match: { kind: 'pattern', pattern: 'sonnet' }, sprite: 'sonnet', displayName: 'Sonnet 4.6' },
+    { match: { kind: 'pattern', pattern: 'haiku' }, sprite: 'haiku', displayName: 'Haiku 4.5' },
+    { match: { kind: 'pattern', pattern: 'fable' }, sprite: 'fable', displayName: 'Fable 5' },
+  ],
+  windows: [
+    { match: { kind: 'pattern', pattern: '[1m]' }, contextWindow: 1_000_000 }, // tag 1M bije bazowe
+    { match: { kind: 'pattern', pattern: 'opus' }, contextWindow: 200_000 },
+    { match: { kind: 'pattern', pattern: 'sonnet' }, contextWindow: 200_000 },
+    { match: { kind: 'pattern', pattern: 'haiku' }, contextWindow: 200_000 },
+    { match: { kind: 'pattern', pattern: 'fable' }, contextWindow: 200_000 },
+  ],
+  fallback: { sprite: 'sonnet', contextWindow: 200_000 },
+};
+
+/** Waliduje surowy obiekt na ModelConfig. Buduje CZYSTY config (bez nadmiarowych pól). */
+export function validateModelConfig(
+  input: unknown,
+): { ok: true; config: ModelConfig } | { ok: false; error: string } {
+  if (typeof input !== 'object' || input === null) {
+    return { ok: false, error: 'Config musi być obiektem.' };
+  }
+  const obj = input as Record<string, unknown>;
+  if (!Array.isArray(obj.sprites)) return { ok: false, error: 'Brakuje tablicy "sprites".' };
+  if (!Array.isArray(obj.windows)) return { ok: false, error: 'Brakuje tablicy "windows".' };
+  if (typeof obj.fallback !== 'object' || obj.fallback === null) {
+    return { ok: false, error: 'Brakuje obiektu "fallback".' };
+  }
+  const fb = obj.fallback as Record<string, unknown>;
+  if (!isSpriteId(fb.sprite)) return { ok: false, error: `Nieznany "fallback.sprite": ${String(fb.sprite)}.` };
+  if (typeof fb.contextWindow !== 'number' || !(fb.contextWindow > 0)) {
+    return { ok: false, error: 'Pole "fallback.contextWindow" musi być liczbą > 0.' };
+  }
+
+  const cleanMatch = (
+    raw: unknown,
+    where: string,
+  ): { ok: true; match: ModelMatch } | { ok: false; error: string } => {
+    if (typeof raw !== 'object' || raw === null) return { ok: false, error: `${where}: "match" nie jest obiektem.` };
+    const mm = raw as Record<string, unknown>;
+    if (mm.kind === 'exact') {
+      if (typeof mm.id !== 'string' || !mm.id) return { ok: false, error: `${where}: "exact" wymaga niepustego "id".` };
+      return { ok: true, match: { kind: 'exact', id: mm.id } };
+    }
+    if (mm.kind === 'pattern') {
+      if (typeof mm.pattern !== 'string' || !mm.pattern) return { ok: false, error: `${where}: "pattern" wymaga niepustego "pattern".` };
+      return { ok: true, match: { kind: 'pattern', pattern: mm.pattern } };
+    }
+    return { ok: false, error: `${where}: nieznany "match.kind" ${String(mm.kind)}.` };
+  };
+
+  const sprites: SpriteRule[] = [];
+  for (let i = 0; i < obj.sprites.length; i++) {
+    const raw = obj.sprites[i];
+    if (typeof raw !== 'object' || raw === null) return { ok: false, error: `sprites[${i}]: nie jest obiektem.` };
+    const r = raw as Record<string, unknown>;
+    const m = cleanMatch(r.match, `sprites[${i}]`);
+    if (!m.ok) return m;
+    if (!isSpriteId(r.sprite)) return { ok: false, error: `sprites[${i}]: nieznany "sprite" ${String(r.sprite)}.` };
+    const rule: SpriteRule = { match: m.match, sprite: r.sprite };
+    if (r.displayName !== undefined) {
+      if (typeof r.displayName !== 'string') return { ok: false, error: `sprites[${i}]: "displayName" musi być stringiem.` };
+      rule.displayName = r.displayName;
+    }
+    sprites.push(rule);
+  }
+
+  const windows: WindowRule[] = [];
+  for (let i = 0; i < obj.windows.length; i++) {
+    const raw = obj.windows[i];
+    if (typeof raw !== 'object' || raw === null) return { ok: false, error: `windows[${i}]: nie jest obiektem.` };
+    const r = raw as Record<string, unknown>;
+    const m = cleanMatch(r.match, `windows[${i}]`);
+    if (!m.ok) return m;
+    if (typeof r.contextWindow !== 'number' || !(r.contextWindow > 0)) {
+      return { ok: false, error: `windows[${i}]: "contextWindow" musi być liczbą > 0.` };
+    }
+    windows.push({ match: m.match, contextWindow: r.contextWindow });
+  }
+
+  return { ok: true, config: { sprites, windows, fallback: { sprite: fb.sprite, contextWindow: fb.contextWindow } } };
+}
+
 /** Zużycie tokenów (wyjściowych) budynku w oknach czasowych. */
 export interface BuildingWindowStats {
   today: number;
