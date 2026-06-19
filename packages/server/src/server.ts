@@ -5,6 +5,8 @@ import { World } from './world.js';
 import { registerMappingRoutes } from './mapping-routes.js';
 import { registerModelRoutes } from './model-routes.js';
 import { OpenCodePoller } from './sources/opencode-poller.js';
+import { DockerPoller } from './sources/docker-poller.js';
+import { CliDockerClient } from './sources/docker-client.js';
 import { ArsenalPoller } from './arsenal/arsenal-poller.js';
 
 export interface StartServerOptions {
@@ -49,6 +51,8 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     
     // OpenCode używa SQLite zamiast JSONL - uruchom poller
     const opencodePoller = new OpenCodePoller(world);
+    // Kontenery Docker: poller czyta pliki sesji przez `docker exec` (pull).
+    const dockerPoller = new DockerPoller(world, new CliDockerClient());
 
     app.get('/building-stats', async () => getBuildingStats());
     // Mapa narzędzie→budynek: lokalny serwer = źródło prawdy (plik na dysku usera);
@@ -73,6 +77,9 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     app.addHook('onReady', async () => {
       for (const w of watchers) w.start();
       await opencodePoller.start();
+      // Świadomie `void` — start pollera nie może opóźniać gotowości serwera;
+      // poller sam jest odporny na brak Dockera.
+      void dockerPoller.start();
       // `arsenal-updated` event do klienta (panel Arsenału).
       new ArsenalPoller(world).start();
       app.log.info(`Source watchers active: ${watchers.map((w) => w.id).join(', ')}`);
