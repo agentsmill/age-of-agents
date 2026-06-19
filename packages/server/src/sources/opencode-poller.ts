@@ -29,7 +29,11 @@ const SESSION_RETENTION_MS = HISTORICAL_WINDOW_MS;
 
 function isSchemaMismatchError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err);
-  return /no such column/i.test(message) || /has no column named/i.test(message);
+  // Trwały dryf schematu OpenCode: usunięta kolumna („no such column") albo
+  // usunięta/przemianowana tabela („no such table" — query robi LEFT JOIN project).
+  // To są błędy z SELECT-a; „has no column named" pochodzi tylko z INSERT/UPDATE,
+  // a baza jest otwierana readonly, więc tu nieosiągalne.
+  return /no such column/i.test(message) || /no such table/i.test(message);
 }
 
 interface SessionState {
@@ -145,7 +149,9 @@ export class OpenCodePoller {
         await this.stop();
         return;
       }
-      console.warn('[OpenCode] Poll error:', err instanceof Error ? err.message : String(err));
+      // Nieoczekiwany/przejściowy błąd: zachowaj pełny obiekt (stack) — to klasa
+      // błędów, gdzie ślad jest najcenniejszy. Spam ogranicza tylko gałąź schema-stop.
+      console.error('[OpenCode] Poll error:', err);
     }
   }
 
