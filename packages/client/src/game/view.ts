@@ -9,6 +9,7 @@ import { buildBuilding, drawRoads, drawTerrain, TEAM_COLORS } from './placeholde
 import { Unit } from './unit';
 import { getHeroSheet, getPeonSheet, loadThemeSprites } from './sprites';
 import { sessionToArchetypeKey } from './archetype';
+import { resolveModelLive } from '../model-store';
 import { loadTilemaps, hasTilemaps, buildTilemap } from './tilemap';
 import { loadBuildingSprites, getBuildingSprite } from './building-sprites';
 import { loadDecorationSprites, getDecorationTexture } from './decoration-sprites';
@@ -432,7 +433,7 @@ export class GameView {
         const home = this.building(homeId);
         const o = heroSpawnScatter(hero.sessionId);
         const door = { gx: home.door.gx + o.dx, gy: home.door.gy + o.dy };
-        const sheet = getHeroSheet(sessionToArchetypeKey(hero));
+        const sheet = getHeroSheet(sessionToArchetypeKey(hero, resolveModelLive(hero.model).sprite));
         unit = new Unit(hero.sessionId, hero.teamColor, false, clipName(hero.title), door, this.theme.projection, sheet, hero.agent ?? 'claude', this.theme.heroSprite.scale, this.theme.heroSprite.footAnchor);
         unit.container.eventMode = 'static';
         unit.container.cursor = 'pointer';

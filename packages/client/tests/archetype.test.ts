@@ -2,6 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { sessionToArchetypeKey, stateToAnimation, archetypeKeyChain } from '../src/game/archetype';
 import type { HeroSnapshot } from '@agent-citadel/shared';
 
+describe('sessionToArchetypeKey — override sprite', () => {
+  const base = { permissionMode: 'default' } as HeroSnapshot;
+  it('spriteOverride wygrywa nad zgadywaniem z nazwy', () => {
+    expect(sessionToArchetypeKey({ ...base, model: 'llama3.1:8b' }, 'haiku')).toBe('haiku-default');
+  });
+  it('bez override — stara logika podciągu', () => {
+    expect(sessionToArchetypeKey({ ...base, model: 'claude-opus-4-8[1m]' })).toBe('opus-default');
+  });
+});
+
 const hero = (model?: string, permissionMode?: string): HeroSnapshot => ({
   sessionId: 's', title: 't', projectDir: '/p', teamColor: 0, state: 'idle',
   tokens: { input: 0, output: 0 }, startedAt: '', lastActivityAt: '',

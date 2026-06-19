@@ -1,4 +1,5 @@
 import type { HeroSnapshot, HeroStateKind } from '@agent-citadel/shared';
+import { SPRITE_IDS, type SpriteId } from '@agent-citadel/shared';
 
 /** Tory animacji generowane dla każdej postaci (1 kierunek = south + odbicie). */
 export type AnimationName = 'idle' | 'walk' | 'work';
@@ -6,7 +7,8 @@ export type AnimationName = 'idle' | 'walk' | 'work';
 /** Klucz atlasu, gdy kombinacja model×mode jest nieznana lub assetu brak. */
 export const ARCHETYPE_FALLBACK = 'sonnet-default';
 
-export const MODELS = ['opus', 'sonnet', 'haiku', 'fable'] as const;
+// Lista modeli = pula sprite'ów (jedno źródło prawdy w shared).
+export const MODELS = SPRITE_IDS;
 export const MODES = ['default', 'plan', 'acceptEdits', 'bypassPermissions'] as const;
 
 /**
@@ -16,12 +18,11 @@ export const MODES = ['default', 'plan', 'acceptEdits', 'bypassPermissions'] as 
  * (np. 'claude-opus-4-8[1m]') — znormalizuj do jednego z MODELS / MODES.
  * Nieznane → ARCHETYPE_FALLBACK. NIE generuje — tylko wybiera.
  */
-export function sessionToArchetypeKey(hero: HeroSnapshot): string {
-  // Model: dopasowanie po fragmencie, by łapać pełne id ('claude-opus-4-8[1m]' → opus).
-  const raw = (hero.model ?? '').toLowerCase();
-  const model = MODELS.find((m) => raw.includes(m));
+export function sessionToArchetypeKey(hero: HeroSnapshot, spriteOverride?: SpriteId): string {
+  // Override z rejestru modeli ma pierwszeństwo; inaczej dopasowanie po fragmencie nazwy.
+  const model: SpriteId | undefined =
+    spriteOverride ?? MODELS.find((m) => (hero.model ?? '').toLowerCase().includes(m));
   if (!model) return ARCHETYPE_FALLBACK; // nieznany/brak modelu → cały klucz na fallback
-  // Tryb: tylko znana wartość, inaczej 'default' (model nadal decyduje o wyglądzie).
   const mode = (MODES as readonly string[]).includes(hero.permissionMode ?? '')
     ? (hero.permissionMode as string)
     : 'default';
