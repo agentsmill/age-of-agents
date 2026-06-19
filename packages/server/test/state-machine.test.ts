@@ -30,6 +30,25 @@ describe('SessionTracker', () => {
     expect(world.getHero('sesja-1')?.state).toBe('awaiting-input');
   });
 
+  it('odpowiedź (tool-result sukces) gasi awaiting-input nawet bez bloku thinking', () => {
+    // Regresja: po odpowiedzi na AskUserQuestion bohater zostawał z żółtym "!".
+    // Sama odpowiedź (tool-result) musi wyprowadzić z awaiting-input → thinking.
+    const { world, tracker } = setup();
+    tracker.apply({ kind: 'tool-start', tool: 'AskUserQuestion', messageId: 'm1', ts: '2026-06-19T10:00:00.000Z' });
+    expect(world.getHero('sesja-1')?.state).toBe('awaiting-input');
+    tracker.apply({ kind: 'tool-result', isError: false, ts: '2026-06-19T10:00:05.000Z' });
+    expect(world.getHero('sesja-1')?.state).toBe('thinking');
+  });
+
+  it('tool-result (sukces) podczas working NIE rusza stanu', () => {
+    // Gaszenie dotyczy wyłącznie awaiting-input — zwykłe narzędzia zostają w working.
+    const { world, tracker } = setup();
+    tracker.apply({ kind: 'tool-start', tool: 'Bash', messageId: 'm1', ts: '2026-06-19T10:00:00.000Z' });
+    expect(world.getHero('sesja-1')?.state).toBe('working');
+    tracker.apply({ kind: 'tool-result', isError: false, ts: '2026-06-19T10:00:01.000Z' });
+    expect(world.getHero('sesja-1')?.state).toBe('working');
+  });
+
   it('turn-end kończy misję i wysyła bohatera do twierdzy', () => {
     const { world, events, tracker } = setup();
     tracker.apply({ kind: 'prompt', text: 'Zadanie', ts: '2026-06-13T10:00:00.000Z' });

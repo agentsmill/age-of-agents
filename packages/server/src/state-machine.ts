@@ -206,6 +206,11 @@ export class SessionTracker {
         if (fact.isError) {
           this.errorUntil = Date.now() + this.thresholds.errorFlashMs;
           this.patch({ state: 'error' }, fact.ts);
+        } else if (this.world.getHero(this.sessionId)?.state === 'awaiting-input') {
+          // Odpowiedź usera na AskUserQuestion/ExitPlanMode: gasimy "!" od razu.
+          // Nie czekamy, aż w transkrypcie pojawi się blok 'thinking' (bywa, że
+          // kontynuacja jest samym tekstem) — inaczej bohater wisiał w awaiting-input.
+          this.patch({ state: 'thinking', currentTool: undefined, toolDetail: undefined }, fact.ts);
         }
         break;
 

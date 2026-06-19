@@ -25,6 +25,18 @@ export interface HookPayload {
   tool_input?: Record<string, unknown>;
   model?: string;
   permission_mode?: string;
+  message?: string;
+}
+
+/**
+ * Notification odpala się DWOMA torami: realną prośbą o akcję ("Claude needs your
+ * permission to use Bash") oraz ciszą ~60 s po zakończonej turze ("Claude is waiting
+ * for your input"). Tylko ten pierwszy to pytanie do usera — drugi NIE ma podbijać
+ * spoczywającego bohatera w wieczny alarm "!". Wzorzec celowo wąski; nieznane
+ * komunikaty traktujemy zachowawczo jako alarm (zwracamy false).
+ */
+function isIdleWaitingNotice(message: string | undefined): boolean {
+  return typeof message === 'string' && /waiting for (your )?input/i.test(message);
 }
 
 export function translateHook(payload: HookPayload): { sessionId: string; projectDir: string; facts: Fact[] } | null {
@@ -56,7 +68,7 @@ export function translateHook(payload: HookPayload): { sessionId: string; projec
       facts.push({ kind: 'thinking', ts });
       break;
     case 'Notification':
-      facts.push({ kind: 'awaiting', ts });
+      if (!isIdleWaitingNotice(payload.message)) facts.push({ kind: 'awaiting', ts });
       break;
     case 'Stop':
       facts.push({ kind: 'turn-end', ts });
