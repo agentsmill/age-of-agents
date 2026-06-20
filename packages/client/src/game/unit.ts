@@ -2,6 +2,7 @@ import { AnimatedSprite, Container, Graphics, Sprite, Text, type Spritesheet } f
 import { resolveProvider, type AgentKind, type HeroStateKind } from '@agent-citadel/shared';
 import { getEmblemTexture } from './emblems';
 import type { Projection } from './projection';
+import type { NeonStyle } from '../theme/types';
 import type { PathNode } from './pathfind';
 import { buildUnitBody, labelStyle, teamColor } from './placeholders';
 import { stateToAnimation } from './archetype';
@@ -52,6 +53,8 @@ export class Unit {
     agent: AgentKind = 'claude',
     spriteScale: number = SPRITE_SCALE,
     spriteFootAnchor: number = SPRITE_FOOT_ANCHOR,
+    /** Gdy motyw neonowy (#cyberpunk) i brak sprite'a → abstrakcyjny świecący awatar. */
+    neon?: NeonStyle,
   ) {
     this.gx = start.gx;
     this.gy = start.gy;
@@ -69,7 +72,7 @@ export class Unit {
       this.body = new Container();
       this.body.addChild(sprite);
     } else {
-      this.body = buildUnitBody(teamColor(colorIndex), isPeon);
+      this.body = buildUnitBody(teamColor(colorIndex), isPeon, neon);
     }
 
     // Pierścień koloru drużyny u stóp — ZAWSZE widoczny (także pod spritem PixelLab),

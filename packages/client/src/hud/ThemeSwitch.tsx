@@ -74,6 +74,13 @@ export function ThemeSwitch() {
       >
         🛰️ {t.scifi}
       </button>
+      <button
+        className="ghost"
+        style={themeId === 'cyberpunk' ? { background: '#3b3b35' } : undefined}
+        onClick={() => setTheme('cyberpunk')}
+      >
+        🌃 {t.cyberpunk}
+      </button>
       <HooksPanel />
 
       {/* ── Język jako dropdown (zamiast cyklicznego przycisku) ── */}

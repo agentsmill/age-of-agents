@@ -15,6 +15,7 @@ import { useSettings, type Lang } from './settings';
 export interface UiStrings {
   fantasy: string;
   scifi: string;
+  cyberpunk: string;
   hooksOn: string;
   hooksOff: string;
   hooksTitle: string;
@@ -117,6 +118,7 @@ export interface UiStrings {
 const EN: UiStrings = {
   fantasy: 'Fantasy',
   scifi: 'Sci-Fi',
+  cyberpunk: 'Cyberpunk',
   hooksOn: '⚡ live: on',
   hooksOff: '⚡ live: off',
   hooksTitle: 'Update the world the instant your sessions do something (otherwise there is a ~1s delay)',
@@ -232,6 +234,7 @@ const EN: UiStrings = {
 const PL: UiStrings = {
   fantasy: 'Fantasy',
   scifi: 'Sci-Fi',
+  cyberpunk: 'Cyberpunk',
   hooksOn: '⚡ na żywo: wł',
   hooksOff: '⚡ na żywo: wył',
   hooksTitle: 'Aktualizuj świat w chwili, gdy Twoje sesje coś robią (inaczej jest ~1 s opóźnienia)',
@@ -347,6 +350,7 @@ const PL: UiStrings = {
 const IT: UiStrings = {
   fantasy: 'Fantasy',
   scifi: 'Sci-Fi',
+  cyberpunk: 'Cyberpunk',
   hooksOn: '⚡ live: on',
   hooksOff: '⚡ live: off',
   hooksTitle: "Aggiorna il mondo nell'istante in cui le tue sessioni fanno qualcosa (altrimenti c'è un ritardo di ~1s)",
@@ -471,10 +475,10 @@ export interface BuildingText {
   desc: string;
 }
 
-type ThemeId = 'fantasy' | 'scifi';
+type ThemeId = 'fantasy' | 'scifi' | 'cyberpunk';
 
 // Opis = co budynek REPREZENTUJE, zwykłym językiem (2 zdania, bez żargonu narzędzi).
-const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>> = {
+const BUILDINGS: Record<ThemeId, Record<BuildingId, Partial<Record<Lang, BuildingText>>>> = {
   fantasy: {
     citadel: {
       en: {
@@ -898,6 +902,27 @@ const BUILDINGS: Record<ThemeId, Record<BuildingId, Record<Lang, BuildingText>>>
       pl: { label: 'Świątynia', desc: 'Punkt zbiórki fantasy.' },
       it: { label: 'Santuario', desc: 'Punto di raccolta fantasy.' },
     },
+  },
+  // Cyberpunk — tylko EN (Partial<Record<Lang,...>>); pl/it spadają na en w buildingText.
+  cyberpunk: {
+    citadel: { en: { label: 'The Mainframe', desc: 'Home node. A session idles here between runs — planning its next move before it jacks back in.' } },
+    tower: { en: { label: 'Uplink', desc: 'The outside link. Agents reach the open net here — searching and pulling pages the project doesn’t hold.' } },
+    forge: { en: { label: 'Fabricator', desc: 'The workshop. Where agents actually write and rewrite code — forging features and patching what’s broken.' } },
+    library: { en: { label: 'The Archive', desc: 'Cold storage. Agents read and search the project’s files here to map how it all wires together.' } },
+    mine: { en: { label: 'Daemon Pit', desc: 'The engine pit. Agents run commands and tests here — building, executing, the heavy compute.' } },
+    barracks: { en: { label: 'Spawn Pool', desc: 'The staging pool. Big jobs spin up helper processes here, each taking a slice of the work at once.' } },
+    market: { en: { label: 'The Exchange', desc: 'The outbound port. Finished work ships from here — changes committed and pushed to the world.' } },
+    guild: { en: { label: 'The Nexus', desc: 'The connection hub. Agents reach external tools and services here — the plug-ins that extend them.' } },
+    holodeck: { en: { label: 'Sim-Deck', desc: 'A gathering node for a project’s active sessions.' } },
+    mess: { en: { label: 'Charging Bay', desc: 'A quieter node for sessions that are waiting or thinking.' } },
+    hydroponics: { en: { label: 'Bio-Vat', desc: 'A rest node for sessions that just finished their run.' } },
+    lounge: { en: { label: 'Neon Lounge', desc: 'A social node — sessions waiting on your call idle here.' } },
+    medbay: { en: { label: 'Repair Bay', desc: 'A recovery node for sessions that hit an error.' } },
+    arena: { en: { label: 'Arena', desc: 'Unused in cyberpunk.' } },
+    tavern: { en: { label: 'Tavern', desc: 'Unused in cyberpunk.' } },
+    garden: { en: { label: 'Garden', desc: 'Unused in cyberpunk.' } },
+    bar: { en: { label: 'Bar', desc: 'Unused in cyberpunk.' } },
+    shrine: { en: { label: 'Shrine', desc: 'Unused in cyberpunk.' } },
   },
 };
 

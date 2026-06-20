@@ -16,11 +16,12 @@ import type { ThemeDef } from '../theme/types';
 const HOME_BUILDINGS: Record<string, BuildingId[]> = {
   fantasy: ['arena', 'tavern', 'garden', 'bar', 'shrine'],
   scifi: ['holodeck', 'mess', 'hydroponics', 'lounge', 'medbay'],
+  cyberpunk: ['holodeck', 'mess', 'hydroponics', 'lounge', 'medbay'],
 };
 
 /** Budynek „poczekalni", do którego idzie bohater czekający na usera (awaiting-input).
  *  fantasy: kaplica (shrine); sci-fi: poczekalnia (lounge); fallback: citadel. */
-const AWAITING_BY_THEME: Record<string, BuildingId> = { fantasy: 'shrine', scifi: 'lounge' };
+const AWAITING_BY_THEME: Record<string, BuildingId> = { fantasy: 'shrine', scifi: 'lounge', cyberpunk: 'lounge' };
 export function awaitingBuilding(themeId: string): BuildingId {
   return AWAITING_BY_THEME[themeId] ?? 'citadel';
 }

@@ -6,6 +6,8 @@ import { resolveBuildingLive, useMapping } from '../mapping-store';
 import type { BuildingDef, BuildingId, ThemeDef } from '../theme/types';
 import { WaypointGraph } from './pathfind';
 import { buildBuilding, drawRoads, drawTerrain, TEAM_COLORS } from './placeholders';
+import { themeRoadCurves } from './roads';
+import { MatrixRain } from './matrix-rain';
 import { Unit } from './unit';
 import { getHeroSheet, getPeonSheet, loadThemeSprites } from './sprites';
 import { loadEmblems } from './emblems';
@@ -106,7 +108,8 @@ export class GameView {
   // (HUD to osobny DOM, więc nie jest tintowany).
   private dayNight = new ColorMatrixFilter();
   private lastTotalOutput = 0;
-  private tokenRate = 0; // wygładzona EMA tokenów/s
+  private dayLevel = 0; // 0=noc, 1=dzień — wygładzane SYMETRYCZNIE (świt tak powolny jak zmierzch)
+  private lastProduceAt = -999; // elapsed (s) ostatniej produkcji tokenów
   // Mission Thunderclap: rozchodzące się pierścienie przy ukończeniu misji.
   private shockwaves: { g: Graphics; life: number; maxLife: number; color: number }[] = [];
   // Tool Trail: ostatnia pozycja ekranowa, w której jednostka zostawiła ślad.
@@ -116,6 +119,11 @@ export class GameView {
   // Living Banners (#9): herb wybranego projektu nad twierdzą + jego klucz cache.
   private crest?: Container;
   private crestKey?: string;
+  // Cyberpunk: deszcz Matriksa (tło ekranowe) + neonowe „pakiety światła" płynące drogami.
+  private matrix?: MatrixRain;
+  private neonFlowLayer?: Container;
+  private neonPaths: { pts: { x: number; y: number }[]; cum: number[]; total: number }[] = [];
+  private neonMotes: { g: Graphics; path: number; dist: number; speed: number }[] = [];
   private missionStatus = new Map<string, string>();
   private graph: WaypointGraph;
   private unsubscribe?: () => void;
@@ -134,7 +142,8 @@ export class GameView {
   async init(host: HTMLElement): Promise<void> {
     TextureStyle.defaultOptions.scaleMode = 'nearest';
     await this.app.init({
-      background: 0x1a1a17,
+      // Cyberpunk → czysta czerń OLED (deszcz Matriksa świeci w pustce); reszta → ciepły grafit.
+      background: this.theme.neon ? 0x000000 : 0x1a1a17,
       resizeTo: host,
       antialias: false,
       roundPixels: true,
@@ -182,9 +191,18 @@ export class GameView {
     });
     this.viewport.drag().pinch().wheel().decelerate();
     this.viewport.clamp({ direction: 'all', underflow: 'center' });
+    // Cyberpunk: deszcz Matriksa POD viewportem (tło ekranowe). Dodany pierwszy →
+    // renderuje się za światem, w pustce dookoła unoszącego się miasta.
+    if (this.theme.neon) {
+      // Deszcz pada w barwach budynków realm (paleta placeholderColor) — spójny z miastem.
+      const palette = this.theme.buildings.map((b) => `#${b.placeholderColor.toString(16).padStart(6, '0')}`);
+      this.matrix = new MatrixRain(palette);
+      this.app.stage.addChild(this.matrix.view);
+    }
     this.app.stage.addChild(this.viewport);
-    // Realm Heartbeat: filtr dnia/nocy na całej scenie gry (zob. updateDayNight).
-    this.app.stage.filters = [this.dayNight];
+    // Realm Heartbeat: filtr dnia/nocy NA VIEWPORCIE (nie na stage) — świat „oddycha",
+    // ale deszcz Matriksa (sąsiad na stage) zostaje nietknięty czystą zielenią.
+    this.viewport.filters = [this.dayNight];
 
     // Ręczne sterowanie kamerą (zoom kółkiem, pinch, przeciągnięcie) przejmuje
     // kontrolę → zrywa autofollow. Inaczej followSelected co klatkę cofałby
@@ -203,6 +221,7 @@ export class GameView {
       const screenW = this.app.screen.width;
       const screenH = this.app.screen.height;
       if (screenW < 50 || screenH < 50) return;
+      this.matrix?.resize(screenW, screenH);
       this.viewport.resize(screenW, screenH, worldWidth, worldHeight);
       // cover (Math.max): teren ZAWSZE wypełnia ekran — koniec letterboxa/czarnych rogów.
       // Przybliżać można do MAX_ZOOM; oddalać nie da się poza „cover" (brak pustki).
@@ -243,6 +262,15 @@ export class GameView {
       worldLayer.addChild(drawTerrain(this.theme, projection));
     }
     worldLayer.addChild(drawRoads(this.theme, projection));
+
+    // Cyberpunk: „pakiety światła" płynące siecią dróg (świecące krople nad trasami).
+    // Warstwa tuż nad drogami, pod budynkami/jednostkami → światło sunie po gruncie.
+    if (this.theme.neon) {
+      this.neonFlowLayer = new Container();
+      this.neonFlowLayer.blendMode = 'add';
+      worldLayer.addChild(this.neonFlowLayer);
+      this.setupNeonFlow();
+    }
 
     // Budynki i jednostki we wspólnej warstwie sortowanej po głębokości —
     // w izometrii jednostka może zniknąć ZA budynkiem.
@@ -298,6 +326,8 @@ export class GameView {
       this.updateShockwaves(dt);
       this.updateDayNight(dt);
       this.dropFootprints();
+      this.matrix?.update(dt);
+      this.updateNeonFlow(dt);
     });
 
     this.unsubscribe = useWorld.subscribe((state) => {
@@ -324,6 +354,7 @@ export class GameView {
     if (activeView === this) activeView = undefined;
     this.unsubscribe?.();
     this.unsubscribeMapping?.();
+    this.matrix?.destroy();
     if (this.ready) this.app.destroy(true, { children: true }); // app.init() musiało się rozwiązać
   }
 
@@ -530,7 +561,7 @@ export class GameView {
         const o = heroSpawnScatter(hero.sessionId);
         const door = { gx: home.door.gx + o.dx, gy: home.door.gy + o.dy };
         const sheet = getHeroSheet(sessionToArchetypeKey(hero, resolveModelLive(hero.model).sprite));
-        unit = new Unit(hero.sessionId, hero.teamColor, false, clipName(hero.title), door, this.theme.projection, sheet, hero.agent ?? 'claude', this.theme.heroSprite.scale, this.theme.heroSprite.footAnchor);
+        unit = new Unit(hero.sessionId, hero.teamColor, false, clipName(hero.title), door, this.theme.projection, sheet, hero.agent ?? 'claude', this.theme.heroSprite.scale, this.theme.heroSprite.footAnchor, this.theme.neon);
         unit.container.eventMode = 'static';
         unit.container.cursor = 'pointer';
         const sessionId = hero.sessionId;
@@ -566,7 +597,7 @@ export class GameView {
         const door = this.building('barracks').door;
         const o = peonSpawnScatter(peon.agentId);
         const start = { gx: door.gx + o.dx, gy: door.gy + o.dy };
-        unit = new Unit(peon.agentId, this.parentColor(peon, heroes), true, clipName(peon.description ?? 'peon', 22), start, this.theme.projection, getPeonSheet());
+        unit = new Unit(peon.agentId, this.parentColor(peon, heroes), true, clipName(peon.description ?? 'peon', 22), start, this.theme.projection, getPeonSheet(), 'claude', undefined, undefined, this.theme.neon);
         unit.container.eventMode = 'static';
         unit.container.cursor = 'pointer';
         const parentId = peon.parentSessionId;
@@ -761,9 +792,14 @@ export class GameView {
     // Tylko dodatnie przyrosty: zniknięcie sesji obniża sumę, ale to nie „ujemna praca".
     const delta = Math.max(0, total - this.lastTotalOutput);
     this.lastTotalOutput = total;
-    const inst = dt > 0 ? delta / dt : 0; // chwilowe tempo tok/s
-    this.tokenRate += (inst - this.tokenRate) * Math.min(1, dt * 0.4);
-    const day = 1 - Math.exp(-this.tokenRate / 40); // ~40 tok/s ≈ pełne południe
+    if (delta > 0) this.lastProduceAt = this.elapsed; // właśnie była produkcja tokenów
+    // Cel: dzień, gdy ktoś produkował w ostatnich ~6 s (most nad ciszą myślenia); inaczej noc.
+    // Binarny cel zamiast spikującego TEMPA — paczka tokenów nie „przeskakuje" już od razu w dzień.
+    const target = this.elapsed - this.lastProduceAt < 6 ? 1 : 0;
+    // SYMETRYCZNE wygładzanie: TA SAMA stała czasowa w obie strony — świt jest teraz
+    // tak samo powolny jak zmierzch (koniec brzydkiego skoku noc→dzień).
+    this.dayLevel += (target - this.dayLevel) * Math.min(1, dt * 0.35);
+    const day = this.dayLevel;
     // Noc: przyciemniona i chłodna (więcej niebieskiego). Dzień: neutralna pełnia.
     const r = 0.55 + 0.45 * day;
     const g = 0.62 + 0.38 * day;
@@ -822,6 +858,56 @@ export class GameView {
         s.g.destroy();
         this.shockwaves.splice(i, 1);
       }
+    }
+  }
+
+  /**
+   * Cyberpunk: przygotuj geometrię „pakietów światła". Każda droga motywu →
+   * polilinia ekranowa z tablicą skumulowanych długości (do próbkowania pozycji).
+   * Na każdej trasie sieją się 1–2 świecące krople sunące w kółko.
+   */
+  private setupNeonFlow(): void {
+    const neon = this.theme.neon!;
+    const proj = this.theme.projection;
+    const palette = [neon.edge, neon.primary, neon.secondary, neon.tertiary];
+    for (const curve of themeRoadCurves(this.theme)) {
+      if (curve.length < 2) continue;
+      const pts = curve.map((p) => proj.toScreen(p.gx, p.gy));
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+      const total = cum[cum.length - 1];
+      if (total < 1) continue;
+      const pathIdx = this.neonPaths.push({ pts, cum, total }) - 1;
+      const count = total > this.theme.tile * 6 ? 2 : 1;
+      for (let k = 0; k < count; k++) {
+        const color = palette[(pathIdx + k) % palette.length];
+        const g = new Graphics();
+        g.circle(0, 0, 5).fill({ color, alpha: 0.22 }); // halo
+        g.circle(0, 0, 2).fill({ color: neon.edge, alpha: 0.95 }); // rdzeń
+        this.neonFlowLayer!.addChild(g);
+        this.neonMotes.push({
+          g,
+          path: pathIdx,
+          dist: (total * (k + Math.random())) / count,
+          speed: this.theme.tile * (1.4 + Math.random() * 1.2), // px/s wzdłuż trasy
+        });
+      }
+    }
+  }
+
+  /** Cyberpunk: przesuń pakiety światła wzdłuż dróg (zapętlone) z delikatnym tętnem. */
+  private updateNeonFlow(dt: number): void {
+    for (const m of this.neonMotes) {
+      const path = this.neonPaths[m.path];
+      m.dist = (m.dist + m.speed * dt) % path.total;
+      // Próbkuj pozycję na polilinii wg skumulowanej długości.
+      const { cum, pts } = path;
+      let i = 1;
+      while (i < cum.length - 1 && cum[i] < m.dist) i++;
+      const seg = cum[i] - cum[i - 1] || 1;
+      const t = (m.dist - cum[i - 1]) / seg;
+      m.g.position.set(pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t, pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t);
+      m.g.alpha = 0.7 + 0.3 * Math.sin(this.elapsed * 5 + m.path);
     }
   }
 
