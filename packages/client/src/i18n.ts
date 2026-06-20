@@ -20,6 +20,8 @@ export interface UiStrings {
   hooksTitle: string;
   hooksInstall: string;
   hooksUninstall: string;
+  hooksRepair: string;
+  hooksRepairShort: string;
   tokensOut: string;
   tokensIn: string;
   connecting: string;
@@ -123,6 +125,9 @@ const EN: UiStrings = {
   hooksInstall:
     'Turn on live updates?\n\nThe world will react the moment your Claude Code sessions do something, instead of with a ~1 second delay. This adds a small entry to your Claude Code settings file (a backup is saved first). Your existing settings are left untouched.',
   hooksUninstall: 'Turn off live updates? (your other settings stay untouched)',
+  hooksRepair:
+    'Repair live updates?\n\nThis replaces the old direct HTTP hook with a silent local shim. Live updates still work when Age of Agents is running, but Claude Code will stop showing hook errors when it is closed.',
+  hooksRepairShort: '⚡ live: repair',
   tokensOut: 'Total work the agents have produced',
   tokensIn: 'Total amount the agents have read',
   connecting: '○ connecting…',
@@ -237,6 +242,9 @@ const PL: UiStrings = {
   hooksInstall:
     'Włączyć aktualizacje na żywo?\n\nŚwiat będzie reagował w chwili, gdy Twoje sesje Claude Code coś zrobią, zamiast z ~1-sekundowym opóźnieniem. Dopisze to mały wpis do pliku ustawień Claude Code (najpierw powstaje kopia zapasowa). Twoje istniejące ustawienia pozostają nietknięte.',
   hooksUninstall: 'Wyłączyć aktualizacje na żywo? (Twoje pozostałe ustawienia zostają nietknięte)',
+  hooksRepair:
+    'Naprawić aktualizacje na żywo?\n\nTo zastąpi stary bezpośredni hook HTTP cichym lokalnym shimem. Aktualizacje nadal działają, gdy Age of Agents jest uruchomione, ale Claude Code przestanie pokazywać błędy hooków, gdy aplikacja jest zamknięta.',
+  hooksRepairShort: '⚡ live: napraw',
   tokensOut: 'Łączna praca wytworzona przez agentów',
   tokensIn: 'Łączna ilość, którą agenci przeczytali',
   connecting: '○ łączenie…',
@@ -351,6 +359,9 @@ const IT: UiStrings = {
   hooksInstall:
     "Attivare gli aggiornamenti in tempo reale?\n\nIl mondo reagirà nell'istante in cui le tue sessioni Claude Code faranno qualcosa, invece di avere un ritardo di ~1 secondo. Verrà aggiunta una piccola voce al file delle impostazioni di Claude Code (prima viene salvato un backup). Le tue impostazioni esistenti restano intatte.",
   hooksUninstall: 'Disattivare gli aggiornamenti in tempo reale? (le altre impostazioni restano intatte)',
+  hooksRepair:
+    "Riparare gli aggiornamenti in tempo reale?\n\nSostituisce il vecchio hook HTTP diretto con uno shim locale silenzioso. Gli aggiornamenti funzionano ancora quando Age of Agents è aperto, ma Claude Code smette di mostrare errori degli hook quando l'app è chiusa.",
+  hooksRepairShort: '⚡ live: ripara',
   tokensOut: 'Lavoro totale prodotto dagli agenti',
   tokensIn: "Quantità totale che gli agenti hanno letto",
   connecting: '○ connessione…',
