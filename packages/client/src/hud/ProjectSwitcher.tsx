@@ -160,7 +160,7 @@ export function ProjectSwitcher() {
       className="hud-panel px"
       style={{
         position: 'absolute',
-        top: 16,
+        top: 12,
         left: '50%',
         transform: 'translateX(-50%)',
         padding: 0,
