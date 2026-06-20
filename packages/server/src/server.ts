@@ -43,7 +43,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   } else {
     const { SourceWatcher } = await import('./watcher.js');
     const { SOURCES } = await import('./sources/index.js');
-    const { translateHook, hooksInstalled, installHooks, uninstallHooks } = await import('./hooks.js');
+    const { translateHook, hooksStatus, installHooks, uninstallHooks } = await import('./hooks.js');
     const { getBuildingStats, invalidateBuildingStatsCache } = await import('./building-stats.js');
     const watchers = SOURCES.map((source) => new SourceWatcher(world, source));
     // Hooki HTTP są kanałem Claude → kierujemy je do watchera Claude.
@@ -64,7 +64,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
       if (translated) claudeWatcher.applyExternalFacts(translated.sessionId, translated.projectDir, translated.facts, translated.cwd);
       return { ok: true };
     });
-    app.get('/hooks/status', async () => ({ installed: await hooksInstalled() }));
+    app.get('/hooks/status', async () => hooksStatus());
     app.post('/hooks/install', async () => {
       await installHooks();
       return { ok: true, installed: true };

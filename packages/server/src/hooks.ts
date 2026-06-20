@@ -12,6 +12,7 @@ import { toolDetail } from './transcript/parser.js';
  */
 
 export const HOOK_URL = `http://localhost:${SERVER_PORT}/hooks`;
+const HOOK_COMMAND_MARKER = 'age-of-agents-hook-shim';
 const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop'] as const;
 const MATCHER_EVENTS = new Set(['PreToolUse', 'PostToolUse']);
 
@@ -88,7 +89,7 @@ function settingsPath(): string {
   return join(homedir(), '.claude', 'settings.json');
 }
 
-type HookEntry = { matcher?: string; hooks: { type: string; url?: string; timeout?: number }[] };
+type HookEntry = { matcher?: string; hooks: { type: string; url?: string; command?: string; timeout?: number }[] };
 
 async function readSettings(): Promise<Record<string, any>> {
   try {
@@ -98,16 +99,54 @@ async function readSettings(): Promise<Record<string, any>> {
   }
 }
 
+function hookCommand(): string {
+  // Command hook shim: forwards Claude's stdin JSON when AoA is running, exits
+  // cleanly when it is not. This avoids global Claude Code HTTP-hook error spam.
+  const script = [
+    `const marker=${JSON.stringify(HOOK_COMMAND_MARKER)}`,
+    `const url=${JSON.stringify(HOOK_URL)}`,
+    `let body=''`,
+    `process.stdin.setEncoding('utf8')`,
+    `process.stdin.on('data', c => { body += c })`,
+    `process.stdin.on('end', async () => {`,
+    `  void marker`,
+    `  try {`,
+    `    await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: AbortSignal.timeout(300) })`,
+    `  } catch {}`,
+    `  process.exit(0)`,
+    `})`,
+    `setTimeout(() => process.exit(0), 600)`,
+  ].join(';');
+  return `node -e ${JSON.stringify(script)}`;
+}
+
 function isOurs(entry: HookEntry): boolean {
   return entry.hooks?.some((h) => h.type === 'http' && h.url === HOOK_URL) ?? false;
 }
 
+function isOursCommand(entry: HookEntry): boolean {
+  return entry.hooks?.some((h) => h.type === 'command' && h.command?.includes(HOOK_COMMAND_MARKER)) ?? false;
+}
+
+function isAnyOurs(entry: HookEntry): boolean {
+  return isOurs(entry) || isOursCommand(entry);
+}
+
 export async function hooksInstalled(): Promise<boolean> {
+  return (await hooksStatus()).installed;
+}
+
+export async function hooksStatus(): Promise<{ installed: boolean; needsMigration: boolean }> {
   const settings = await readSettings();
-  return HOOK_EVENTS.every((event) => {
+  let hasLegacy = false;
+  let hasAny = false;
+  const installed = HOOK_EVENTS.every((event) => {
     const entries: HookEntry[] = settings.hooks?.[event] ?? [];
-    return entries.some(isOurs);
+    hasLegacy ||= entries.some(isOurs);
+    hasAny ||= entries.some(isAnyOurs);
+    return entries.some(isOursCommand);
   });
+  return { installed, needsMigration: hasLegacy || (hasAny && !installed) };
 }
 
 /** Dopisuje nasze hooki (merge — cudzych wpisów nie rusza). Robi backup. */
@@ -122,10 +161,11 @@ export async function installHooks(): Promise<void> {
   settings.hooks ??= {};
   for (const event of HOOK_EVENTS) {
     const entries: HookEntry[] = (settings.hooks[event] ??= []);
-    if (entries.some(isOurs)) continue;
-    const entry: HookEntry = { hooks: [{ type: 'http', url: HOOK_URL, timeout: 5 }] };
+    if (entries.some(isOursCommand)) continue;
+    settings.hooks[event] = entries.filter((entry) => !isOurs(entry));
+    const entry: HookEntry = { hooks: [{ type: 'command', command: hookCommand(), timeout: 1 }] };
     if (MATCHER_EVENTS.has(event)) entry.matcher = '*';
-    entries.push(entry);
+    settings.hooks[event].push(entry);
   }
   await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
 }
@@ -135,7 +175,7 @@ export async function uninstallHooks(): Promise<void> {
   const settings = await readSettings();
   if (!settings.hooks) return;
   for (const event of Object.keys(settings.hooks)) {
-    settings.hooks[event] = (settings.hooks[event] as HookEntry[]).filter((entry) => !isOurs(entry));
+    settings.hooks[event] = (settings.hooks[event] as HookEntry[]).filter((entry) => !isAnyOurs(entry));
     if (settings.hooks[event].length === 0) delete settings.hooks[event];
   }
   await writeFile(settingsPath(), `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
