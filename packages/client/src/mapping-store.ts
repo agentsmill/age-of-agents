@@ -8,12 +8,12 @@ import {
 } from './theme/mapping';
 
 /**
- * Store edytowalnej mapy narzędzie→budynek. Lokalny serwer jest źródłem prawdy
- * (plik na dysku), ale klient trzyma optymistyczny cache, by świat reagował na
- * zmianę NATYCHMIAST: `setMapping` ustawia stan + zapis localStorage + PUT w tle.
+ * Editable tool->building map store. The local server is the source of truth
+ * (file on disk), but the client keeps an optimistic cache so the world reacts
+ * to changes IMMEDIATELY: `setMapping` updates state + localStorage + background PUT.
  *
- * Wszystkie dotknięcia `localStorage`/`fetch` są strażowane `typeof` — moduł
- * importuje się i działa też w środowisku node (testy, brak DOM).
+ * All `localStorage`/`fetch` touches are guarded with `typeof`; the module also
+ * imports and works in node environments (tests, no DOM).
  */
 
 const STORAGE_KEY = 'age-of-agents.mapping';
@@ -35,7 +35,7 @@ function writeCache(config: MappingConfig): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   } catch {
-    /* quota / prywatny tryb → ignoruj, serwer i tak ma źródło prawdy */
+    /* quota / private mode: ignore; the server is still the source of truth */
   }
 }
 
@@ -47,16 +47,16 @@ function putMapping(config: MappingConfig): void {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(config),
     }).catch(() => {
-      /* PUT nieblokujący — błąd nie psuje UI (stan i cache już ustawione) */
+      /* non-blocking PUT: failure does not break UI (state and cache are already set) */
     });
   } catch {
-    /* gdyby fetch rzucił synchronicznie (np. zła baza URL w teście) */
+    /* if fetch throws synchronously (for example a bad base URL in a test) */
   }
 }
 
 interface MappingStore {
   mapping: MappingConfig;
-  /** Czy serwer odpowiedział na początkowy GET (do ewentualnego „ładowanie…"). */
+  /** Whether the server answered the initial GET (for possible "loading..."). */
   mappingLoaded: boolean;
   setMapping(config: MappingConfig): void;
   resetMapping(): void;
@@ -69,7 +69,7 @@ export const useMapping = create<MappingStore>((set, get) => ({
   setMapping: (config) => {
     set({ mapping: config });
     writeCache(config);
-    putMapping(config); // optymistycznie: zapis na serwer w tle
+    putMapping(config); // optimistic: save to server in the background
   },
   resetMapping: () => get().setMapping(DEFAULT_MAPPING),
   hydrate: async () => {
@@ -88,15 +88,15 @@ export const useMapping = create<MappingStore>((set, get) => ({
         }
       }
     } catch {
-      /* sieć padła → zostaje cache/DEFAULT */
+      /* network failed: keep cache/DEFAULT */
     }
     set({ mappingLoaded: true });
   },
 }));
 
 /**
- * Resolver dla konsumentów spoza Reacta (ticker w game/view.ts): czyta aktualną
- * mapę ze store przez getState — bez couplingu z drzewem React (jak useWorld).
+ * Resolver for non-React consumers (ticker in game/view.ts): reads the current
+ * map from the store via getState, without coupling to the React tree (like useWorld).
  */
 export function resolveBuildingLive(tool: string | undefined, detail?: string): BuildingId {
   return resolveBuilding(tool, detail, useMapping.getState().mapping);

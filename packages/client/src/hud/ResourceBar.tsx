@@ -2,7 +2,7 @@ import { useWorld } from '../store';
 import { useUi } from '../i18n';
 import { formatK } from '../util';
 
-/** Pasek zasobów: suma tokenów wszystkich bohaterów = "złoto" twierdzy. */
+/** Resource bar: total tokens of all heroes = citadel "gold". */
 export function ResourceBar() {
   const heroes = useWorld((s) => s.heroes);
   const connected = useWorld((s) => s.connected);

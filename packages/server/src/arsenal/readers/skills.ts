@@ -5,8 +5,8 @@ import { parseFrontmatter } from '../frontmatter.js';
 
 interface Opts { workingDir: string; homeDir: string; }
 
-/** Nazwa pluginu ze ścieżki SKILL.md: segment tuż przed `/skills/`, a jeśli to wersja
- *  (np. '5.1.0') — segment wcześniejszy. */
+/** Plugin name from SKILL.md path: segment just before `/skills/`; if that is a
+ *  version (for example '5.1.0'), use the previous segment. */
 export function pluginNameFromPath(filePath: string): string {
   const parts = filePath.split(path.sep).filter(Boolean);
   const si = parts.lastIndexOf('skills');
@@ -32,13 +32,13 @@ async function readOneLevel(skillsDir: string, origin: ArsenalOrigin): Promise<A
       const fm = parseFrontmatter(await fs.readFile(file, 'utf8'));
       out.push({ id: fm.name ?? e.name, description: fm.description, origin });
     } catch {
-      // brak SKILL.md w tym podkatalogu — pomiń
+      // no SKILL.md in this subdirectory: skip
     }
   }
   return out;
 }
 
-/** Skille z drzewa pluginów (rekurencyjnie szukamy plików SKILL.md). */
+/** Skills from plugin tree (recursively search for SKILL.md files). */
 async function readPlugins(pluginsRoot: string): Promise<ArsenalSkill[]> {
   let files: string[] = [];
   try {
@@ -60,13 +60,13 @@ async function readPlugins(pluginsRoot: string): Promise<ArsenalSkill[]> {
         pluginName: pluginNameFromPath(file),
       });
     } catch {
-      // pomiń uszkodzony plik
+      // skip broken file
     }
   }
   return out;
 }
 
-/** Efektywny zestaw skilli: projekt ∪ user ∪ plugin, dedup po id (projekt > user > plugin). */
+/** Effective skill set: project + user + plugin, deduped by id (project > user > plugin). */
 export async function readSkills({ workingDir, homeDir }: Opts): Promise<ArsenalSkill[]> {
   const [project, user, plugin] = await Promise.all([
     readOneLevel(path.join(workingDir, '.claude', 'skills'), 'project'),

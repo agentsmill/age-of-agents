@@ -19,30 +19,30 @@ afterEach(() => {
 });
 
 describe('useModels store', () => {
-  it('domyślnie DEFAULT_MODEL_CONFIG', () => {
+  it('defaults to DEFAULT_MODEL_CONFIG', () => {
     expect(useModels.getState().models).toEqual(DEFAULT_MODEL_CONFIG);
   });
-  it('setModels aktualizuje stan i wysyła PUT /model-config', () => {
+  it('setModels updates state and sends PUT /model-config', () => {
     const f = vi.fn(() => Promise.resolve(new Response('{}')));
     vi.stubGlobal('fetch', f);
     useModels.getState().setModels(CUSTOM);
     expect(useModels.getState().models).toEqual(CUSTOM);
     expect(f).toHaveBeenCalledWith('/model-config', expect.objectContaining({ method: 'PUT' }));
   });
-  it('resetModels przywraca DEFAULT', () => {
+  it('resetModels restores DEFAULT', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('{}'))));
     useModels.setState({ models: CUSTOM });
     useModels.getState().resetModels();
     expect(useModels.getState().models).toEqual(DEFAULT_MODEL_CONFIG);
   });
-  it('odrzucony PUT nie psuje stanu (optymistyczny zapis)', async () => {
+  it('rejected PUT does not break state (optimistic save)', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('net'))));
     useModels.getState().setModels(CUSTOM);
     await Promise.resolve();
     expect(useModels.getState().models).toEqual(CUSTOM);
   });
-  it('niepoprawny config: stan żywy, ale BEZ zapisu do localStorage/PUT', () => {
-    // Świeżo dodany wiersz z pustym wzorcem = config niepoprawny przejściowo.
+  it('invalid config: live state, but WITHOUT save to localStorage/PUT', () => {
+    // Freshly added row with an empty pattern = temporarily invalid config.
     const invalid = {
       sprites: [{ match: { kind: 'pattern', pattern: '' }, sprite: 'opus' }],
       windows: [],
@@ -57,17 +57,28 @@ describe('useModels store', () => {
     const f = vi.fn(() => Promise.resolve(new Response('{}')));
     vi.stubGlobal('fetch', f);
     useModels.getState().setModels(invalid);
-    expect(useModels.getState().models).toEqual(invalid); // stan żywy (edytor pokazuje wiersz)
-    expect(f).not.toHaveBeenCalled(); // nie PUT-ujemy garbage'u
-    expect(store['age-of-agents.models']).toBeUndefined(); // nie zatruwamy localStorage
+    expect(useModels.getState().models).toEqual(invalid); // live state (editor shows the row)
+    expect(f).not.toHaveBeenCalled(); // do not PUT garbage
+    expect(store['age-of-agents.models']).toBeUndefined(); // do not poison localStorage
   });
-  it('hydrate wczytuje config z GET', async () => {
+  it('hydrate loads config from GET', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(CUSTOM)))));
     await useModels.getState().hydrate();
-    expect(useModels.getState().models).toEqual(CUSTOM);
+    expect(useModels.getState().models.sprites[0]).toEqual(CUSTOM.sprites[0]);
+    expect(useModels.getState().models.windows[0]).toEqual(CUSTOM.windows[0]);
+    expect(useModels.getState().models.fallback).toEqual(CUSTOM.fallback);
     expect(useModels.getState().modelsLoaded).toBe(true);
   });
-  it('hydrate ignoruje niepoprawny config z serwera', async () => {
+  it('hydrate upgrades older saved configs with built-in Codex presets', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(CUSTOM)))));
+    await useModels.getState().hydrate();
+    expect(resolveModelLive('gpt-5.5')).toMatchObject({
+      sprite: 'fable',
+      displayName: 'GPT-5.5',
+      contextWindow: 258_400,
+    });
+  });
+  it('hydrate ignores invalid config from server', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ sprites: [], windows: [], fallback: { sprite: 'nope', contextWindow: 1 } })))));
     await useModels.getState().hydrate();
     expect(useModels.getState().models).toEqual(DEFAULT_MODEL_CONFIG);
@@ -75,7 +86,7 @@ describe('useModels store', () => {
 });
 
 describe('resolveModelLive', () => {
-  it('używa aktualnego configu ze store', () => {
+  it('uses current config from store', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('{}'))));
     expect(resolveModelLive('claude-opus-4-8').sprite).toBe('opus'); // DEFAULT
     useModels.setState({ models: CUSTOM });

@@ -1,28 +1,28 @@
 import type { HeroSnapshot, HeroStateKind } from '@agent-citadel/shared';
 import { SPRITE_IDS, type SpriteId } from '@agent-citadel/shared';
 
-/** Tory animacji generowane dla każdej postaci (1 kierunek = south + odbicie). */
+/** Animation tracks generated for each character (1 direction = south + mirroring). */
 export type AnimationName = 'idle' | 'walk' | 'work';
 
-/** Klucz atlasu, gdy kombinacja model×mode jest nieznana lub assetu brak. */
+/** Atlas key used when model x mode is unknown or the asset is missing. */
 export const ARCHETYPE_FALLBACK = 'sonnet-default';
 
-// Lista modeli = pula sprite'ów (jedno źródło prawdy w shared).
+// Model list = sprite pool (single source of truth in shared).
 export const MODELS = SPRITE_IDS;
 export const MODES = ['default', 'plan', 'acceptEdits', 'bypassPermissions'] as const;
 
 /**
- * WKŁAD USERA (learning) — siostra toolToBuilding (theme/mapping.ts).
- * Mapuje HeroSnapshot.model × HeroSnapshot.permissionMode na klucz atlasu
- * '<model>-<mode>'. Surowe stringi bywają undefined albo pełnym id modelu
- * (np. 'claude-opus-4-8[1m]') — znormalizuj do jednego z MODELS / MODES.
- * Nieznane → ARCHETYPE_FALLBACK. NIE generuje — tylko wybiera.
+ * USER CONTRIBUTION (learning): sibling of toolToBuilding (theme/mapping.ts).
+ * Maps HeroSnapshot.model x HeroSnapshot.permissionMode to an atlas key
+ * '<model>-<mode>'. Raw strings can be undefined or a full model id.
+ * (for example 'claude-opus-4-8[1m]'); normalize to one of MODELS / MODES.
+ * Unknown -> ARCHETYPE_FALLBACK. Does NOT generate, only selects.
  */
 export function sessionToArchetypeKey(hero: HeroSnapshot, spriteOverride?: SpriteId): string {
-  // Override z rejestru modeli ma pierwszeństwo; inaczej dopasowanie po fragmencie nazwy.
+  // Model registry override takes precedence; otherwise match by name fragment.
   const model: SpriteId | undefined =
     spriteOverride ?? MODELS.find((m) => (hero.model ?? '').toLowerCase().includes(m));
-  if (!model) return ARCHETYPE_FALLBACK; // nieznany/brak modelu → cały klucz na fallback
+  if (!model) return ARCHETYPE_FALLBACK; // unknown/missing model -> whole key falls back
   const mode = (MODES as readonly string[]).includes(hero.permissionMode ?? '')
     ? (hero.permissionMode as string)
     : 'default';
@@ -30,25 +30,25 @@ export function sessionToArchetypeKey(hero: HeroSnapshot, spriteOverride?: Sprit
 }
 
 /**
- * Kolejność szukania atlasu dla klucza archetypu: dokładny → wariant `<model>-default`
- * → globalny fallback. Warianty trybów (plan/acceptEdits/bypassPermissions) to Faza 2 —
- * na razie istnieją tylko atlasy `<model>-default`, więc bez tej degradacji bohater w
- * trybie ≠ default spadałby na placeholder. Tu zachowujemy sprite JEGO modelu (typy!).
+ * Atlas search order for an archetype key: exact -> `<model>-default` variant
+ * -> global fallback. Mode variants (plan/acceptEdits/bypassPermissions) are Phase 2;
+ * for now only `<model>-default` atlases exist, so without this degradation a hero
+ * in non-default mode would fall to the placeholder. This keeps ITS model sprite.
  */
 export function archetypeKeyChain(key: string): string[] {
   const model = key.split('-')[0];
-  return [...new Set([key, `${model}-default`, ARCHETYPE_FALLBACK])]; // dedup, kolejność zachowana
+  return [...new Set([key, `${model}-default`, ARCHETYPE_FALLBACK])]; // dedup, preserve order
 }
 
 /**
- * WKŁAD USERA (learning) — który tor animacji odtwarzać.
- * working → 'work'; jednostka w ruchu lub state 'returning' → 'walk';
- * idle/thinking/awaiting-input/error/sleeping → 'idle'.
- * `moving` jest osobnym argumentem, bo ruch po waypointach NIE jest zakodowany
- * w HeroStateKind (jednostka może iść będąc 'idle' albo 'working').
+ * USER CONTRIBUTION (learning): which animation track to play.
+ * working -> 'work'; moving unit or state 'returning' -> 'walk';
+ * idle/thinking/awaiting-input/error/sleeping -> 'idle'.
+ * `moving` is a separate argument because waypoint movement is NOT encoded
+ * in HeroStateKind (a unit can be walking while 'idle' or 'working').
  */
 export function stateToAnimation(state: HeroStateKind, moving: boolean): AnimationName {
-  if (moving) return 'walk'; // ruch wygrywa: marsz do budynku zanim zacznie pracę
+  if (moving) return 'walk'; // movement wins: walk to the building before starting work
   if (state === 'working') return 'work';
   if (state === 'returning') return 'walk';
   return 'idle';

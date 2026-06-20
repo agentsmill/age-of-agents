@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { sessionToArchetypeKey, stateToAnimation, archetypeKeyChain } from '../src/game/archetype';
 import type { HeroSnapshot } from '@agent-citadel/shared';
 
-describe('sessionToArchetypeKey — override sprite', () => {
+describe('sessionToArchetypeKey - sprite override', () => {
   const base = { permissionMode: 'default' } as HeroSnapshot;
-  it('spriteOverride wygrywa nad zgadywaniem z nazwy', () => {
+  it('spriteOverride wins over guessing from name', () => {
     expect(sessionToArchetypeKey({ ...base, model: 'llama3.1:8b' }, 'haiku')).toBe('haiku-default');
   });
-  it('bez override — stara logika podciągu', () => {
+  it('without override - old substring logic', () => {
     expect(sessionToArchetypeKey({ ...base, model: 'claude-opus-4-8[1m]' })).toBe('opus-default');
   });
 });
@@ -19,38 +19,38 @@ const hero = (model?: string, permissionMode?: string): HeroSnapshot => ({
 });
 
 describe('sessionToArchetypeKey', () => {
-  it('czyste model+mode → "<model>-<mode>"', () => {
+  it('clean model+mode -> "<model>-<mode>"', () => {
     expect(sessionToArchetypeKey(hero('opus', 'plan'))).toBe('opus-plan');
   });
-  it('brak model → fallback', () => {
+  it('missing model -> fallback', () => {
     expect(sessionToArchetypeKey(hero(undefined, 'plan'))).toBe('sonnet-default');
   });
-  it('brak mode → tryb default', () => {
+  it('missing mode -> default mode', () => {
     expect(sessionToArchetypeKey(hero('haiku', undefined))).toBe('haiku-default');
   });
-  it('nieznany model → fallback', () => {
+  it('unknown model -> fallback', () => {
     expect(sessionToArchetypeKey(hero('gpt-5', 'default'))).toBe('sonnet-default');
   });
-  it('pełne id modelu (substring) → "<model>-<mode>"', () => {
+  it('full model id (substring) -> "<model>-<mode>"', () => {
     expect(sessionToArchetypeKey(hero('claude-opus-4-8[1m]', 'acceptEdits'))).toBe('opus-acceptEdits');
   });
 });
 
-describe('archetypeKeyChain (degradacja brakującego wariantu trybu → atlas modelu)', () => {
-  it('tryb ≠ default degraduje do <model>-default, potem globalny fallback', () => {
+describe('archetypeKeyChain (degradation of missing mode variant -> model atlas)', () => {
+  it('mode != default degrades to <model>-default, then global fallback', () => {
     expect(archetypeKeyChain('opus-acceptEdits')).toEqual(['opus-acceptEdits', 'opus-default', 'sonnet-default']);
   });
-  it('default → bez duplikatu <model>-default', () => {
+  it('default -> without duplicate <model>-default', () => {
     expect(archetypeKeyChain('haiku-default')).toEqual(['haiku-default', 'sonnet-default']);
   });
-  it('globalny fallback sam dla siebie', () => {
+  it('global fallback alone for itself', () => {
     expect(archetypeKeyChain('sonnet-default')).toEqual(['sonnet-default']);
   });
 });
 
 describe('stateToAnimation', () => {
   it('working → work', () => expect(stateToAnimation('working', false)).toBe('work'));
-  it('w ruchu → walk niezależnie od stanu', () => expect(stateToAnimation('idle', true)).toBe('walk'));
+  it('moving -> walk regardless of state', () => expect(stateToAnimation('idle', true)).toBe('walk'));
   it('returning → walk', () => expect(stateToAnimation('returning', false)).toBe('walk'));
   it('thinking → idle', () => expect(stateToAnimation('thinking', false)).toBe('idle'));
   it('error → idle', () => expect(stateToAnimation('error', false)).toBe('idle'));

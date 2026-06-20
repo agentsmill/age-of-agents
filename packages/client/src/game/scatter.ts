@@ -1,11 +1,12 @@
 /**
- * Rozsianie spawnu peonów (minionów) wokół drzwi Hangaru/Koszar.
+ * Scattered peon (minion) spawn around Hangar/Barracks doors.
  *
- * Wszystkie peony rekrutują się z jednego budynku — bez rozrzutu spawnowałyby się
- * w JEDNYM punkcie (drzwi), więc 8 sprite'ów stoi na sobie i wygląda jak „2 zamiast 8"
- * (krótkożyciowi subagenci nie zdążą się rozejść). Hash FNV-1a daje równy rozrzut
- * NAWET dla sekwencyjnych id (agent-1, agent-2, …) — słaby hash mapowałby je na
- * sąsiednie kąty (ciasny łuk). Promień 0.9–1.8 kafla: blisko drzwi, ale rozróżnialnie.
+ * All peons are recruited from one building; without scatter they would spawn at
+ * ONE point (the door), so 8 sprites overlap and look like "2 instead of 8"
+ * (short-lived subagents do not have time to spread out). FNV-1a gives even
+ * scatter EVEN for sequential ids (agent-1, agent-2, ...); a weak hash would map
+ * them to neighboring angles (tight arc). Radius 0.9-1.8 tiles: near the door,
+ * but visually distinct.
  */
 export function peonSpawnScatter(id: string): { dx: number; dy: number } {
   let h = 2166136261 >>> 0; // FNV-1a 32-bit
@@ -19,12 +20,12 @@ export function peonSpawnScatter(id: string): { dx: number; dy: number } {
 }
 
 /**
- * Rozsianie spawnu bohaterów wokół drzwi budynku „home".
+ * Scattered hero spawn around the "home" building door.
  *
- * Analogicznie do peonów: bohaterowie jednego projektu trafiają do tego samego
- * punktu zbiórki (5 budynków per temat, wybór djb2 na projectName), ale wielu
- * agentów tego samego projektu BEZ rozrzutu stoi na sobie i wygląda jak jeden.
- * Promień 0.5–1.4 kafla — bliżej niż peony, bo bohaterowie są więksi.
+ * As with peons: heroes for one project go to the same gathering point (5
+ * buildings per theme, djb2 choice by projectName), but many agents from the
+ * same project WITHOUT scatter overlap and look like one. Radius 0.5-1.4 tiles,
+ * closer than peons because heroes are larger.
  */
 export function heroSpawnScatter(id: string): { dx: number; dy: number } {
   let h = 2166136261 >>> 0; // FNV-1a 32-bit

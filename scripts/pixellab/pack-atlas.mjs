@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Packer offline: downloads/frames/<key>/<anim>/*.png -> atlas Pixi.
- * Wynik: public/assets/<theme>/heroes/<key>.png + <key>.json (frames+animations+meta)
- * oraz index.json z listą kluczy. Zero zależności od PixelLab/MCP.
+ * Result: public/assets/<theme>/heroes/<key>.png + <key>.json (frames+animations+meta)
+ * and index.json with the key list. No PixelLab/MCP dependency.
  */
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
@@ -17,7 +17,7 @@ const ANIMS = ['idle', 'walk', 'work'];
 
 const loadPng = (p) => PNG.sync.read(readFileSync(p));
 
-/** Ręczny blit RGBA: kopiuje src (sw×sh) do dst (szerokość dw) w punkcie (ox,oy). */
+/** Manual RGBA blit: copies src (sw x sh) to dst (width dw) at (ox,oy). */
 function blit(src, sw, sh, dst, dw, ox, oy) {
   for (let y = 0; y < sh; y++) {
     for (let x = 0; x < sw; x++) {
@@ -39,8 +39,8 @@ function packCharacter(key) {
     sources[anim] = files.map((f) => loadPng(join(dir, f)));
     for (const png of sources[anim]) { fw = Math.max(fw, png.width); fh = Math.max(fh, png.height); }
   }
-  // Nazwy klatek MUSZĄ być globalnie unikalne — Pixi cache'uje tekstury po nazwie
-  // globalnie, więc bez prefiksu klucza klatki kolejnych atlasów kolidują.
+  // Frame names MUST be globally unique; Pixi caches textures globally by name,
+  // so frames from later atlases collide without the key prefix.
   const all = Object.entries(sources).flatMap(([anim, pngs]) =>
     pngs.map((png, i) => ({ name: `${key}__${anim}_${String(i).padStart(2, '0')}`, anim, png })));
   if (!all.length) return null;
@@ -74,4 +74,4 @@ const keys = existsSync(framesRoot)
 const packed = keys.map(packCharacter).filter(Boolean);
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, 'index.json'), JSON.stringify({ keys: packed }, null, 2));
-console.log(`Spakowano ${packed.length} atlasów do ${outDir}:`, packed.join(', '));
+console.log(`Packed ${packed.length} atlases into ${outDir}:`, packed.join(', '));

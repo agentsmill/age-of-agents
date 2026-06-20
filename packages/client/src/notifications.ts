@@ -1,20 +1,20 @@
 import type { GameEvent, HeroSnapshot } from '@agent-citadel/shared';
 
-/** Waga powiadomienia — steruje ikoną, kolorem akcentu i czasem życia. */
+/** Notification severity; controls icon, accent color, and lifetime. */
 export type NotifKind = 'alert' | 'error' | 'success';
 
-/** Powód powiadomienia — mapuje się na etykietę i18n oraz na NotifKind. */
+/** Notification reason; maps to the i18n label and NotifKind. */
 export type NotifReason = 'needs-you' | 'error' | 'mission-done' | 'new-session';
 
 export interface Notification {
   id: string;
   reason: NotifReason;
   kind: NotifKind;
-  /** Gdy obecne → klik skacze do agenta (store.select). */
+  /** When present, clicking jumps to the agent (store.select). */
   sessionId?: string;
-  /** Tekst-podmiot: nazwa bohatera lub prompt misji (komponent dokleja etykietę). */
+  /** Subject text: hero name or mission prompt (the component appends the label). */
   subject: string;
-  /** Dodatkowy kontekst (np. gałąź gita). */
+  /** Additional context (for example the git branch). */
   branch?: string;
   createdAt: number;
   ttl: number;
@@ -22,13 +22,13 @@ export interface Notification {
 
 export const ALERT_TTL = 12_000;
 export const SUCCESS_TTL = 6_000;
-/** Maks. widocznych toastów (najstarsze wypadają). */
+/** Maximum visible toasts (oldest ones are dropped). */
 export const MAX_VISIBLE = 5;
 /**
- * Okno anty-burzy per waga: pomiń duplikat sessionId+reason młodszy niż to.
- * Alarmy mają DŁUŻSZE okno, bo serwer ustawia 'error' przy każdym błędnym wyniku
- * narzędzia (flash) — podczas debugowania potrafi błyskać raz za razem. 30 s
- * tnie sztorm do ~1 toastu/sesję; sukcesy zostają łagodniejsze.
+ * Per-severity storm guard: skip duplicate sessionId+reason entries younger than this.
+ * Alerts use a LONGER window because the server sets 'error' for every failing tool
+ * result (flash), which can blink repeatedly during debugging. 30s cuts the storm
+ * to about one toast per session; successes stay gentler.
  */
 export const DEDUP_WINDOW: Record<NotifKind, number> = {
   alert: 30_000,
@@ -43,7 +43,7 @@ export const REASON_KIND: Record<NotifReason, NotifKind> = {
   'new-session': 'success',
 };
 
-/** Fabryka powiadomienia: wylicza kind/ttl z reason, składa stabilne id. */
+/** Notification factory: derives kind/ttl from reason and builds a stable id. */
 export function make(
   reason: NotifReason,
   sessionId: string | undefined,
@@ -65,17 +65,18 @@ export function make(
 }
 
 /**
- * Wykrywanie KRAWĘDZI: zamienia pojedyncze GameEvent na 0..1 powiadomień,
- * porównując poprzedni stan z nowym. Zwraca null, gdy nic nie wybijamy.
+ * EDGE detection: converts a single GameEvent to 0..1 notifications by comparing
+ * previous state with new state. Returns null when nothing should pop.
  *
- * Wykrywanie KRAWĘDZI (nie poziomu): alarm pada tylko w MOMENCIE wejścia w stan,
- * nie przy każdym ticku, gdy agent dalej czeka/błądzi. Częstotliwość alarmów
- * dodatkowo tnie okno dedup w store (patrz DEDUP_WINDOW) — istotne dla 'error',
- * które serwer „flashuje" przy każdym błędnym wyniku narzędzia.
+ * EDGE detection (not level detection): the alert fires only at the MOMENT the
+ * state is entered, not on every tick while the agent keeps waiting/errored.
+ * The dedup window in the store additionally cuts alert frequency (see
+ * DEDUP_WINDOW), which matters for 'error' events that the server flashes for
+ * every failing tool result.
  *
- * @param prev  poprzedni HeroSnapshot tej sesji (undefined = nieznany / mission)
- * @param event nadchodzące GameEvent
- * @param now   znacznik czasu (wstrzykiwany dla testowalności)
+ * @param prev  previous HeroSnapshot for this session (undefined = unknown / mission)
+ * @param event incoming GameEvent
+ * @param now   timestamp injected for testability
  */
 export function deriveNotification(
   prev: HeroSnapshot | undefined,
@@ -87,7 +88,7 @@ export function deriveNotification(
     case 'hero-updated': {
       const hero = event.hero;
       const entered = prev?.state !== hero.state;
-      // Alarm ma pierwszeństwo nad sukcesem-spawnu.
+      // Alert takes precedence over spawn success.
       if (entered && hero.state === 'awaiting-input')
         return make('needs-you', hero.sessionId, hero.title, hero.gitBranch, now);
       if (entered && hero.state === 'error')

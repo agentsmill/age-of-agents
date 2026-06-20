@@ -339,7 +339,7 @@
   }
   bFan.onclick=()=>set('fantasy'); bSci.onclick=()=>set('scifi');
 
-  // Kopiowanie komendy instalacji do schowka (kopiuje dokładnie to, co pokazane).
+  // Copy the install command to the clipboard (copies exactly what is shown).
   const copyBtn=document.getElementById('copyBtn'), npxCmd=document.getElementById('npxCmd');
   copyBtn?.addEventListener('click', async ()=>{
     try{
@@ -347,7 +347,7 @@
       copyBtn.textContent='✓ copied';
       copyBtn.classList.add('copied');
       setTimeout(()=>{ copyBtn.textContent='copy'; copyBtn.classList.remove('copied'); }, 1600);
-    }catch(_){ /* schowek niedostępny (np. nie-https) — pomiń */ }
+    }catch(_){ /* clipboard unavailable (for example non-https) - skip */ }
   });
 </script>
 </body>

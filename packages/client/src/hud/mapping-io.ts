@@ -1,6 +1,6 @@
 import { validateMapping, type MappingConfig } from '../theme/mapping';
 
-/** Parsuje treść wgranego pliku → config albo błąd (do komunikatu). */
+/** Parses uploaded file content -> config or error (for the message). */
 export function parseUploadedMapping(text: string):
   | { ok: true; config: MappingConfig }
   | { ok: false; error: string } {
@@ -13,7 +13,7 @@ export function parseUploadedMapping(text: string):
   return validateMapping(parsed);
 }
 
-/** Pobiera config jako plik tool-mapping.json (DOM-only; no-op bez document). */
+/** Downloads config as tool-mapping.json (DOM-only; no-op without document). */
 export function downloadMapping(mapping: MappingConfig): void {
   if (typeof document === 'undefined') return;
   const blob = new Blob([JSON.stringify(mapping, null, 2)], { type: 'application/json' });

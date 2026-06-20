@@ -1,29 +1,29 @@
-# PixelLab — format eksportu top-down tileset (Wang dual-grid)
+# PixelLab - Top-down Tileset Export Format (Wang Dual-grid)
 
-Data: 2026-06-13. Probe: `grass↔water` (`9ff2d08a-...`), 32px, 16 kafli.
+Date: 2026-06-13. Probe: `grass<->water` (`9ff2d08a-...`), 32px, 16 tiles.
 
-## Pobieranie
+## Downloading
 
-`get_topdown_tileset(id)` zwraca dwa publiczne URL-e (HTTP 200, bez auth):
+`get_topdown_tileset(id)` returns two public URLs (HTTP 200, no auth):
 - `download_metadata`: `https://api.pixellab.ai/mcp/tilesets/<id>/metadata` (JSON)
 - `download_png`: `https://api.pixellab.ai/mcp/tilesets/<id>/image` (PNG)
 
-Plus `base_tile_ids.{lower,upper}` — `lower` (grass) przekazujemy jako `lower_base_tile_id` w kolejnych tilesetach dla spójnej bazy.
+Plus `base_tile_ids.{lower,upper}`; pass `lower` (grass) as `lower_base_tile_id` in subsequent tilesets for a consistent base.
 
-## Metadata (kluczowe pola)
+## Metadata (Key Fields)
 
 - `tile_size: {width,height}` (32).
-- `tileset_data.tiles[]` (16 sztuk), każdy:
-  - `corners: {NW,NE,SW,SE}` ∈ `"lower"|"upper"` — róg terenu.
-  - `bounding_box: {x,y,width,height}` — pozycja kafla w pobranym PNG (128×128 = 4×4 × 32px).
-  - `name`: `wang_<idx>` gdzie idx = `NW*8+NE*4+SW*2+SE*1` (konwencja PixelLab).
+- `tileset_data.tiles[]` (16 items), each:
+  - `corners: {NW,NE,SW,SE}` in `"lower"|"upper"` - terrain corner.
+  - `bounding_box: {x,y,width,height}` - tile position in the downloaded PNG (128x128 = 4x4 x 32px).
+  - `name`: `wang_<idx>` where idx = `NW*8+NE*4+SW*2+SE*1` (PixelLab convention).
 - `metadata.terrain_prompts.{lower,upper,transition}`.
 
-## Mapowanie na nasz autotiling
+## Mapping to Our Autotiling
 
-Nasza maska: `NW=1, NE=2, SW=4, SE=8` (bit=`upper`) — INNA niż PixelLab (`NW*8+NE*4+SW*2+SE*1`).
-Packer (`scripts/pixellab/pack-tileset.mjs`) czyta `corners` → liczy **naszą** maskę → wycina wg `bounding_box` → zapisuje klatkę `t_{naszaMaska}`. Dzięki temu `DUAL_GRID_LOOKUP` w `autotile.ts` jest **tożsamościowy** (`frameForMask(m)=m`), a kruchy punkt „kolejność eksportu" znika (czytamy prawdę z metadanych, nie zgadujemy). Weryfikacja: packer wymaga 16 unikalnych masek (0–15).
+Our mask: `NW=1, NE=2, SW=4, SE=8` (bit=`upper`) - DIFFERENT from PixelLab (`NW*8+NE*4+SW*2+SE*1`).
+Packer (`scripts/pixellab/pack-tileset.mjs`) reads `corners` -> calculates **our** mask -> cuts by `bounding_box` -> writes frame `t_{ourMask}`. This keeps `DUAL_GRID_LOOKUP` in `autotile.ts` **identity-based** (`frameForMask(m)=m`), and the brittle "export order" problem disappears (we read truth from metadata instead of guessing). Verification: the packer requires 16 unique masks (0-15).
 
 ## Render
 
-Atlas wyjściowy: `<pair>.png` = 16 kafli 32px w rzędzie (kolumna = maska), `<pair>.json` = klatki `t_0..t_15`, `index.json` = `{pairs, tile}`. Silnik: baza grass (`t_0`) wszędzie + warstwa dual-grid na parę (skala `theme.tile/32`).
+Output atlas: `<pair>.png` = 16 32px tiles in one row (column = mask), `<pair>.json` = frames `t_0..t_15`, `index.json` = `{pairs, tile}`. Engine: grass base (`t_0`) everywhere + dual-grid layer per pair (scale `theme.tile/32`).

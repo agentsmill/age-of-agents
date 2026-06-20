@@ -2,7 +2,7 @@ import { build } from 'esbuild';
 import { chmod } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const root = fileURLToPath(new URL('..', import.meta.url)); // kończy się '/'
+const root = fileURLToPath(new URL('..', import.meta.url)); // ends with '/'
 const outfile = `${root}dist/cli.js`;
 
 await build({
@@ -12,12 +12,12 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node22',
-  // Shebang dla pliku `bin`; cli.ts NIE ma własnego shebanga, by nie zdublować.
+  // Shebang for the `bin` file; cli.ts has no own shebang to avoid duplication.
   banner: { js: '#!/usr/bin/env node' },
-  // Deps z natywnymi/dynamicznymi require — zostają w node_modules konsumenta.
+  // Dependencies with native/dynamic require stay in the consumer's node_modules.
   external: ['fastify', '@fastify/static', 'ws', 'chokidar', 'better-sqlite3'],
   logLevel: 'info',
 });
 
 await chmod(outfile, 0o755);
-console.log('✓ Serwer + CLI zbundlowane do dist/cli.js');
+console.log('✓ Server + CLI bundled to dist/cli.js');

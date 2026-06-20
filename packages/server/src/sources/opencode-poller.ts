@@ -4,27 +4,27 @@ import type { World } from '../world.js';
 import type { Fact } from '../transcript/facts.js';
 
 /**
- * OpenCode Poller - okresowo odpytuje bazę SQLite OpenCode
- * i generuje fakty dla SessionTracker.
+ * OpenCode Poller: periodically queries the OpenCode SQLite database.
+ * and generates facts for SessionTracker.
  * 
- * OpenCode nie używa plików JSONL jak Claude/Codex, więc
- * nie możemy użyć SourceWatcher. Zamiast tego polling SQL.
+ * OpenCode does not use JSONL files like Claude/Codex, so SourceWatcher cannot
+ * be used. Use SQL polling instead.
  */
 
 const POLL_INTERVAL_MS = 1000;
-/** Ile dni wstecz pobieramy istniejceju sesje przy starcie / po restarcie.
- * Wystarczajco, by uzupenić statystyki 'Today / 7d / 30d' zanim jeszcze sesja
- * zdąży cokolwiek nowego zrobić. */
+/** How many days back to fetch existing sessions on startup / restart.
+ * Enough to fill 'Today / 7d / 30d' stats before the session has time to do
+ * anything new. */
 const HISTORICAL_WINDOW_DAYS = 31;
 const HISTORICAL_WINDOW_MS = HISTORICAL_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-/** Ile sekund bez aktualizacji time_updated traktujemy sesję jako „martwą”.
- * Sesje-starsze niż ten próg: (a) nie spawnają bohatera na mapie, (b) tracker
- * dostaje tick(), który usunie go z World po removeAfterMs. OpenCode trzyma
- * w SQLite WSZYSTKIE historyczne sesje — bez tego filtra mielibyśmy setki
- * „zombie” bohaterów na mapie (185+ na jednym komputerze). */
+/** Seconds without time_updated change after which a session is treated as "dead".
+ * Sessions older than this threshold: (a) do not spawn a hero on the map,
+ * (b) tracker receives tick(), which removes it from World after removeAfterMs.
+ * OpenCode keeps ALL historical sessions in SQLite; without this filter there
+ * would be hundreds of "zombie" heroes on the map (185+ on one machine). */
 const STALE_SESSION_MS = 5 * 60_000;
-/** Granica ważności danych: sesje starsze niż to usuwamy ze zbioru, by nie
- * rosnąć w pamięci w nieskończoność. = HISTORICAL_WINDOW_MS. */
+/** Data validity boundary: remove sessions older than this from the set so
+ * memory does not grow forever. = HISTORICAL_WINDOW_MS. */
 const SESSION_RETENTION_MS = HISTORICAL_WINDOW_MS;
 
 function isSchemaMismatchError(err: unknown): boolean {
@@ -51,8 +51,8 @@ export class OpenCodePoller {
   private timer?: NodeJS.Timeout;
   private db: any; // better-sqlite3 Database
   private isRunning = false;
-  /** Sesje-historyczne (time_updated > STALE_SESSION_MS) już obsłużone —
-   * nie powtarzamy pracy dla nich. */
+  /** Historical sessions (time_updated > STALE_SESSION_MS) already handled:
+   * do not repeat work for them. */
   private processedStale = new Set<string>();
 
   constructor(private readonly world: World) {}
@@ -61,9 +61,9 @@ export class OpenCodePoller {
     if (this.isRunning) return;
     
     try {
-      // Dynamic import better-sqlite3 (opcjonalna zależność)
+      // Dynamic import better-sqlite3 (optional dependency).
       const mod = await import('better-sqlite3');
-      const Database = mod.default; // better-sqlite3 (CJS) eksportuje konstruktor jako default
+      const Database = mod.default; // better-sqlite3 (CJS) exports constructor as default
       if (!Database || typeof Database !== 'function') {
         throw new Error('better-sqlite3 did not export a Database constructor');
       }
@@ -77,7 +77,7 @@ export class OpenCodePoller {
       // Pierwsze odpytanie natychmiast
       await this.poll();
       
-      console.log('[OpenCode] Poller started');
+      if (this.isRunning) console.log('[OpenCode] Poller started');
     } catch (err) {
       console.warn('[OpenCode] Could not start poller:', err instanceof Error ? err.message : String(err));
       console.log('[OpenCode] Make sure better-sqlite3 is installed: npm install better-sqlite3');
@@ -100,9 +100,9 @@ export class OpenCodePoller {
     if (!this.db || !this.isRunning) return;
 
     try {
-      // Pobierz sesje z całego okna statystyk (domyślnie 31 dni). To zapewnia,
-      // że po restarcie klienta okno 'Today / 7d / 30d' ma dane, a nie czeka,
-      // aż sesja znowu stanie się aktywna.
+      // Fetch sessions from the whole stats window (default 31 days). This
+      // ensures that after client restart the 'Today / 7d / 30d' window has data
+      // instead of waiting until a session becomes active again.
       const cutoffTime = Date.now() - HISTORICAL_WINDOW_MS;
       
       const sessions = this.db.prepare(`
@@ -130,15 +130,15 @@ export class OpenCodePoller {
       for (const session of sessions) {
         const ageMs = Date.now() - Number(session.time_updated);
         if (ageMs > STALE_SESSION_MS) {
-          // Stara sesja (zombie): nie spawnuj bohatera, nie aktualizuj trackera.
-          // Nadal tu jesteśmy po to, by zgromadzić tokeny do statystyk (jeden raz).
+          // Old session (zombie): do not spawn hero, do not update tracker.
+          // Still here to collect tokens for stats (once).
           await this.processStaleSession(session);
         } else {
           await this.processSession(session);
         }
       }
 
-      // Usuń sesje starsze niż okno retencji, by nie rosnąć w pamięci
+      // Remove sessions older than retention window so memory does not grow.
       this.sweep();
     } catch (err) {
       if (isSchemaMismatchError(err)) {
@@ -165,7 +165,7 @@ export class OpenCodePoller {
     let state = this.sessions.get(sessionId);
     
     if (!state) {
-      // Nowa sesja - utwórz tracker
+      // New session: create tracker.
       const meta = extractOpencodeMeta(sessionRow);
       state = {
         tracker: new SessionTracker(this.world, sessionId, projectDir, DEFAULT_THRESHOLDS, 'opencode'),
@@ -192,19 +192,18 @@ export class OpenCodePoller {
         ts: new Date(timeCreated || Date.now()).toISOString(),
       });
       
-      // Wyślij zagregowane tokeny z tabeli session (OpenCode trzyma je w sesji).
-      // 'usage-total' ustawia (nie dodaje), więc wystarczy raz przy pierwszym
-      // widzeniu sesji - tracker zainicjalizuje statystyki.
+      // Send aggregated tokens from session table (OpenCode stores them on session).
+      // 'usage-total' sets (does not add), so once at first session sighting
+      // is enough for the tracker to initialize stats.
       this.applySessionTokens(state, sessionRow);
     } else {
-      // Sesja znana - aktualizuj tokeny (sesja mogła dostać nowe dane w międzyczasie)
+      // Known session: update tokens (session may have received new data meanwhile).
       this.applySessionTokens(state, sessionRow);
       state.projectDir = projectDir;
       state.title = title;
     }
 
-    // Pobierz nowe części (parts) dla tej sesji - tylko jeśli coś się
-    // zmieniło od ostatniego razu.
+    // Fetch new parts for this session only if something changed since last time.
     const parts = this.db.prepare(`
       SELECT 
         p.id,
@@ -230,18 +229,18 @@ export class OpenCodePoller {
         
         state.lastPartTime = Math.max(state.lastPartTime, Number(part.time_created));
       } catch (err) {
-        // Ignoruj błędy parsowania pojedynczych partów
+        // Ignore parsing errors for individual parts.
       }
     }
 
-    // Upewnij się, że lastPartTime nie jest starsze niż time_updated,
-    // bo to go używamy do "kiedy ostatnio widziano sesję".
+    // Ensure lastPartTime is not older than time_updated, because we use it for
+    // "when the session was last seen".
     if (timeUpdated > state.lastPartTime) {
       state.lastPartTime = timeUpdated;
     }
   }
 
-  /** Wysyła usage-total tylko gdy zagregowane tokeny w sesji wzrosły.
+  /** Sends usage-total only when aggregated session tokens increased.
    * Zapobiega cofaniu licznika (usage-total SET, nie ADD). */
   private applySessionTokens(state: SessionState, row: Record<string, unknown>): void {
     const tokensInput = Number(row.tokens_input ?? 0);
@@ -261,16 +260,15 @@ export class OpenCodePoller {
   private sweep(): void {
     const now = Date.now();
     for (const [sessionId, state] of this.sessions) {
-      // Tracker jest źródłem prawdy o lifecycle bohatera — tick() przejdzie
+      // Tracker is the source of truth for hero lifecycle: tick() will transition
       // go w 'sleeping' po sleepAfterMs, a po removeAfterMs (30 min) usunie
-      // z World. Wywołujemy tu, by zombie sesje w końcu znikły z mapy.
+      // from World. Call it here so zombie sessions eventually disappear from the map.
       if (state.tracker.tick(now) === 'remove') {
         this.sessions.delete(sessionId);
         continue;
       }
-      // Usuwamy sesje starsze niż okno retencji (domyślnie 31 dni).
-      // To zapobiega niekontrolowanemu wzrostowi pamięci dla klientów,
-      // którzy używają agenta od miesięcy.
+      // Remove sessions older than retention window (default 31 days). This
+      // prevents uncontrolled memory growth for clients using the agent for months.
       if (now - state.lastPartTime > SESSION_RETENTION_MS) {
         state.tracker.apply({ kind: 'turn-end', ts: new Date().toISOString() });
         this.sessions.delete(sessionId);
@@ -279,16 +277,16 @@ export class OpenCodePoller {
   }
 
   /**
-   * Dla sesji-historycznej (>5 min bez aktualizacji) nie spawnujemy bohatera.
-   * Tylko zliczamy tokeny do statystyk okienkowych (jeśli sesja nie była
-   * jeszcze widziana) i wyrzucamy z pamięci.
+   * For historical session (>5 min without update), do not spawn a hero.
+   * Only count tokens for windowed stats (if session has not been seen yet) and
+   * drop from memory.
    */
   private async processStaleSession(sessionRow: Record<string, unknown>): Promise<void> {
     const sessionId = String(sessionRow.id);
     if (this.processedStale.has(sessionId)) return;
     this.processedStale.add(sessionId);
-    // Tokeny przetworzone tylko raz — applySessionTokens jest w SessionState
-    // z RESERVED, ale tu nie mamy trackera (bo nie chcemy bohatera).
-    // Statystyki budynków liczone są z innego mechanizmu (pliki JSONL).
+    // Tokens processed only once: applySessionTokens is in SessionState.
+    // from RESERVED, but there is no tracker here because we do not want a hero.
+    // Building stats are computed by another mechanism (JSONL files).
   }
 }

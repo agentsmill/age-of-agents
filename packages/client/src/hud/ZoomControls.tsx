@@ -1,7 +1,7 @@
 import { getGameView } from '../game/view';
 import { useUi } from '../i18n';
 
-/** Widoczne kontrolki kamery: przybliż / oddal / wycentruj (jak w grze). */
+/** Visible camera controls: zoom in / zoom out / center (as in-game). */
 export function ZoomControls() {
   const t = useUi();
   return (

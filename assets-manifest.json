@@ -1,5 +1,5 @@
 {
-  "comment": "OPCJONALNY pipeline alternatywnych paczek assetów. Gra działa w PEŁNI na własnych assetach PixelLab dołączonych do repo (packages/client/public/assets/) — ten manifest NIE jest potrzebny do uruchomienia. Jeśli chcesz podmienić assety na zewnętrzne paczki: pobierz zipy ze stron 'page' do downloads/<id>.zip i uruchom `npm run assets`. Surowe pliki tych paczek NIE są commitowane (część, np. Tiny Swords/CraftPix, zakazuje redystrybucji) — trafiają tylko do downloads/ (gitignore).",
+  "comment": "OPTIONAL pipeline for alternative asset packs. The game works FULLY with its own PixelLab assets included in the repo (packages/client/public/assets/); this manifest is NOT required to run it. To replace assets with external packs, download zip files from each 'page' URL into downloads/<id>.zip and run `npm run assets`. Raw files from these packs are NOT committed (some, for example Tiny Swords/CraftPix, prohibit asset redistribution); they only go into downloads/ (gitignored).",
   "packs": [
     {
       "id": "tiny-swords",
@@ -7,10 +7,10 @@
       "name": "Tiny Swords",
       "author": "Pixel Frog",
       "page": "https://pixelfrog-assets.itch.io/tiny-swords",
-      "license": "Custom free — użycie komercyjne i prywatne OK, modyfikacje OK, zakaz redystrybucji/odsprzedaży assetów",
+      "license": "Custom free - commercial and private use OK, modifications OK, redistribution/resale of assets prohibited",
       "attribution": "Tiny Swords — Pixel Frog (pixelfrog-assets.itch.io/tiny-swords)",
       "target": "fantasy/tiny-swords",
-      "role": "Rdzeń fantasy: jednostki animowane (Warrior, Lancer, Archer, Monk, Pawn z animacjami pracy), zamek, koszary, wieże, teren, woda, UI"
+      "role": "Fantasy core: animated units (Warrior, Lancer, Archer, Monk, Pawn with work animations), castle, barracks, towers, terrain, water, UI"
     },
     {
       "id": "lucifer-sorceress",
@@ -19,9 +19,9 @@
       "author": "FoozleCC",
       "page": "https://foozlecc.itch.io/lucifer-sorceress",
       "license": "CC0",
-      "attribution": "Lucifer Collection — FoozleCC (opcjonalna, CC0)",
+      "attribution": "Lucifer Collection - FoozleCC (optional, CC0)",
       "target": "fantasy/lucifer-sorceress",
-      "role": "Magowie fantasy: 4 kierunki × 10 animacji (idle, walk, czarowanie)"
+      "role": "Fantasy mages: 4 directions x 10 animations (idle, walk, casting)"
     },
     {
       "id": "lucifer-necromancer",
@@ -30,20 +30,20 @@
       "author": "FoozleCC",
       "page": "https://foozlecc.itch.io/lucifer-4-direction-necromancer",
       "license": "CC0",
-      "attribution": "Lucifer Collection — FoozleCC (opcjonalna, CC0)",
+      "attribution": "Lucifer Collection - FoozleCC (optional, CC0)",
       "target": "fantasy/lucifer-necromancer",
-      "role": "Drugi mag fantasy"
+      "role": "Second fantasy mage"
     },
     {
       "id": "wyrmsun",
       "theme": "fantasy",
-      "name": "Wyrmsun CC0 (900+ elementów)",
-      "author": "społeczność Wyrmsun",
+      "name": "Wyrmsun CC0 (900+ items)",
+      "author": "Wyrmsun community",
       "page": "https://opengameart.org/content/wyrmsun-cc0-over-900-items",
       "license": "CC0",
-      "attribution": "Wyrmsun CC0 — opengameart.org (opcjonalna)",
+      "attribution": "Wyrmsun CC0 - opengameart.org (optional)",
       "target": "fantasy/wyrmsun",
-      "role": "Zapas budynków fantasy: kuźnia, kopalnia, ratusz"
+      "role": "Fallback fantasy buildings: forge, mine, town hall"
     },
     {
       "id": "acdrnx-mech",
@@ -52,9 +52,9 @@
       "author": "acdrnx",
       "page": "https://acdrnx.itch.io",
       "license": "CC0",
-      "attribution": "Sci-Fi Strategy Mech Buildings — acdrnx (opcjonalna, CC0)",
+      "attribution": "Sci-Fi Strategy Mech Buildings - acdrnx (optional, CC0)",
       "target": "scifi/acdrnx-mech",
-      "role": "Rdzeń sci-fi (izometryczny): teren, 8 budynków z animacjami, 6 jednostek"
+      "role": "Sci-fi core (isometric): terrain, 8 animated buildings, 6 units"
     },
     {
       "id": "craftpix-drones",
@@ -62,10 +62,10 @@
       "name": "Free Drones Pack",
       "author": "CraftPix (free-game-assets)",
       "page": "https://free-game-assets.itch.io/free-drones-pack-pixel-art",
-      "license": "CraftPix free — komercja OK, zakaz redystrybucji surowych plików",
+      "license": "CraftPix free - commercial use OK, redistribution of raw files prohibited",
       "attribution": "Free Drones Pack — craftpix.net",
       "target": "scifi/craftpix-drones",
-      "role": "Drony sci-fi z animacjami idle/scan/lot"
+      "role": "Sci-fi drones with idle/scan/flight animations"
     },
     {
       "id": "lunar-battle",
@@ -74,9 +74,9 @@
       "author": "MattWalkden",
       "page": "https://mattwalkden.itch.io/lunar-battle-pack",
       "license": "CC0",
-      "attribution": "Lunar Battle Pack — MattWalkden (opcjonalna, CC0)",
+      "attribution": "Lunar Battle Pack - MattWalkden (optional, CC0)",
       "target": "scifi/lunar-battle",
-      "role": "Teren księżycowy (recolor na Marsa), struktury bazy"
+      "role": "Lunar terrain (recolored for Mars), base structures"
     }
   ]
 }

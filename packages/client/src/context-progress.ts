@@ -1,7 +1,7 @@
 /** Procent zapełnienia okna kontekstu, 0..100 (zaokrąglony, clamp). */
 export function contextPct(tokens: number, windowSize: number): number {
-  if (!(windowSize > 0)) return 0;
-  return Math.min(100, Math.round((tokens / windowSize) * 100));
+  if (!Number.isFinite(tokens) || !Number.isFinite(windowSize) || tokens <= 0 || windowSize <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((tokens / windowSize) * 100)));
 }
 
 /** Kolor wypełnienia wg %: green <=60 -> yellow <=80 -> red. */

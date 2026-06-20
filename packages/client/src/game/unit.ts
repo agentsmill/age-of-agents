@@ -8,19 +8,19 @@ import { stateToAnimation } from './archetype';
 import { contextColor } from '../context-progress';
 
 const SPEED_GRID_PER_S = 2.2;
-/** Jak długo (s) dymek roboczy jest widoczny po zmianie treści (potem chowamy — declutter). */
+/** How long (s) the work bubble stays visible after content changes (then hide to declutter). */
 const BUBBLE_TTL = 7;
 const CONTEXT_BAR_W = 30;
 const CONTEXT_BAR_H = 4;
 
-/** Domyślna skala sprite'a (fantasy/standard ~68px). Motyw nadpisuje przez ThemeDef.heroSprite. */
+/** Default sprite scale (fantasy/standard ~68px). Theme overrides via ThemeDef.heroSprite. */
 const SPRITE_SCALE = 0.8;
-/** Domyślna kotwica Y stopy (fantasy/standard: wiersz 57-59/68 → 0.87). Nadpisywana per motyw. */
+/** Default foot anchor Y (fantasy/standard: row 57-59/68 -> 0.87). Overridden per theme. */
 const SPRITE_FOOT_ANCHOR = 0.87;
 /**
- * Jednostka na mapie (bohater lub peon): pozycja na siatce logicznej,
- * ruch po waypointach, nakładki stanów (aura, wykrzyknik, dym, zzz)
- * i dymek z opisem pracy.
+ * Unit on the map (hero or peon): position on the logical grid,
+ * waypoint movement, state overlays (aura, exclamation, smoke, zzz)
+ * and a bubble with the work description.
  */
 export class Unit {
   readonly container = new Container();
@@ -44,8 +44,8 @@ export class Unit {
   private nameTag: Text;
   private elapsed = Math.random() * 10;
   private state: HeroStateKind = 'idle';
-  private bubbleUntil = 0; // do kiedy (elapsed) pokazywać świeży dymek
-  private bubbleForced = false; // jednostka zaznaczona → dymek zawsze widoczny
+  private bubbleUntil = 0; // elapsed time until the fresh bubble is shown
+  private bubbleForced = false; // selected unit -> bubble always visible
 
   constructor(
     readonly id: string,
@@ -63,8 +63,8 @@ export class Unit {
     this.gy = start.gy;
 
     if (sheet) {
-      // Prawdziwy sprite PixelLab owinięty w Container, by mechanika odbicia/przygaszenia
-      // (scale.x / alpha na this.body) działała bez zmian. Tor animacji wybiera update().
+      // Real PixelLab sprite wrapped in Container so mirroring/dimming mechanics
+      // (scale.x / alpha on this.body) keep working. update() chooses animation track.
       this.sheet = sheet;
       const sprite = new AnimatedSprite(sheet.animations.idle);
       sprite.anchor.set(0.5, spriteFootAnchor);
@@ -78,20 +78,20 @@ export class Unit {
       this.body = buildUnitBody(teamColor(colorIndex), isPeon);
     }
 
-    // Pierścień koloru drużyny u stóp — ZAWSZE widoczny (także pod spritem PixelLab),
-    // by od jednego spojrzenia rozpoznać drużynę. Ciemny kontur pod spodem dla kontrastu.
+    // Team-color ring at the feet: ALWAYS visible (also under PixelLab sprite),
+    // so the team is recognizable at a glance. Dark outline underneath for contrast.
     const ringRx = (isPeon ? 0.7 : 1) * 12;
     const ringRy = (isPeon ? 0.7 : 1) * 5.5;
     this.teamRing.ellipse(0, 2, ringRx, ringRy).stroke({ color: 0x14120c, width: 3.5, alpha: 0.5 });
     this.teamRing.ellipse(0, 2, ringRx, ringRy).stroke({ color: teamColor(colorIndex), width: 2.5, alpha: 0.95 });
-    // Pierścień zaznaczenia — biały, pulsujący, większy; odróżnia „wybranego" bez gubienia koloru drużyny.
+    // Selection ring: white, pulsing, larger; distinguishes "selected" without losing team color.
     this.selectionRing.ellipse(0, 2, ringRx + 3.5, ringRy + 2).stroke({ color: 0xffffff, width: 2, alpha: 0.9 });
     this.selectionRing.visible = false;
 
     this.aura.circle(0, -12, 18).fill({ color: 0x7f77dd, alpha: 0.25 });
     this.aura.visible = false;
 
-    // skrzynka z "łupem" — peon niesie ją wracając do bohatera
+    // "loot" crate: peon carries it while returning to the hero
     this.crate.rect(-5, -8, 10, 8).fill(0x8a5a2a);
     this.crate.rect(-5, -8, 10, 3).fill(0xb07a3a);
     this.crate.rect(-1.5, -8, 3, 8).fill(0x5a3a1a);
@@ -157,17 +157,17 @@ export class Unit {
     return this.path.length > 0;
   }
 
-  /** Bieżący stan (do logiki sceny — np. spacer tylko bezczynnych). */
+  /** Current state (for scene logic, for example only idle units wander). */
   get stateKind(): HeroStateKind {
     return this.state;
   }
 
-  /** Zaznaczenie z HUD — wtedy dymek roboczy widoczny bez limitu czasu. */
+  /** Selection from HUD; then the work bubble is visible without a time limit. */
   setBubbleForced(forced: boolean): void {
     this.bubbleForced = forced;
   }
 
-  /** Zaznaczenie z HUD/mapy — pulsujący biały pierścień u stóp wybranej jednostki. */
+  /** Selection from HUD/map: pulsing white ring at the selected unit's feet. */
   setSelected(on: boolean): void {
     if (this.selected === on) return;
     this.selected = on;
@@ -178,12 +178,12 @@ export class Unit {
   setState(state: HeroStateKind, bubbleText?: string): void {
     this.state = state;
     this.aura.visible = state === 'thinking';
-    this.overlay.text = state === 'awaiting-input' ? '!' : state === 'error' ? '✶' : state === 'sleeping' ? 'zzz' : '';
-    this.overlay.style.fill = state === 'awaiting-input' ? 0xfac775 : state === 'error' ? 0xe24b4a : 0xb4b2a9;
+    this.overlay.text = state === 'awaiting-input' ? '!' : state === 'error' ? '✶' : state === 'recovering' ? '+' : state === 'sleeping' ? 'zzz' : '';
+    this.overlay.style.fill = state === 'awaiting-input' ? 0xfac775 : state === 'error' ? 0xe24b4a : state === 'recovering' ? 0xe06080 : 0xb4b2a9;
     const newBubble = bubbleText ? clip(bubbleText, 34) : '';
     if (newBubble !== this.bubble.text) {
       this.bubble.text = newBubble;
-      if (newBubble) this.bubbleUntil = this.elapsed + BUBBLE_TTL; // odśwież TTL tylko przy realnej zmianie
+      if (newBubble) this.bubbleUntil = this.elapsed + BUBBLE_TTL; // refresh TTL only on real change
     }
     const dimmed = state === 'sleeping';
     this.body.alpha = dimmed ? 0.45 : 1;
@@ -194,7 +194,7 @@ export class Unit {
   update(dtSeconds: number): void {
     this.elapsed += dtSeconds;
 
-    // Jednostka ze spritem: wybór toru animacji (placeholder ma proceduralny ruch niżej).
+    // Sprite-backed unit: choose animation track (placeholder has procedural movement below).
     if (this.animated && this.sheet) {
       const anim = stateToAnimation(this.state, this.moving);
       const track = this.sheet.animations[anim];
@@ -220,13 +220,13 @@ export class Unit {
         // zwrot w kierunku ruchu (sprite i placeholder)
         this.body.scale.x = dx < -0.01 ? -1 : 1;
       }
-      // proceduralna animacja kroku — tylko placeholder (sprite ma własne klatki)
+      // procedural step animation: placeholder only (sprite has its own frames)
       if (!this.animated) {
         this.body.rotation = Math.sin(this.elapsed * 14) * 0.06;
         this.body.position.y = -Math.abs(Math.sin(this.elapsed * 14)) * 2;
       }
     } else {
-      // puls aury "thinking" działa dla obu wariantów (to nakładka silnika, nie body)
+      // "thinking" aura pulse works for both variants (engine overlay, not body)
       if (this.state === 'thinking') {
         this.aura.scale.set(1 + Math.sin(this.elapsed * 3) * 0.12);
       }
@@ -250,7 +250,7 @@ export class Unit {
 
     if (this.selected) this.selectionRing.scale.set(1 + Math.sin(this.elapsed * 4) * 0.08);
 
-    // Dymek: świeży (po zmianie) lub gdy jednostka zaznaczona — reszta czasu schowany.
+    // Bubble: fresh (after change) or when unit is selected; hidden the rest of the time.
     this.bubble.visible = this.bubble.text !== '' && (this.bubbleForced || this.elapsed < this.bubbleUntil);
 
     this.syncScreen();
@@ -272,6 +272,8 @@ function clip(text: string, max: number): string {
  *  AGENT_PROVIDERS (tylko nie-Claude; kolor CSS '#rrggbb' → liczba Pixi). */
 function buildAgentBadge(agent: AgentKind): Container | undefined {
   const provider = resolveProvider(agent);
+  if (provider.color === null) return undefined;
+
   const c = new Container();
   c.position.set(10, -30); // przy głowie, prawy-górny róg jednostki
 
@@ -285,8 +287,7 @@ function buildAgentBadge(agent: AgentKind): Container | undefined {
     return c;
   }
 
-  // Fallback proceduralny — tylko nie-Claude (Claude: color null → bez odznaki).
-  if (provider.color === null) return undefined;
+  // Fallback proceduralny — tylko providerzy z kolorem.
   const g = new Graphics();
   const color = parseInt(provider.color.slice(1), 16);
   g.circle(0, 0, 7).fill({ color }).stroke({ color: 0x0b0b0a, width: 1.5 });

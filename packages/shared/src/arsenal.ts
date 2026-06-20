@@ -1,26 +1,26 @@
-/** Skąd pochodzi element arsenału (do plakietki w UI). */
+/** Where an arsenal item comes from, used for the UI badge. */
 export type ArsenalOrigin = 'project' | 'user' | 'plugin';
 
 export interface ArsenalSkill {
-  /** Goła nazwa skilla z frontmattera SKILL.md (np. 'brainstorming'). */
+  /** Bare skill name from SKILL.md frontmatter, e.g. 'brainstorming'. */
   id: string;
   description?: string;
   origin: ArsenalOrigin;
-  /** Gdy origin === 'plugin' — nazwa pluginu wyprowadzona ze ścieżki. */
+  /** When origin === 'plugin', the plugin name derived from the path. */
   pluginName?: string;
 }
 
 export interface ArsenalConnector {
-  /** Nazwa serwera MCP (klucz w mcpServers), np. 'visualize'. */
+  /** MCP server name (the key in mcpServers), e.g. 'visualize'. */
   name: string;
   origin: ArsenalOrigin;
   transport?: 'stdio' | 'http' | 'sse';
 }
 
 export interface ArsenalHook {
-  /** Zdarzenie, np. 'SessionStart', 'PreToolUse'. */
+  /** Event name, e.g. 'SessionStart', 'PreToolUse'. */
   event: string;
-  /** Pełna komenda hooka (UI skraca do basename). */
+  /** Full hook command; the UI shortens it to the basename. */
   command: string;
   origin: ArsenalOrigin;
 }
@@ -31,7 +31,7 @@ export interface ArsenalAgent {
   origin: ArsenalOrigin;
 }
 
-/** Źródło A — statyczny ekwipunek jednego miasta. */
+/** Source A: the static loadout for one city. */
 export interface ProjectArsenal {
   projectDir: string;
   projectName: string;
@@ -43,7 +43,7 @@ export interface ProjectArsenal {
   refreshedAt: number;
 }
 
-/** Źródło B — co bohater REALNIE wyciągnął (distinct sety z atrybucji transkryptu). */
+/** Source B: what the hero actually used, as distinct sets from transcript attribution. */
 export interface WieldedArsenal {
   skills: string[];
   connectors: string[];

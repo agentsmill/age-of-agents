@@ -3,22 +3,22 @@ import { BUILDING_FX, collectActiveBuildings, FX_ACTIVE_RADIUS } from '../src/ga
 import { FANTASY } from '../src/theme/fantasy';
 
 describe('BUILDING_FX', () => {
-  it('ma styl dla każdego budynku obu motywów', () => {
+  it('has a style for every building in both themes', () => {
     for (const b of FANTASY.buildings) expect(BUILDING_FX[b.id]).toBeDefined();
   });
 });
 
 describe('collectActiveBuildings', () => {
-  it('liczy tylko pracujące i blisko drzwi', () => {
+  it('counts only working units near the door', () => {
     const active = collectActiveBuildings([
-      { buildingId: 'forge', distToDoor: 1, working: true }, // ✓
-      { buildingId: 'mine', distToDoor: 10, working: true }, // za daleko
-      { buildingId: 'tower', distToDoor: 0.5, working: false }, // nie pracuje
+      { buildingId: 'forge', distToDoor: 1, working: true }, // active
+      { buildingId: 'mine', distToDoor: 10, working: true }, // too far
+      { buildingId: 'tower', distToDoor: 0.5, working: false }, // not working
     ]);
     expect([...active]).toEqual(['forge']);
   });
 
-  it('deduplikuje wielu pracowników tego samego budynku', () => {
+  it('deduplicates many workers for the same building', () => {
     const active = collectActiveBuildings([
       { buildingId: 'forge', distToDoor: 1, working: true },
       { buildingId: 'forge', distToDoor: 2, working: true },
@@ -26,12 +26,12 @@ describe('collectActiveBuildings', () => {
     expect(active.size).toBe(1);
   });
 
-  it('respektuje promień graniczny', () => {
+  it('respects boundary radius', () => {
     expect(collectActiveBuildings([{ buildingId: 'forge', distToDoor: FX_ACTIVE_RADIUS, working: true }]).size).toBe(1);
     expect(collectActiveBuildings([{ buildingId: 'forge', distToDoor: FX_ACTIVE_RADIUS + 0.1, working: true }]).size).toBe(0);
   });
 
-  it('pusty wkład → pusty zbiór', () => {
+  it('empty input -> empty set', () => {
     expect(collectActiveBuildings([]).size).toBe(0);
   });
 });

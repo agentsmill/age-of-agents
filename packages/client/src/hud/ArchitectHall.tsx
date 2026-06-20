@@ -6,9 +6,9 @@ import { relTime } from '../util';
 import { aggregateWielded } from './arsenal-select';
 
 /**
- * Arsenał: panel boczny pokazujący efektywny ekwipunek agentów wybranego miasta —
- * skille, konektory MCP, hooki, subagenci (projekt ∪ user ∪ plugin, z tagiem źródła),
- * z podświetleniem tego, co bohaterowie REALNIE wyciągnęli w tej sesji (wielded).
+ * Arsenal: side panel showing the effective agent equipment for the selected city:
+ * skills, MCP connectors, hooks, subagents (project union user union plugin, with
+ * source tag), highlighting what heroes REALLY pulled in this session (wielded).
  */
 export function ArchitectHall() {
   const selected = useWorld((s) => s.selectedProjectDir);

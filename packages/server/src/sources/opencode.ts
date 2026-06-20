@@ -4,9 +4,9 @@ import type { Fact } from '../transcript/facts.js';
 import type { AgentSource, ClassifiedFile } from './types.js';
 
 /**
- * Źródło OpenCode: ~/.local/share/opencode/opencode.db (SQLite)
+ * OpenCode source: ~/.local/share/opencode/opencode.db (SQLite)
  * OpenCode przechowuje sesje w bazie danych, nie w plikach JSONL.
- * Używamy pollingu SQL zamiast file watching.
+ * Use SQL polling instead of file watching.
  */
 
 /** Skraca tekst (jak w parserze Claude). */
@@ -16,7 +16,7 @@ function clip(text: string, max = 240): string {
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 
 /* ─────────────────────────────────────────────────────────────────
- * Mapowanie narzędzi OpenCode → nazwa kanoniczna gry
+ * OpenCode tool mapping -> canonical game name.
  * ───────────────────────────────────────────────────────────────── */
 export function opencodeToolToCanonical(name: string): string {
   switch (name) {
@@ -52,14 +52,14 @@ export function opencodeToolToCanonical(name: string): string {
     case 'todo':
       return 'todo';
     default:
-      // Narzędzia MCP: 'serwer__narzędzie' albo 'serwer.narzędzie'
+      // MCP tools: 'server__tool' or 'server.tool'.
       if (name.includes('__')) return `mcp__${name}`;
       if (name.includes('.')) return `mcp__${name.replace(/\./g, '__')}`;
       return name;
   }
 }
 
-/** Detal do dymka z argumentów tool (analog toolDetail Claude). */
+/** Bubble detail from tool arguments (Claude toolDetail analog). */
 function opencodeToolDetail(name: string, input: Record<string, unknown> | undefined): string | undefined {
   if (!input) return undefined;
   
@@ -94,7 +94,7 @@ function opencodeToolDetail(name: string, input: Record<string, unknown> | undef
   return str(input.description) ?? str(input.prompt) ?? str(input.filePath) ?? str(input.path);
 }
 
-/** Parsuje dane part z OpenCode → Fakty. */
+/** Parses OpenCode part data -> Facts. */
 export function interpretOpencodePart(data: Record<string, unknown>, ts: string): Fact[] {
   const facts: Fact[] = [];
   const type = str(data.type);
@@ -132,7 +132,7 @@ export function interpretOpencodePart(data: Record<string, unknown>, ts: string)
           ts,
         });
         
-        // Jeśli tool zakończony, dodaj tool-result
+        // If tool finished, add tool-result.
         const status = str(state?.status);
         if (status === 'completed' || status === 'error') {
           facts.push({ kind: 'tool-result', isError: status === 'error', ts });
@@ -152,7 +152,7 @@ export function interpretOpencodePart(data: Record<string, unknown>, ts: string)
     }
     
     case 'file': {
-      // Plik załączony - nie generuje fakty narzędzia
+      // Attached file: does not generate a tool fact.
       break;
     }
     
@@ -163,7 +163,7 @@ export function interpretOpencodePart(data: Record<string, unknown>, ts: string)
     }
     
     case 'compaction': {
-      // Sesja skompaktowana - koniec tury
+      // Session compacted: end of turn.
       facts.push({ kind: 'turn-end', ts });
       break;
     }
@@ -172,11 +172,11 @@ export function interpretOpencodePart(data: Record<string, unknown>, ts: string)
   return facts;
 }
 
-/** Parsuje wiadomość użytkownika z OpenCode → Fakty. */
+/** Parses OpenCode user message -> Facts. */
 export function interpretOpencodeMessage(data: Record<string, unknown>, ts: string): Fact[] {
   const facts: Fact[] = [];
   
-  // Sprawdź czy to wiadomość użytkownika (ma części typu 'text' z promptem)
+  // Check whether this is a user message (has 'text' parts with prompt).
   const parts = data.parts as Array<Record<string, unknown>> | undefined;
   if (parts) {
     for (const part of parts) {
@@ -192,7 +192,7 @@ export function interpretOpencodeMessage(data: Record<string, unknown>, ts: stri
   return facts;
 }
 
-/** Ekstrahuje metadane z sesji OpenCode. */
+/** Extracts metadata from an OpenCode session. */
 export function extractOpencodeMeta(sessionRow: Record<string, unknown>): { model?: string; cwd?: string; gitBranch?: string } {
   const modelData = sessionRow.model as string | undefined;
   let model: string | undefined;
@@ -212,28 +212,28 @@ export function extractOpencodeMeta(sessionRow: Record<string, unknown>): { mode
   };
 }
 
-/** Ścieżka do bazy danych OpenCode. */
+/** Path to OpenCode database. */
 export function getOpencodeDbPath(): string {
   return join(homedir(), '.local', 'share', 'opencode', 'opencode.db');
 }
 
 /**
- * Źródło OpenCode - kompatybilne z AgentSource, ale używane
- * tylko dla parseLine (nie dla file watching - bo OpenCode używa SQLite).
+ * OpenCode source: compatible with AgentSource, but used only for parseLine
+ * (not file watching, because OpenCode uses SQLite).
  */
 export const opencodeSource: AgentSource = {
   id: 'opencode',
-  roots: () => [], // Nie używamy file watching dla OpenCode
+  roots: () => [], // No file watching for OpenCode.
   depth: 0,
   classify(_path: string, _root: string): ClassifiedFile {
-    return { kind: 'other' }; // OpenCode nie używa classify
+    return { kind: 'other' }; // OpenCode does not use classify.
   },
   parseLine(line: string): Fact[] {
     try {
       const data = JSON.parse(line);
       const ts = new Date().toISOString();
       
-      // Sprawdź czy to part czy message
+      // Check whether this is part or message.
       if (data.type && typeof data.type === 'string') {
         return interpretOpencodePart(data, ts);
       }

@@ -1,10 +1,10 @@
 /**
- * Zabezpieczenia, żeby zoom dotyczył TYLKO mapy, nie całej strony.
+ * Guards so zoom applies ONLY to the map, not the whole page.
  *
- * Pinch na trackpadzie wysyła `wheel` z `ctrlKey` (Chrome/Firefox) albo zdarzenia
- * `gesture*` (Safari) — przeglądarka traktuje je jako zoom strony (skalując też
- * HUD). Przechwytujemy je `preventDefault`; pixi-viewport i tak zoomuje mapę z
- * własnych listenerów. Zwykły scroll (bez ctrl) zostawiamy viewportowi.
+ * Trackpad pinch sends `wheel` with `ctrlKey` (Chrome/Firefox) or `gesture*`
+ * events (Safari); the browser treats them as page zoom (scaling HUD too).
+ * Intercept them with `preventDefault`; pixi-viewport still zooms the map from
+ * its own listeners. Regular scroll (without ctrl) is left to the viewport.
  */
 export function installCameraGuards(host: HTMLElement): () => void {
   const prevTouchAction = host.style.touchAction;

@@ -1,7 +1,7 @@
 {
   "name": "age-of-agents",
   "version": "0.5.0",
-  "description": "Age of Agents — wizualizacja sesji Claude Code jako gra RTS w pixel-arcie",
+  "description": "Age of Agents: visualize Claude Code sessions as a pixel-art RTS",
   "type": "module",
   "license": "MIT",
   "author": "Mateusz Pawelczuk",

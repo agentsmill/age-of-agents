@@ -1,27 +1,26 @@
 import type { ThemeDef } from '../theme/types';
 
 /**
- * Geometria dróg — JEDNO źródło prawdy dla renderu (placeholders.drawRoads)
- * i dla rasteryzacji pasa ziemi (terrain-map: dirt wzdłuż dróg). Dzięki temu
- * narysowana droga i tekstura ziemi pod nią pokrywają się (maska dirt to kapsuła
- * wokół osi, więc na ostrych zakrętach/końcach możliwa różnica 1–2 kafli).
+ * Road geometry: ONE source of truth for rendering (placeholders.drawRoads) and
+ * for rasterizing the dirt band (terrain-map: dirt along roads). This keeps the
+ * drawn road aligned with the ground texture beneath it (the dirt mask is a
+ * capsule around the axis, so sharp turns/ends can differ by 1-2 tiles).
  *
- * Droga to deterministyczny łuk (quadratic Bézier) między dwoma węzłami grafu,
- * z haszowanym wygięciem i falującą szerokością — bez Math.random, więc świat
- * jest identyczny między sesjami.
+ * A road is a deterministic arc (quadratic Bezier) between two graph nodes, with
+ * hashed bowing and wavy width. No Math.random, so the world is identical across sessions.
  */
 
-/** Punkt na osi drogi w przestrzeni siatki + lokalna pół-szerokość (kafle). */
+/** Point on the road axis in grid space + local half-width (tiles). */
 export interface RoadPoint {
   gx: number;
   gy: number;
   hw: number;
 }
 
-const BASE_HW = 0.5; // bazowa pół-szerokość drogi (kafle)
-const JUNCTION_BONUS = 0.5; // o ile szersza przy węzłach (placach/skrzyżowaniach)
-const WOBBLE_HW = 0.12; // amplituda organicznego falowania szerokości
-const MAX_BOW = 1.5; // maks. wygięcie łuku na środku (kafle)
+const BASE_HW = 0.5; // base road half-width (tiles)
+const JUNCTION_BONUS = 0.5; // extra width near nodes (squares/intersections)
+const WOBBLE_HW = 0.12; // organic width wobble amplitude
+const MAX_BOW = 1.5; // max arc bow at the middle (tiles)
 
 function hash01(a: number, b: number, seed: number): number {
   let h = (a * 374761393 + b * 668265263 + seed * 2246822519) >>> 0;
@@ -36,21 +35,21 @@ function resolveNode(theme: ThemeDef, id: string): { gx: number; gy: number } | 
 }
 
 /**
- * Deterministyczny łuk między dwoma węzłami + profil szerokości.
- * Bézier PRZECHODZI przez końce (t=0, t=1), więc drogi spotykają się dokładnie
- * w węzłach — ciągłość na skrzyżowaniach zachowana mimo wygięcia.
+ * Deterministic arc between two nodes + width profile.
+ * Bezier PASSES through endpoints (t=0, t=1), so roads meet exactly at nodes;
+ * intersection continuity is preserved despite bowing.
  */
 export function roadCurve(ax: number, ay: number, bx: number, by: number, seed: number): RoadPoint[] {
   const dx = bx - ax;
   const dy = by - ay;
   const len = Math.hypot(dx, dy) || 1;
-  const nx = -dy / len; // jednostkowa normalna do odcinka
+  const nx = -dy / len; // unit normal to the segment
   const ny = dx / len;
-  // wygięcie proporcjonalne do długości, ze stałym (haszowanym) znakiem i amplitudą
+  // bow proportional to length, with stable hashed sign and amplitude
   const bow = signed(Math.round(ax * 8 + bx), Math.round(ay * 8 + by), seed * 131 + 7) * Math.min(MAX_BOW, len * 0.16);
   const cx = (ax + bx) / 2 + nx * bow; // punkt kontrolny Béziera
   const cy = (ay + by) / 2 + ny * bow;
-  const wobFreq = 2 + Math.floor(hash01(seed, Math.round(len), 53) * 3); // 2..4 fale szerokości
+  const wobFreq = 2 + Math.floor(hash01(seed, Math.round(len), 53) * 3); // 2..4 width waves
   const wobPhase = hash01(seed, 99, 17) * Math.PI * 2;
   const steps = Math.max(8, Math.round(len * 2));
   const pts: RoadPoint[] = [];
@@ -59,14 +58,14 @@ export function roadCurve(ax: number, ay: number, bx: number, by: number, seed: 
     const mt = 1 - t;
     const x = mt * mt * ax + 2 * mt * t * cx + t * t * bx;
     const y = mt * mt * ay + 2 * mt * t * cy + t * t * by;
-    const junction = Math.abs(Math.cos(Math.PI * t)); // 1 przy węzłach, 0 w środku
+    const junction = Math.abs(Math.cos(Math.PI * t)); // 1 at nodes, 0 in the middle
     const wobble = WOBBLE_HW * Math.sin(t * Math.PI * wobFreq + wobPhase);
     pts.push({ gx: x, gy: y, hw: BASE_HW + JUNCTION_BONUS * junction + wobble });
   }
   return pts;
 }
 
-/** Krzywe wszystkich dróg motywu — jedna polilinia na krawędź grafu (theme.edges). */
+/** Curves for all theme roads: one polyline per graph edge (theme.edges). */
 export function themeRoadCurves(theme: ThemeDef): RoadPoint[][] {
   const out: RoadPoint[][] = [];
   theme.edges.forEach(([aId, bId], i) => {
@@ -77,7 +76,7 @@ export function themeRoadCurves(theme: ThemeDef): RoadPoint[][] {
   return out;
 }
 
-/** Czy punkt (px,py) w przestrzeni siatki leży na którejś z dróg (wewnątrz pasa). */
+/** Whether point (px,py) in grid space lies on any road (inside the band). */
 export function pointOnRoad(curves: RoadPoint[][], px: number, py: number): boolean {
   for (const c of curves) {
     for (let i = 0; i < c.length - 1; i++) {

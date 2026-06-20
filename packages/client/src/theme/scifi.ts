@@ -2,9 +2,9 @@ import { isometric } from '../game/projection';
 import type { ThemeDef } from './types';
 
 /**
- * Motyw sci-fi (izometryczny, docelowo assety acdrnx CC0).
- * Ten sam układ logiczny co fantasy — zmienia się tylko projekcja,
- * nazwy budynków i paleta (marsjańska baza).
+ * Sci-fi theme (isometric, eventually acdrnx CC0 assets).
+ * Same logical layout as fantasy; only projection, building names, and palette
+ * change (martian base).
  */
 export const SCIFI: ThemeDef = {
   id: 'scifi',
@@ -12,8 +12,9 @@ export const SCIFI: ThemeDef = {
   style: 'iso',
   projection: isometric(64, 32),
   tile: 64,
-  // Bohaterowie sci-fi generowani w v3 (canvas 92px, stopa ≈ 0.74) — inna
-  // kalibracja niż fantasy (standard 68px). Treść ~42px × 1.0 ≈ render fantasy.
+  // Sci-fi heroes are generated in v3 (92px canvas, foot around 0.74), with
+  // different calibration than fantasy (standard 68px). Content ~42px x 1.0
+  // approximates the fantasy render.
   heroSprite: { scale: 1.0, footAnchor: 0.74 },
   grid: { w: 40, h: 26 },
   buildings: [
@@ -25,13 +26,13 @@ export const SCIFI: ThemeDef = {
     { id: 'barracks', label: 'Hangar', gx: 9, gy: 20, w: 3, h: 2, door: { gx: 11, gy: 19.5 }, placeholderColor: 0x1d9e75 },
     { id: 'market', label: 'Spaceport', gx: 26, gy: 20, w: 3, h: 2, door: { gx: 28, gy: 19.5 }, placeholderColor: 0xba7517 },
     { id: 'guild', label: 'Comms Station', gx: 17, gy: 20.5, w: 3, h: 2, door: { gx: 19.5, gy: 20 }, placeholderColor: 0xd4537e },
-    // Punti di raccolta sci-fi (cfr. fantasy arena/tavern/garden): holodeck per
-    // sessioni attive, mensa per chi aspetta, idroponica per chi ha finito.
+    // Sci-fi gathering points (compare fantasy arena/tavern/garden): holodeck for
+    // active sessions, mess for waiting ones, hydroponics for completed ones.
     { id: 'holodeck', label: 'Holodeck', gx: 22, gy: 4.5, w: 2, h: 2, door: { gx: 23, gy: 8 }, placeholderColor: 0x1d6eaa },
     { id: 'mess', label: 'Mess Hall', gx: 14, gy: 4.5, w: 2, h: 2, door: { gx: 15, gy: 8 }, placeholderColor: 0x8a6a3a },
     { id: 'hydroponics', label: 'Hydroponics', gx: 14, gy: 22, w: 2, h: 2, door: { gx: 15, gy: 21 }, placeholderColor: 0x2a8a4a },
-    // Ulteriori punti di raccolta sci-fi: lounge (NW, spazio sociale) e
-    // medbay (NE, recupero). Insieme a holodeck/mess/hydroponics, 5 gathering.
+    // Additional sci-fi gathering points: lounge (NW, social space) and medbay
+    // (NE, recovery). Together with holodeck/mess/hydroponics, 5 gathering spots.
     { id: 'lounge', label: 'Lounge', gx: 7, gy: 6, w: 2, h: 2, door: { gx: 8, gy: 9.5 }, placeholderColor: 0x8a4a7a },
     { id: 'medbay', label: 'Medbay', gx: 28, gy: 6, w: 2, h: 2, door: { gx: 29, gy: 9.5 }, placeholderColor: 0xc04a6a },
   ],
@@ -55,7 +56,7 @@ export const SCIFI: ThemeDef = {
     ['x-east', 'door:mine'],
     ['x-east', 'x-ne'],
     ['x-ne', 'door:forge'],
-    // Strade minori verso i punti di raccolta
+    // Minor roads toward gathering points.
     ['x-nw', 'door:holodeck'],
     ['x-nw', 'door:mess'],
     ['x-nw', 'door:lounge'],

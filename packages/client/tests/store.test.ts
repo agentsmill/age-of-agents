@@ -1,22 +1,22 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useWorld } from '../src/store';
-import type { ProjectArsenal } from '@agent-citadel/shared';
+import type { ProjectArsenal, TranscriptLine } from '@agent-citadel/shared';
 
 beforeEach(() => {
   useWorld.setState({ autofollow: false, selectedSessionId: undefined, selectedBuildingId: undefined, heroes: {} });
 });
 
-describe('autofollow w store', () => {
-  it('domyślnie wyłączony', () => {
+describe('autofollow in store', () => {
+  it('disabled by default', () => {
     expect(useWorld.getState().autofollow).toBe(false);
   });
 
-  it('setAutofollow(true) włącza', () => {
+  it('setAutofollow(true) enables it', () => {
     useWorld.getState().setAutofollow(true);
     expect(useWorld.getState().autofollow).toBe(true);
   });
 
-  it('zmiana zaznaczenia na INNĄ jednostkę resetuje autofollow', () => {
+  it('selection change to a DIFFERENT unit resets autofollow', () => {
     useWorld.getState().select('hero-1');
     useWorld.getState().setAutofollow(true);
     useWorld.getState().select('hero-2');
@@ -24,14 +24,14 @@ describe('autofollow w store', () => {
     expect(useWorld.getState().selectedSessionId).toBe('hero-2');
   });
 
-  it('ponowny klik w TĘ SAMĄ śledzoną jednostkę NIE zrywa autofollow', () => {
+  it('clicking the SAME followed unit again does NOT break autofollow', () => {
     useWorld.getState().select('hero-1');
     useWorld.getState().setAutofollow(true);
     useWorld.getState().select('hero-1');
     expect(useWorld.getState().autofollow).toBe(true);
   });
 
-  it('zamknięcie panelu (select(undefined)) resetuje autofollow', () => {
+  it('closing the panel (select(undefined)) resets autofollow', () => {
     useWorld.getState().select('hero-1');
     useWorld.getState().setAutofollow(true);
     useWorld.getState().select(undefined);
@@ -45,7 +45,7 @@ describe('autofollow w store', () => {
     expect(useWorld.getState().autofollow).toBe(false);
   });
 
-  it('usunięcie ŚLEDZONEGO bohatera czyści selekcję i autofollow', () => {
+  it('removing the FOLLOWED hero clears selection and autofollow', () => {
     useWorld.getState().select('hero-1');
     useWorld.getState().setAutofollow(true);
     useWorld.getState().apply({ type: 'hero-removed', sessionId: 'hero-1' });
@@ -53,7 +53,7 @@ describe('autofollow w store', () => {
     expect(useWorld.getState().autofollow).toBe(false);
   });
 
-  it('usunięcie INNEGO bohatera nie zmienia selekcji/autofollow', () => {
+  it('removing a DIFFERENT hero does not change selection/autofollow', () => {
     useWorld.getState().select('hero-1');
     useWorld.getState().setAutofollow(true);
     useWorld.getState().apply({ type: 'hero-removed', sessionId: 'hero-2' });
@@ -66,20 +66,48 @@ function arsenal(over: Partial<ProjectArsenal>): ProjectArsenal {
   return { projectDir: 'PD', projectName: 'p', activeSessions: 1, skills: [], connectors: [], hooks: [], agents: [], refreshedAt: 1, ...over };
 }
 
+function transcript(over: Partial<TranscriptLine>): TranscriptLine {
+  return { sessionId: 's1', role: 'assistant', text: 'Ready', ts: '2026-06-20T12:00:00.000Z', ...over };
+}
+
 describe('store arsenal-updated', () => {
-  it('zapisuje arsenał per projectDir', () => {
+  it('stores arsenal per projectDir', () => {
     useWorld.getState().apply({ type: 'arsenal-updated', arsenal: arsenal({ projectDir: 'PD' }) });
     expect(useWorld.getState().arsenal['PD']?.projectName).toBe('p');
   });
 });
 
-describe('store snapshot — arsenał', () => {
-  beforeEach(() => useWorld.setState({ arsenal: {} }));
+describe('store snapshot', () => {
+  beforeEach(() => useWorld.setState({ arsenal: {}, transcripts: {} }));
 
-  it('snapshot z arsenals[] zapełnia arsenał (replay dla świeżo podłączonego klienta)', () => {
+  it('hydrates transcripts and arsenal from one snapshot', () => {
     useWorld.getState().apply({
-      type: 'snapshot', heroes: [], peons: [], missions: [], arsenals: [arsenal({ projectDir: 'PD' })],
+      type: 'snapshot',
+      heroes: [],
+      peons: [],
+      missions: [],
+      transcripts: [
+        transcript({ sessionId: 's1', role: 'user', text: 'Start' }),
+        transcript({ sessionId: 's1', role: 'assistant', text: 'Ready' }),
+      ],
+      arsenals: [arsenal({ projectDir: 'PD' })],
     });
+
+    expect(useWorld.getState().transcripts['s1']?.map((line) => line.text)).toEqual(['Start', 'Ready']);
     expect(useWorld.getState().arsenal['PD']?.projectName).toBe('p');
+  });
+
+  it('accepts legacy snapshots without arsenal data', () => {
+    const legacySnapshot = {
+      type: 'snapshot',
+      heroes: [],
+      peons: [],
+      missions: [],
+      transcripts: [transcript({ sessionId: 'legacy', text: 'Old snapshot' })],
+    };
+    useWorld.getState().apply(legacySnapshot as never);
+
+    expect(useWorld.getState().transcripts['legacy']?.map((line) => line.text)).toEqual(['Old snapshot']);
+    expect(useWorld.getState().arsenal).toEqual({});
   });
 });

@@ -77,6 +77,18 @@ npm run demo     # server (demo) + client (Vite) → http://localhost:5173
 npm run dev      # visualize your real sessions
 ```
 
+For focused local testing you can limit which session sources are watched:
+
+```bash
+AOA_SOURCES=codex npm run dev
+AOA_SOURCES=claude,codex npm run dev
+AOA_CODEX_LOOKBACK_DAYS=3 npm run dev
+```
+
+`AOA_SOURCES` accepts `claude`, `codex`, `opencode`, and `koda`.
+Codex watches recent date folders by default instead of the entire historical
+`~/.codex/sessions` tree.
+
 ## 🧭 How it works
 
 ```

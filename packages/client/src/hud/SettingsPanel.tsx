@@ -3,7 +3,7 @@ import { useUi } from '../i18n';
 import { BuildingReactionsEditor } from './BuildingReactionsEditor';
 import { ModelRegistryEditor } from './ModelRegistryEditor';
 
-/** Modal ustawień. Sekcjonowany — na razie jedna sekcja: reakcje budynków. */
+/** Settings modal. Sectioned; currently one section: building reactions. */
 export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const t = useUi();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -15,7 +15,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         onClose();
         return;
       }
-      // Minimalny focus-trap: Tab/Shift+Tab cyklują w obrębie dialogu.
+      // Minimal focus trap: Tab/Shift+Tab cycle within the dialog.
       if (e.key === 'Tab') {
         const dialog = dialogRef.current;
         if (!dialog) return;
@@ -47,7 +47,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
     <div
       className="settings-overlay"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose(); // klik w tło zamyka
+        if (e.target === e.currentTarget) onClose(); // backdrop click closes
       }}
     >
       <div

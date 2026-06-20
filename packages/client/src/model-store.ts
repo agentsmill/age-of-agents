@@ -2,15 +2,16 @@ import { create } from 'zustand';
 import {
   resolveModel,
   DEFAULT_MODEL_CONFIG,
+  upgradeModelConfig,
   validateModelConfig,
   type ModelConfig,
   type ResolvedModel,
 } from './theme/models';
 
 /**
- * Store edytowalnego rejestru modeli. Lokalny serwer = źródło prawdy (plik), ale
- * klient trzyma optymistyczny cache, by świat reagował NATYCHMIAST: setModels
- * ustawia stan + localStorage + PUT w tle. Bliźniak mapping-store.ts.
+ * Editable model-registry store. The local server is the source of truth (file),
+ * but the client keeps an optimistic cache so the world reacts IMMEDIATELY:
+ * setModels updates state + localStorage + background PUT. Twin of mapping-store.ts.
  */
 const STORAGE_KEY = 'age-of-agents.models';
 
@@ -20,7 +21,7 @@ function readCache(): ModelConfig {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_MODEL_CONFIG;
     const res = validateModelConfig(JSON.parse(raw));
-    return res.ok ? res.config : DEFAULT_MODEL_CONFIG;
+    return res.ok ? upgradeModelConfig(res.config) : DEFAULT_MODEL_CONFIG;
   } catch {
     return DEFAULT_MODEL_CONFIG;
   }
@@ -31,7 +32,7 @@ function writeCache(config: ModelConfig): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   } catch {
-    /* quota / prywatny tryb → ignoruj */
+    /* quota / private mode: ignore */
   }
 }
 
@@ -43,10 +44,10 @@ function putModels(config: ModelConfig): void {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(config),
     }).catch(() => {
-      /* PUT nieblokujący */
+      /* non-blocking PUT */
     });
   } catch {
-    /* synchroniczny rzut fetch */
+    /* synchronous fetch throw */
   }
 }
 
@@ -62,11 +63,11 @@ export const useModels = create<ModelStore>((set, get) => ({
   models: readCache(),
   modelsLoaded: false,
   setModels: (config) => {
-    set({ models: config }); // stan zawsze aktualny — edytor pokazuje bieżący wpis na żywo
-    // Persystuj TYLKO poprawny config. Stan przejściowo niepoprawny (np. świeżo
-    // dodany wiersz z pustym wzorcem) nie może trafić do localStorage/serwera —
-    // inaczej readCache przy reloadzie odrzuciłby CAŁY config i zresetował do
-    // DEFAULT, gubiąc pozostałe edycje usera.
+    set({ models: config }); // state always current; editor shows the live entry
+    // Persist ONLY valid config. Temporarily invalid state (for example a freshly
+    // added row with an empty pattern) must not reach localStorage/server, or
+    // readCache would reject the WHOLE config on reload and reset to DEFAULT,
+    // losing the user's other edits.
     if (validateModelConfig(config).ok) {
       writeCache(config);
       putModels(config);
@@ -84,20 +85,21 @@ export const useModels = create<ModelStore>((set, get) => ({
         const parsed: unknown = await res.json();
         const v = validateModelConfig(parsed);
         if (v.ok) {
-          set({ models: v.config });
-          writeCache(v.config);
+          const upgraded = upgradeModelConfig(v.config);
+          set({ models: upgraded });
+          writeCache(upgraded);
         }
       }
     } catch {
-      /* sieć padła → zostaje cache/DEFAULT */
+      /* network failed: keep cache/DEFAULT */
     }
     set({ modelsLoaded: true });
   },
 }));
 
 /**
- * Resolver dla konsumentów spoza Reacta (ticker w game/view.ts): czyta aktualny
- * config ze store przez getState — bez couplingu z drzewem React.
+ * Resolver for non-React consumers (ticker in game/view.ts): reads current
+ * config from the store via getState, without coupling to the React tree.
  */
 export function resolveModelLive(model: string | undefined): ResolvedModel {
   return resolveModel(model, useModels.getState().models);

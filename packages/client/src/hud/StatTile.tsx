@@ -1,4 +1,4 @@
-/** Beveled kafelek statystyki HUD (pixel-art, Wariant B) — wspólny dla paneli postaci i budynku. */
+/** Beveled HUD stat tile (pixel-art, Variant B), shared by character and building panels. */
 export function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="stat-tile">

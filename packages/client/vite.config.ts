@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 export default defineConfig({
   plugins: [react()],
   build: {
-    // Wspólny katalog dystrybucji w korzeniu repo (root/dist/web).
+    // Shared distribution directory at the repository root (root/dist/web).
     outDir: fileURLToPath(new URL('../../dist/web', import.meta.url)),
     emptyOutDir: true,
   },

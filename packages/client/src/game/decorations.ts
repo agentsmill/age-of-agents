@@ -4,14 +4,14 @@ import type { TerrainId } from './terrain-map';
 export type DecoKind = 'tree' | 'rock' | 'bush' | 'flower';
 export interface DecoPlacement { gx: number; gy: number; kind: DecoKind; }
 
-/** Deterministyczny hash komórki (styl spotJitter, bez Math.random). */
+/** Deterministic cell hash (spotJitter style, no Math.random). */
 export function cellHash(gx: number, gy: number, salt: number): number {
   let h = ((salt * 2654435761) ^ (gx * 73856093) ^ (gy * 19349663)) >>> 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return (h ^ (h >>> 16)) >>> 0;
 }
 
-/** Komórka w obrysie któregokolwiek budynku (+1 otulina), by drzewa nie kleiły się do ścian. */
+/** Cell in any building outline (+1 padding), so trees do not stick to walls. */
 function inBuilding(theme: ThemeDef, gx: number, gy: number): boolean {
   return theme.buildings.some(
     (b) => gx >= b.gx - 1 && gx < b.gx + b.w + 1 && gy >= b.gy - 1 && gy < b.gy + b.h + 1,
@@ -19,28 +19,28 @@ function inBuilding(theme: ThemeDef, gx: number, gy: number): boolean {
 }
 
 /**
- * WKŁAD USERA (learning) — reguła rozsiewu dekoracji dla pojedynczej komórki.
- * Zwraca { place, kind }. Determinizm: użyj cellHash(gx,gy,salt) (NIE Math.random).
- * Pomysły estetyczne: drzewa kępami (sprawdź sąsiadów / niski próg + spójny szum),
- * kwiaty częste ale drobne, skały/krzaki rzadkie. Wywoływana tylko dla komórek
- * 'grass' poza budynkami (scatterDecorations filtruje resztę).
+ * USER CONTRIBUTION (learning): decoration scatter rule for one cell.
+ * Returns { place, kind }. Determinism: use cellHash(gx,gy,salt) (NOT Math.random).
+ * Aesthetic ideas: trees in groves (check neighbors / low threshold + coherent noise),
+ * frequent but tiny flowers, rare rocks/bushes. Called only for 'grass' cells
+ * outside buildings (scatterDecorations filters the rest).
  */
 export function decoRule(gx: number, gy: number): { place: boolean; kind: DecoKind } {
-  const grove = cellHash(gx >> 2, gy >> 2, 11) / 4294967296; // gruba krata 4×4 → spójne gaje
+  const grove = cellHash(gx >> 2, gy >> 2, 11) / 4294967296; // coarse 4x4 grid -> coherent groves
   const r = cellHash(gx, gy, 0) / 4294967296;
   if (grove > 0.7) {
-    // teren leśny: kępa drzew z domieszką krzaków
+    // forest terrain: tree cluster with some bushes
     if (r < 0.35) return { place: true, kind: 'tree' };
     if (r < 0.42) return { place: true, kind: 'bush' };
   } else if (r < 0.06) {
-    // otwarta łąka: rzadkie kwiaty
+    // open meadow: sparse flowers
     return { place: true, kind: 'flower' };
   }
-  if (r > 0.99) return { place: true, kind: 'rock' }; // bardzo rzadkie głazy wszędzie
+  if (r > 0.99) return { place: true, kind: 'rock' }; // very rare boulders everywhere
   return { place: false, kind: 'tree' };
 }
 
-/** Rozsiewa dekoracje po komórkach 'grass' poza budynkami, z jitterem subkomórkowym. */
+/** Scatters decorations over 'grass' cells outside buildings, with sub-cell jitter. */
 export function scatterDecorations(theme: ThemeDef, terrain: TerrainId[][]): DecoPlacement[] {
   const out: DecoPlacement[] = [];
   for (let gy = 0; gy < theme.grid.h; gy++) {

@@ -4,8 +4,8 @@ import { spawn } from 'node:child_process';
 import { startServer } from './server.js';
 import { parseArgs, shouldOpenBrowser } from './cli-args.js';
 
-// Siatka bezpieczeństwa: po starcie pojedynczy nieobsłużony błąd nie może wygasić
-// serwera wizualizacji. Błędy startu i tak lecą do main().catch poniżej.
+// Safety net: after startup, a single unhandled error must not shut down the
+// visualization server. Startup errors still go to main().catch below.
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled promise rejection — server keeps running:', reason);
 });
@@ -35,12 +35,12 @@ function openBrowser(url: string): void {
   const args = platform === 'win32' ? ['/c', 'start', '', url] : [url];
   try {
     const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
-    // ENOENT (brak `open`/`xdg-open`, np. headless Linux) leci jako async event
-    // 'error', nie wyjątek — bez tego handlera proces by się wywalił po starcie.
+    // ENOENT (missing `open`/`xdg-open`, e.g. headless Linux) arrives as async event
+    // 'error', not exception; without this handler the process would crash after startup.
     child.on('error', () => {});
     child.unref();
   } catch {
-    // Brak przeglądarki / środowisko bez GUI — ignorujemy, URL i tak jest wypisany.
+    // No browser / GUI-less environment: ignore, the URL is printed anyway.
   }
 }
 
@@ -51,8 +51,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  // cli.js leży w dist/ obok dist/web/ → katalog klienta liczymy względem siebie,
-  // nie względem cwd (npx może być odpalony z dowolnego katalogu).
+  // cli.js lives in dist/ next to dist/web/: compute client directory relative
+  // to it, not cwd (npx may be run from any directory).
   const webRoot = join(dirname(fileURLToPath(import.meta.url)), 'web');
 
   let port = opts.port;
@@ -70,7 +70,7 @@ async function main(): Promise<void> {
       return;
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
-      // Próbujemy do 10 portów: gdy dziesiąty (attempt === 9) też zajęty, rzucamy błąd.
+      // Try up to 10 ports: if the tenth (attempt === 9) is also busy, throw.
       if (e.code === 'EADDRINUSE' && attempt < 9) {
         port += 1;
         continue;

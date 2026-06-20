@@ -15,7 +15,7 @@ function hero(over: Partial<HeroSnapshot>): HeroSnapshot {
 }
 
 describe('ArsenalPoller.refreshOnce', () => {
-  it('emituje arsenal-updated z efektywnym ekwipunkiem; drugi raz bez zmian = brak emisji', async () => {
+  it('emits arsenal-updated with effective arsenal; second unchanged run = no emission', async () => {
     const wd = await fs.mkdtemp(path.join(os.tmpdir(), 'ars-wd-'));
     await fs.mkdir(path.join(wd, '.claude'), { recursive: true });
     await fs.writeFile(path.join(wd, '.claude', 'settings.json'), JSON.stringify({

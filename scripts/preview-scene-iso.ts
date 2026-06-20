@@ -1,6 +1,6 @@
-// Offline kompozyt sceny IZOMETRYCZNEJ dla wybranego motywu → PNG.
-// Replikuje placement silnika (buildIsoTilemap + buildBuildingSprite + scatter).
-// Uruchom: npx tsx scripts/preview-scene-iso.ts [fantasy|scifi]
+// Offline ISOMETRIC scene composite for the selected theme -> PNG.
+// Replicates engine placement (buildIsoTilemap + buildBuildingSprite + scatter).
+// Run: npx tsx scripts/preview-scene-iso.ts [fantasy|scifi]
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -51,7 +51,7 @@ function blit(src: PNG, ox: number, oy: number, dw: number, dh: number, tint = 1
   }
 }
 
-// mirror tilemap-iso.ts: tint jitter + kontur graniczny + feather sąsiadów
+// mirror tilemap-iso.ts: tint jitter + boundary outline + neighbor feathering
 const FEATHER_ALPHA = 0.45, FEATHER_SCALE = 0.7, FEATHER_OFFSET = 0.28, BOUNDARY_SHADE = 0.94;
 const jitter01 = (gx: number, gy: number) => 0.95 + ((((gx * 73856093) ^ (gy * 19349663)) >>> 0) % 100) / 1000;
 const cells: { gx: number; gy: number }[] = [];
@@ -73,7 +73,7 @@ for (const { gx, gy } of cells) {
   }
 }
 
-// --- drogi: wstęga o zmiennej szerokości wzdłuż krzywych (mirror placeholders.drawRoads) ---
+// --- roads: variable-width ribbon along curves (mirror placeholders.drawRoads) ---
 function pointInPoly(x: number, y: number, poly: { x: number; y: number }[]): boolean {
   let sign = 0;
   for (let i = 0; i < poly.length; i++) {
@@ -98,7 +98,7 @@ function fillQuad(poly: { x: number; y: number }[], r: number, g: number, b: num
   for (let y = miny; y <= maxy; y++)
     for (let x = minx; x <= maxx; x++) if (pointInPoly(x + 0.5, y + 0.5, poly)) px(x, y, r, g, b, a);
 }
-// zaokrąglony koniec drogi — mirror placeholders.drawCap (promień = połowa szerokości wstęgi)
+// rounded road end - mirror placeholders.drawCap (radius = half the ribbon width)
 function fillDisc(l: { x: number; y: number }, rr: { x: number; y: number }, r: number, g: number, b: number) {
   const cx = (l.x + rr.x) / 2, cy = (l.y + rr.y) / 2, rad = Math.hypot(l.x - rr.x, l.y - rr.y) / 2;
   const R = Math.ceil(rad);
@@ -147,8 +147,8 @@ for (const d of decos) if (d.kind === 'tree' || d.kind === 'rock') items.push({ 
 items.sort((a, b) => a.depth - b.depth);
 for (const it of items) it.draw();
 
-// --- FX aktywności budynków (Zadanie 3): poświata + drobinki nad "pracującymi" ---
-// Statyczny podgląd dynamicznego efektu. Aktywne budynki: env FX_ACTIVE="forge,tower,..."
+// --- building activity FX (Task 3): glow + particles above "working" buildings ---
+// Static preview of the dynamic effect. Active buildings: env FX_ACTIVE="forge,tower,..."
 const ACTIVE = (process.env.FX_ACTIVE ?? 'forge,tower,mine,market').split(',');
 function add(x: number, y: number, r: number, g: number, b: number, a: number) {
   x = Math.round(x); y = Math.round(y);
@@ -162,7 +162,7 @@ function add(x: number, y: number, r: number, g: number, b: number, a: number) {
 function glowDisc(cx: number, cy: number, rad: number, r: number, g: number, b: number, peak: number) {
   for (let y = -rad; y <= rad; y++)
     for (let x = -rad; x <= rad; x++) {
-      const d = Math.hypot(x, y * 2); // spłaszczenie izo
+      const d = Math.hypot(x, y * 2); // iso flattening
       if (d > rad) continue;
       add(cx + x, cy + y, r, g, b, peak * (1 - d / rad) ** 2);
     }
@@ -189,4 +189,4 @@ for (const b of theme.buildings) {
 
 mkdirSync('downloads', { recursive: true });
 writeFileSync(`downloads/scene-iso-${themeId}.png`, PNG.sync.write(out));
-console.log(`scene-iso-${themeId}.png ${W}x${H} (${theme.buildings.length} budynków, ${decos.length} dekoracji)`);
+console.log(`scene-iso-${themeId}.png ${W}x${H} (${theme.buildings.length} buildings, ${decos.length} decorations)`);

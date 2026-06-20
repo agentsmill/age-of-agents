@@ -1,10 +1,10 @@
 /**
- * Wypełnianie prostokątnego obszaru ekranu kaflami izometrycznymi.
+ * Filling a rectangular screen area with isometric tiles.
  *
  * Projekcja izo (toScreen): sx = (gx−gy)·tileW/2, sy = (gx+gy)·tileH/2.
- * Prostokąt indeksów siatki rzutuje się na DIAMENT, a diament indeksów — na
- * PROSTOKĄT. Żeby pokryć prostokątny viewport kaflami, trzeba więc renderować
- * diamentowy zakres komórek (część o ujemnych/nadmiarowych indeksach).
+ * A grid-index rectangle projects to a DIAMOND, and an index diamond projects to
+ * a RECTANGLE. To cover a rectangular viewport with tiles, render a diamond
+ * range of cells (including some negative/excess indices).
  */
 
 export interface WorldRect {
@@ -21,17 +21,16 @@ export interface CellRange {
   gyMax: number;
 }
 
-/** Odwrotność projekcji izometrycznej: piksel ekranu → współrzędna siatki (float). */
+/** Inverse of isometric projection: screen pixel -> grid coordinate (float). */
 export function invIso(tileW: number, tileH: number, sx: number, sy: number): { gx: number; gy: number } {
   return { gx: sx / tileW + sy / tileH, gy: sy / tileH - sx / tileW };
 }
 
 /**
- * Zakres indeksów komórek (z paddingiem ±1) gwarantujący, że renderowanie
- * każdej komórki z tego zakresu pokryje cały prostokąt świata. Odwracamy
- * projekcję dla 4 rogów prostokąta; ekstrema gx/gy (funkcja liniowa) leżą w
- * rogach, więc min/max po rogach jest dokładne. Padding zabezpiecza poszarpaną
- * krawędź teselacji.
+ * Cell index range (with +/-1 padding) guaranteeing that rendering every cell
+ * in this range covers the whole world rectangle. Invert the projection for the
+ * rectangle's 4 corners; gx/gy extrema (linear functions) are at the corners, so
+ * min/max over corners is exact. Padding protects the jagged tessellation edge.
  */
 export function isoFillRange(tileW: number, tileH: number, rect: WorldRect): CellRange {
   const corners = [

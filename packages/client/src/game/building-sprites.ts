@@ -5,11 +5,11 @@ const tex = new Map<string, Texture>();
 let currentTheme = '';
 
 /**
- * Ładuje tekstury budynków danego motywu wprost z PNG (unikalny URL per motyw
- * → brak globalnej kolizji cache Pixi po nazwie klatki/obrazu). Brak → fallback.
+ * Loads building textures for a theme directly from PNG (unique URL per theme
+ * -> no global Pixi cache collision by frame/image name). Missing -> fallback.
  *
- * WAŻNE: unload starego tematu, bo Pixi 8 pamięta assety per URL i może oddać
- * starą teksturę z cache zamiast wczytać nową po zmianie motywu.
+ * IMPORTANT: unload the old theme, because Pixi 8 remembers assets per URL and
+ * may return an old cached texture instead of loading the new one after a theme change.
  */
 export async function loadBuildingSprites(themeId: string): Promise<void> {
   if (currentTheme && currentTheme !== themeId) {

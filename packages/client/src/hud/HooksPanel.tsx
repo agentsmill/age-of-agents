@@ -5,7 +5,7 @@ type Status = 'loading' | 'installed' | 'absent' | 'demo' | 'error';
 
 /**
  * Tryb turbo: hooki HTTP Claude Code. Instalacja modyfikuje
- * ~/.claude/settings.json — wymaga jawnego potwierdzenia użytkownika.
+ * ~/.claude/settings.json; requires explicit user confirmation.
  */
 export function HooksPanel() {
   const [status, setStatus] = useState<Status>('loading');

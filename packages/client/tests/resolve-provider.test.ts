@@ -48,4 +48,9 @@ describe('resolveProvider', () => {
   it('nieznany string (korupcja danych) → degraduje do claude, nie wybucha', () => {
     expect(resolveProvider('gemini' as AgentKind)).toBe(AGENT_PROVIDERS.claude);
   });
+
+  it('nazwy odziedziczonych właściwości obiektu → degraduje do claude', () => {
+    expect(resolveProvider('toString' as AgentKind)).toBe(AGENT_PROVIDERS.claude);
+    expect(resolveProvider('__proto__' as AgentKind)).toBe(AGENT_PROVIDERS.claude);
+  });
 });

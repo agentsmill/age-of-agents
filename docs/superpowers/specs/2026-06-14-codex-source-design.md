@@ -6,8 +6,8 @@ Status: zatwierdzony do implementacji
 ## Cel
 
 Wizualizować sesje **Codex** obok Claude w tym samym świecie RTS. Bohater Codeksa
-wychodzi z Twierdzy jak każdy inny; jego narzędzia (`shell`, `apply_patch`,
-`web_search`…) kierują go do tych samych budynków; **odznaka „C"** odróżnia go od
+wychodzi z Twierdzy jak każdy inny; jego narzędzia (`exec_command`, `apply_patch`,
+`tool_search_call`, `js`, `web.run`...) kierują go do tych samych budynków; **odznaka „C"** odróżnia go od
 Claude. Rdzeń gry (maszyna stanów, świat, klient) bez zmian semantycznych —
 dokładamy **źródło**, które produkuje `Fact[]`.
 
@@ -26,8 +26,10 @@ Motywacja: „żeby to nie było tylko od Claude Code".
 - **OpenCode** (SQLite + serwer SSE / pluginy) — osobny cykl.
 - **Hooki Codeksa** (`codex_hooks`, exec-based) — zostajemy na watcherze plików;
   rollouty JSONL są źródłem prawdy.
-- **Historyczna atrybucja tokenów per budynek dla Codeksa** (`/building-stats`
-  zostaje Claude-only). Żywe tokeny bohatera (panel) działają dla obu.
+- **Pierwotnie:** historyczna atrybucja tokenów per budynek dla Codeksa była
+  poza zakresem. **Aktualizacja 2026-06-20:** `/building-stats` skanuje teraz
+  zarówno `~/.claude/projects`, jak i `~/.codex/sessions`; dla Codeksa przypisuje
+  deltę `token_count.output_tokens` do ostatniego widzianego narzędzia.
 - **Peony/subagenci dla Codeksa** — Codex nie ma struktury subagentów; logika
   peonów zostaje, lecz dla Codeksa nieużywana.
 
@@ -92,40 +94,51 @@ Defensywny jak `interpretLine` (nieznany/uszkodzony rekord → `[]`).
 
 | Rekord Codeksa | Fakt |
 |---|---|
-| `session_meta` → `payload.cwd`, `model_provider`/`model` | `meta {cwd, model?}` |
+| `turn_context` → `payload.cwd`, `payload.model` | `meta {cwd, model?}` |
+| `session_meta` → `payload.cwd`, `payload.model` | `meta {cwd, model?}`; `model_provider: openai` nie jest nazwą modelu |
 | `response_item` / `payload.type='message'` role `user` (po filtrze) | `prompt` |
 | `response_item` / `payload.type='message'` role `assistant` (`output_text`) | `assistant-text` |
 | `response_item` / `payload.type='reasoning'` | `thinking` |
 | `response_item` / `payload.type='function_call'` (`name`,`arguments`) | `tool-start` (nazwa znormalizowana) |
+| `response_item` / `payload.type='custom_tool_call'` (`name`,`input`) | `tool-start` (nazwa znormalizowana) |
+| `response_item` / `payload.type='tool_search_call'` | `tool-start {tool: ToolSearch}` |
 | `response_item` / `payload.type='function_call_output'` (błąd?) | `tool-result {isError}` |
-| `event_msg` / `payload.type='token_count'` (`total_token_usage`) | `usage-total` (nowy fakt) |
+| `event_msg` / `payload.type='token_count'` (`total_token_usage`, `last_token_usage`, `model_context_window`) | `usage-total` |
 | `event_msg` / `payload.type='task_complete'` | `turn-end` |
 
 ### Nowy wariant faktu: `usage-total`
 
-W `facts.ts`: `{ kind: 'usage-total'; input: number; output: number }`.
+W `facts.ts`: `{ kind: 'usage-total'; input: number; output: number; context?;
+cachedInput?; reasoningOutput?; last? }`.
 
 Powód: `token_count` Codeksa jest **kumulatywny** (suma sesji), a istniejący
 `usage` jest **przyrostowy** (delta per wiadomość, dedup po `messageId`).
 Maszyna stanów na `usage-total` **ustawia** `tokens` (`{ input, output }`) zamiast
-dodawać. Mała, czysta zmiana — i poprawna dla Codeksa.
+dodawać oraz zapisuje `contextTokens`, kiedy parser dostaje `model_context_window`.
+Mała, czysta zmiana — i poprawna dla Codeksa.
 
 ### Normalizacja narzędzi (Codex → nazwa kanoniczna)
 
 Robiona w parserze, żeby klient pozostał „głupi" (`toolToBuilding` w shared bez
 zmian). Funkcja `codexToolToCanonical(name)`:
 
-- `shell` / `local_shell` / `exec` → `Bash` (kopalnia; detekcja `git` z
+- `shell` / `local_shell` / `exec` / `exec_command` / `functions.exec_command` → `Bash` (kopalnia; detekcja `git` z
   `arguments` nadal kieruje na targ)
 - `apply_patch` → `Edit` (kuźnia)
-- `read_file` / `view_image` → `Read` (biblioteka)
-- `web_search` → `WebSearch` (wieża)
+- `read_file` / `view_image` / `functions.view_image` → `Read` (biblioteka)
+- `web_search` / `web.run` / `search_query` / `image_query` → `WebSearch` (wieża)
+- `tool_search_call` / `tool_search_tool` / `tool_search.tool_search_tool` → `ToolSearch`
+- `update_plan` / `functions.update_plan` / `create_goal` / `get_goal` / `update_goal`
+  / `multi_tool_use.parallel` → `Workflow`
+- `functions.request_user_input` → `AskUserQuestion`
+- `js` → `mcp__node_repl__js`
 - MCP (nazwa serwer__narzędzie / nieznana z separatorem) → `mcp__…` (gildia)
-- `update_plan` / nieznane → bez mapowania (twierdza)
+- nieznane narzędzia bez reguły → bez mapowania (twierdza)
 
-`tool-start.detail` z `arguments` (parsowane JSON): dla `shell` — komenda; dla
-`apply_patch` — ścieżka pliku; dla `web_search` — zapytanie. Analogicznie do
-`toolDetail` Claude.
+`tool-start.detail` z `arguments`/`input` (parsowane JSON lub tekst): dla
+`exec_command` — `cmd`; dla `apply_patch` — ścieżka pliku; dla `web.run` —
+zapytanie; dla `update_plan` — pierwszy krok planu. Analogicznie do `toolDetail`
+Claude.
 
 ## Warstwa wizualna (odznaka)
 

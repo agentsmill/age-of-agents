@@ -32,7 +32,7 @@ function NotifCard({ n }: { n: Notification }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Hover pauzuje odliczanie (i pasek) — zdążysz przeczytać/kliknąć.
+  // Hover pauses countdown (and bar), giving time to read/click.
   const pause = () => {
     if (leaving) return;
     clearTimeout(timer.current);
@@ -89,7 +89,7 @@ function NotifCard({ n }: { n: Notification }) {
   );
 }
 
-/** Stos efemerycznych powiadomień w lewym-górnym rogu. */
+/** Ephemeral notification stack in the top-left corner. */
 export function NotificationFeed() {
   const notifications = useWorld((s) => s.notifications);
   if (notifications.length === 0) return null;

@@ -1,9 +1,9 @@
 import { SERVER_PORT } from '@agent-citadel/shared';
 
 /**
- * Tryb otwierania przeglądarki:
- *  - 'auto'   — domyślnie: otwórz, jeśli uruchomienie jest interaktywne (nie CI, jest TTY)
- *  - 'always' — wymuś otwarcie (flaga --open), nawet w CI / bez TTY
+ * Browser opening mode:
+ *  - 'auto'   default: open if launch is interactive (not CI, has TTY)
+ *  - 'always' force opening (--open flag), even in CI / without TTY
  *  - 'never'  — nie otwieraj (flaga --no-open)
  */
 export type OpenMode = 'auto' | 'always' | 'never';
@@ -42,11 +42,11 @@ export function parseArgs(argv: string[]): CliOptions {
 }
 
 /**
- * Czy faktycznie otworzyć przeglądarkę. Czysta decyzja (bez efektów ubocznych) —
- * środowisko (CI / TTY) wstrzykiwane, by była łatwo testowalna.
+ * Whether to actually open the browser. Pure decision (no side effects):
+ * environment (CI / TTY) is injected so this is easy to test.
  *
- * 'auto' otwiera tylko interaktywnie: pomija CI i wyjście nie-terminalowe
- * (skrypt/pipe/headless), żeby nie zaskakiwać automatów. --open wymusza,
+ * 'auto' opens only interactively: skips CI and non-terminal output
+ * (script/pipe/headless), so automation is not surprised. --open forces it.
  * --no-open blokuje.
  */
 export function shouldOpenBrowser(mode: OpenMode, env: { ci: boolean; isTTY: boolean }): boolean {

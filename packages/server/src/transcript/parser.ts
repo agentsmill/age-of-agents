@@ -1,7 +1,7 @@
 import { basename } from 'node:path';
 import type { Fact } from './facts.js';
 
-/** Skraca tekst do dymków/panelu. */
+/** Shortens text for bubbles/panel. */
 function clip(text: string, max = 240): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
@@ -11,15 +11,15 @@ function isClearCommand(text: string): boolean {
 }
 
 /**
- * Czy tekst to PROMPT CZŁOWIEKA, a nie syntetyczna tura Claude Code.
- * Transkrypt miesza prawdziwe prompty z: przerwaniami, blokami
- * <system-reminder>/<command-*>/<local-command-*>, "Caveat:…", wstrzyknięciami
- * skilli ("Base directory for this skill:…"). Bez filtra trafiają one do misji
- * i nazw bohaterów jako śmieci.
+ * Whether text is a HUMAN PROMPT, not a synthetic Claude Code turn.
+ * The transcript mixes real prompts with interruptions, blocks such as
+ * <system-reminder>/<command-*>/<local-command-*>, "Caveat:...", and skill
+ * injections ("Base directory for this skill:..."). Without this filter they
+ * pollute missions and hero names.
  *
- * WKŁAD USERA (learning): to heurystyka — dostrój listę odrzuceń pod swoje sesje.
- * Jest celowo KONSERWATYWNA: odrzuca tylko jawne markery systemowe, a markdown
- * ("# Zadanie:…") i krótkie wiadomości ("tak deploy") traktuje jak realne prompty.
+ * USER CONTRIBUTION (learning): this is a heuristic; tune the rejection list for your sessions.
+ * It is intentionally CONSERVATIVE: rejects only explicit system markers, and
+ * treats markdown ("# Task:...") and short messages ("yes deploy") as real prompts.
  */
 export function isHumanPrompt(text: string): boolean {
   const t = text.trim();
@@ -32,7 +32,7 @@ export function isHumanPrompt(text: string): boolean {
   return true;
 }
 
-/** Wyciąga krótki opis pracy z inputu narzędzia (do dymka nad jednostką). */
+/** Extracts a short work description from tool input (for the bubble over the unit). */
 export function toolDetail(tool: string, input: Record<string, unknown> | undefined): string | undefined {
   if (!input) return undefined;
   const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
@@ -60,9 +60,9 @@ export function toolDetail(tool: string, input: Record<string, unknown> | undefi
 }
 
 /**
- * Parsuje jedną linię JSONL transkryptu na listę Faktów.
- * Nieznane/uszkodzone rekordy → pusta lista (format zmienia się między
- * wersjami CLI, więc wszystko czytamy defensywnie).
+ * Parses one transcript JSONL line into a list of Facts.
+ * Unknown/broken records -> empty list (format changes between CLI versions, so
+ * read everything defensively).
  */
 export function interpretLine(line: string): Fact[] {
   let record: any;
@@ -83,9 +83,9 @@ export function interpretLine(line: string): Fact[] {
       }
       break;
 
-    // Tylko JAWNE tytuły sesji (nadane przez CLI) nazywają bohatera. 'last-prompt'
-    // celowo pominięty — nazwa z ostatniego promptu skakała przy każdej turze;
-    // nazwę wyprowadza state-machine (pierwszy realny prompt → projekt → UUID).
+    // Only EXPLICIT session titles (assigned by CLI) name the hero. 'last-prompt'
+    // is intentionally skipped: name from last prompt jumped every turn; state-machine
+    // derives the name (first real prompt -> project -> UUID).
     case 'custom-title':
       if (typeof record.customTitle === 'string') facts.push({ kind: 'title', title: record.customTitle });
       break;

@@ -14,20 +14,20 @@ interface WorldStore {
   heroes: Record<string, HeroSnapshot>;
   peons: Record<string, PeonSnapshot>;
   missions: Record<string, MissionSnapshot>;
-  /** Ostatnie linie transkryptu per sesja (bufor do panelu bocznego). */
+  /** Latest transcript lines per session (side-panel buffer). */
   transcripts: Record<string, TranscriptLine[]>;
-  /** Efemeryczne powiadomienia (stos w lewym-górnym rogu). */
+  /** Ephemeral notifications (stack in the top-left corner). */
   notifications: Notification[];
   selectedSessionId?: string;
   selectedBuildingId?: string;
-  /** Czy kamera ma śledzić wybranego bohatera (opt-in per agent; reset przy zmianie zaznaczenia). */
+  /** Whether the camera should follow the selected hero (opt-in per agent; resets on selection change). */
   autofollow: boolean;
-  /** Statyczny Arsenał per projectDir (Źródło A). */
+  /** Static Arsenal per projectDir (Source A). */
   arsenal: Record<string, ProjectArsenal>;
   /**
-   * Wybrany projekt (miasto). `undefined` = pokaż wszystkie (overlay).
-   * Wpływa na panel boczny: Architect Hall pokazuje tylko wybrany projekt,
-   * mapa filtruje agentów po projectDir.
+   * Selected project (city). `undefined` = show all (overlay).
+   * Affects the side panel: Architect Hall shows only the selected project,
+   * and the map filters agents by projectDir.
    */
   selectedProjectDir?: string;
   setConnected(connected: boolean): void;
@@ -41,7 +41,7 @@ interface WorldStore {
 
 const TRANSCRIPT_BUFFER = 200;
 
-/** Wstaw powiadomienie z dedupem (sessionId+reason w oknie per-waga) i limitem stosu. */
+/** Inserts a notification with deduping (sessionId+reason within the per-kind window) and stack limit. */
 function addNotif(list: Notification[], n: Notification | null, now: number): Notification[] {
   if (!n) return list;
   const dup = list.some(
@@ -61,9 +61,9 @@ export const useWorld = create<WorldStore>((set) => ({
   autofollow: false,
   arsenal: {},
   setConnected: (connected) => set({ connected }),
-  // Wybór jednostki i budynku wzajemnie się wykluczają (jeden panel po prawej).
-  // Reset autofollow tylko przy ZMIANIE celu (opt-in per agent): ponowny klik w już
-  // śledzoną jednostkę nie zrywa follow, a przełączenie na inną — owszem.
+  // Unit and building selection are mutually exclusive (one right-side panel).
+  // Reset autofollow only when the target CHANGES (opt-in per agent): clicking
+  // the already followed unit does not break follow, switching to another does.
   select: (sessionId) =>
     set((s) => ({
       selectedSessionId: sessionId,
@@ -83,7 +83,14 @@ export const useWorld = create<WorldStore>((set) => ({
             heroes: Object.fromEntries(event.heroes.map((h) => [h.sessionId, h])),
             peons: Object.fromEntries(event.peons.map((p) => [p.agentId, p])),
             missions: Object.fromEntries(event.missions.map((m) => [m.id, m])),
-            // `?? []` — odporność na starszy serwer bez arsenału w snapshocie.
+            transcripts: Object.fromEntries(
+              (event.transcripts ?? []).reduce((acc, line) => {
+                const lines = acc.get(line.sessionId) ?? [];
+                lines.push(line);
+                acc.set(line.sessionId, lines.slice(-TRANSCRIPT_BUFFER));
+                return acc;
+              }, new Map<string, TranscriptLine[]>()),
+            ),
             arsenal: Object.fromEntries((event.arsenals ?? []).map((a) => [a.projectDir, a])),
           };
         case 'hero-spawned':
@@ -98,7 +105,7 @@ export const useWorld = create<WorldStore>((set) => ({
         case 'hero-removed': {
           const heroes = { ...state.heroes };
           delete heroes[event.sessionId];
-          // Usunięto śledzonego bohatera → wygaś selekcję i autofollow (brak martwego celu).
+          // The followed hero was removed: clear selection and autofollow (no dead target).
           if (state.selectedSessionId === event.sessionId) {
             return { heroes, selectedSessionId: undefined, autofollow: false };
           }
@@ -138,8 +145,8 @@ export const useWorld = create<WorldStore>((set) => ({
     }),
 }));
 
-// Dev-only uchwyt do debugowania żywego świata z konsoli (np. wstrzyknięcie
-// snapshotu, inspekcja heroes/peons). Nie trafia do builda produkcyjnego.
+// Dev-only handle for debugging the live world from the console (for example
+// injecting a snapshot or inspecting heroes/peons). Excluded from production builds.
 if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) {
   (globalThis as Record<string, unknown>).__world = useWorld;
 }

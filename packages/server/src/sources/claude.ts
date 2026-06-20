@@ -1,15 +1,16 @@
 import { homedir } from 'node:os';
 import { basename, join, sep } from 'node:path';
 import { interpretLine } from '../transcript/parser.js';
+import { rootIfExists } from './config.js';
 import type { AgentSource, ClassifiedFile } from './types.js';
 
 /**
- * Źródło Claude Code: ~/.claude/projects/<projekt>/<uuid>.jsonl (bohaterowie)
- * i <sesja>/subagents/**​/agent-<id>.jsonl (peony).
+ * Claude Code source: ~/.claude/projects/<project>/<uuid>.jsonl (heroes)
+ * and <session>/subagents/**​/agent-<id>.jsonl (peons).
  */
 export const claudeSource: AgentSource = {
   id: 'claude',
-  roots: () => [join(homedir(), '.claude', 'projects')],
+  roots: () => rootIfExists(join(homedir(), '.claude', 'projects')),
   depth: 6,
   classify(path: string, root: string): ClassifiedFile {
     const rel = path.slice(root.length + 1);

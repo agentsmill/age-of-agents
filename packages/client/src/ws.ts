@@ -1,7 +1,7 @@
 import { WS_PATH, type GameEvent } from '@agent-citadel/shared';
 import { useWorld } from './store';
 
-/** Połączenie WS z auto-reconnectem; snapshot przy każdym połączeniu nadpisuje stan. */
+/** WS connection with auto-reconnect; the snapshot on each connection overwrites state. */
 export function connectWorld(): void {
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
   const url = `${protocol}://${location.host}${WS_PATH}`;

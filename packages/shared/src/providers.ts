@@ -29,6 +29,9 @@ export const AGENT_PROVIDERS: Record<AgentKind, ProviderInfo> = {
  * Metadane providera dla danego agenta. Nieznany/undefined → claude
  * (zgodność wsteczna z HeroSnapshot.agent? + bezpieczna degradacja korupcji danych).
  */
-export function resolveProvider(agent: AgentKind | undefined): ProviderInfo {
-  return (agent && AGENT_PROVIDERS[agent]) || AGENT_PROVIDERS.claude;
+export function resolveProvider(agent: unknown): ProviderInfo {
+  if (typeof agent === 'string' && Object.hasOwn(AGENT_PROVIDERS, agent)) {
+    return AGENT_PROVIDERS[agent as AgentKind];
+  }
+  return AGENT_PROVIDERS.claude;
 }

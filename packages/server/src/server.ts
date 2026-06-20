@@ -8,12 +8,13 @@ import { OpenCodePoller } from './sources/opencode-poller.js';
 import { DockerPoller } from './sources/docker-poller.js';
 import { CliDockerClient } from './sources/docker-client.js';
 import { ArsenalPoller } from './arsenal/arsenal-poller.js';
+import type { SourceWatcher } from './watcher.js';
 
 export interface StartServerOptions {
-  /** Port HTTP. Podaj 0, by system wybrał wolny (przydatne w testach). */
+  /** HTTP port. Pass 0 so the system picks a free one (useful in tests). */
   port: number;
   host?: string;
-  /** Tryb demo: sztuczne dane zamiast podglądu ~/.claude/projects. */
+  /** Demo mode: synthetic data instead of watching ~/.claude/projects. */
   demo: boolean;
   /** Katalog ze zbudowanym klientem (dist/web). Gdy podany — serwer serwuje SPA. */
   webRoot?: string;
@@ -29,39 +30,49 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   const host = opts.host ?? '127.0.0.1';
   const app = Fastify({ logger: { level: 'info' } });
   const world = new World();
+  let watchers: SourceWatcher[] = [];
+  let opencodePoller: OpenCodePoller | undefined;
+  let dockerPoller: DockerPoller | undefined;
+  let arsenalPoller: ArsenalPoller | undefined;
 
   app.get('/health', async () => ({ ok: true, demo: opts.demo }));
 
   if (opts.demo) {
-    // No-op trasy, by zainstalowane hooki nie sypały 404 w trybie demo.
+    // No-op routes so installed hooks do not emit 404s in demo mode.
     app.post('/hooks', async () => ({ ok: true }));
     app.get('/hooks/status', async () => ({ installed: false, demo: true }));
     app.get('/building-stats', async () => ({ updatedAt: new Date().toISOString(), buildings: {} }));
-    // Mapa narzędzie→budynek: w demo nie persystujemy (PUT tylko waliduje, GET = domyślna).
+    // Tool->building map: demo does not persist (PUT only validates, GET = default).
     registerMappingRoutes(app, { persist: false });
     registerModelRoutes(app, { persist: false });
   } else {
     const { SourceWatcher } = await import('./watcher.js');
-    const { SOURCES } = await import('./sources/index.js');
+    const { activeSources } = await import('./sources/index.js');
     const { translateHook, hooksInstalled, installHooks, uninstallHooks } = await import('./hooks.js');
     const { getBuildingStats, invalidateBuildingStatsCache } = await import('./building-stats.js');
-    const watchers = SOURCES.map((source) => new SourceWatcher(world, source));
-    // Hooki HTTP są kanałem Claude → kierujemy je do watchera Claude.
-    const claudeWatcher = watchers.find((w) => w.id === 'claude') ?? watchers[0];
+    const sources = activeSources(process.env.AOA_SOURCES);
+    watchers = sources.map((source) => new SourceWatcher(world, source));
+    // HTTP hooks are the Claude channel; route them to the Claude watcher.
+    const claudeWatcher = watchers.find((w) => w.id === 'claude');
     
-    // OpenCode używa SQLite zamiast JSONL - uruchom poller
-    const opencodePoller = new OpenCodePoller(world);
-    // Kontenery Docker: poller czyta pliki sesji przez `docker exec` (pull).
-    const dockerPoller = new DockerPoller(world, new CliDockerClient());
+    // OpenCode uses SQLite instead of JSONL: start poller.
+    const opencodeEnabled = sources.some((source) => source.id === 'opencode');
+    opencodePoller = opencodeEnabled ? new OpenCodePoller(world) : undefined;
+    // Containerized Claude sessions are controlled by the Claude source filter.
+    const dockerEnabled = sources.some((source) => source.id === 'claude');
+    dockerPoller = dockerEnabled ? new DockerPoller(world, new CliDockerClient()) : undefined;
 
     app.get('/building-stats', async () => getBuildingStats());
-    // Mapa narzędzie→budynek: lokalny serwer = źródło prawdy (plik na dysku usera);
-    // zapis invaliduje cache statystyk, by liczby nadążały za nową mapą.
+    // Tool->building map: local server = source of truth (file on user's disk);
+    // saving invalidates stats cache so numbers keep up with the new map.
     registerMappingRoutes(app, { persist: true, onSaved: invalidateBuildingStatsCache });
     registerModelRoutes(app, { persist: true });
-    app.post('/hooks', async (request) => {
+    app.post('/hooks', async (request, reply) => {
       const translated = translateHook((request.body ?? {}) as never);
-      if (translated) claudeWatcher.applyExternalFacts(translated.sessionId, translated.projectDir, translated.facts, translated.cwd);
+      if (translated) {
+        if (!claudeWatcher) return reply.code(409).send({ ok: false, error: 'claude source disabled' });
+        claudeWatcher.applyExternalFacts(translated.sessionId, translated.projectDir, translated.facts, translated.cwd);
+      }
       return { ok: true };
     });
     app.get('/hooks/status', async () => ({ installed: await hooksInstalled() }));
@@ -76,12 +87,12 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
 
     app.addHook('onReady', async () => {
       for (const w of watchers) w.start();
-      await opencodePoller.start();
-      // Świadomie `void` — start pollera nie może opóźniać gotowości serwera;
-      // poller sam jest odporny na brak Dockera.
-      void dockerPoller.start();
-      // `arsenal-updated` event do klienta (panel Arsenału).
-      new ArsenalPoller(world).start();
+      await opencodePoller?.start();
+      // Fire-and-forget: Docker unavailability must not delay server readiness.
+      void dockerPoller?.start();
+      // `arsenal-updated` event to client (Arsenal panel).
+      arsenalPoller = new ArsenalPoller(world);
+      arsenalPoller.start();
       app.log.info(`Source watchers active: ${watchers.map((w) => w.id).join(', ')}`);
     });
   }
@@ -90,8 +101,8 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   if (opts.webRoot) {
     const fastifyStatic = (await import('@fastify/static')).default;
     await app.register(fastifyStatic, { root: opts.webRoot, wildcard: false });
-    // SPA fallback: nieznana trasa GET → index.html (trasy API są zarejestrowane,
-    // więc tu nie trafią).
+    // SPA fallback: unknown GET route -> index.html (API routes are registered,
+    // so they will not land here).
     app.setNotFoundHandler((req, reply) => {
       if (req.method === 'GET') return reply.sendFile('index.html');
       reply.code(404).send({ error: 'not found' });
@@ -107,8 +118,8 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
 
   const send = (socket: WebSocket, event: GameEvent): void => {
     if (socket.readyState !== WebSocket.OPEN) return;
-    // Klient mógł zniknąć w trakcie broadcastu — jego awaria nie może przerwać
-    // dostawy do pozostałych.
+    // Client may disappear during broadcast; its failure must not interrupt
+    // delivery to the others.
     try {
       socket.send(JSON.stringify(event));
     } catch (err) {
@@ -134,6 +145,10 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     port: actualPort,
     close: async () => {
       offEvent();
+      await opencodePoller?.stop();
+      dockerPoller?.stop();
+      await Promise.all(watchers.map((w) => w.stop()));
+      arsenalPoller?.stop();
       await new Promise<void>((resolve, reject) =>
         wss.close((err) => (err ? reject(err) : resolve())),
       );

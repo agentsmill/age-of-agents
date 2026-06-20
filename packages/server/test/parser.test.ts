@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { interpretLine, isHumanPrompt } from '../src/transcript/parser.js';
 
 describe('interpretLine', () => {
-  it('zamienia enqueue na fakt prompt', () => {
+  it('converts enqueue into a prompt fact', () => {
     const line = JSON.stringify({
       type: 'queue-operation',
       operation: 'enqueue',
@@ -15,7 +15,7 @@ describe('interpretLine', () => {
     ]);
   });
 
-  it('wyciąga tool-start z opisem, usage i model z rekordu assistant', () => {
+  it('extracts tool-start with detail, usage, and model from an assistant record', () => {
     const line = JSON.stringify({
       type: 'assistant',
       timestamp: '2026-06-13T10:00:01.000Z',
@@ -42,7 +42,7 @@ describe('interpretLine', () => {
     expect(facts).toContainEqual({ kind: 'meta', model: 'claude-fable-5', gitBranch: 'main', cwd: undefined });
   });
 
-  it('end_turn daje turn-end i tekst asystenta', () => {
+  it('end_turn emits turn-end and assistant text', () => {
     const line = JSON.stringify({
       type: 'assistant',
       timestamp: '2026-06-13T10:00:02.000Z',
@@ -58,7 +58,7 @@ describe('interpretLine', () => {
     expect(kinds).toContain('assistant-text');
   });
 
-  it('tool_result z is_error daje fakt błędu', () => {
+  it('tool_result with is_error emits an error fact', () => {
     const line = JSON.stringify({
       type: 'user',
       timestamp: '2026-06-13T10:00:03.000Z',
@@ -72,29 +72,29 @@ describe('interpretLine', () => {
     });
   });
 
-  it('jawny tytuł (custom/ai) staje się faktem title; last-prompt jest ignorowany', () => {
+  it('explicit title (custom/ai) becomes a title fact; last-prompt is ignored', () => {
     expect(interpretLine(JSON.stringify({ type: 'custom-title', customTitle: 'Refactor API' }))).toEqual([
       { kind: 'title', title: 'Refactor API' },
     ]);
     expect(interpretLine(JSON.stringify({ type: 'ai-title', aiTitle: 'Naprawa auth' }))).toEqual([
       { kind: 'title', title: 'Naprawa auth' },
     ]);
-    // last-prompt nie nazywa już bohatera (nazwa skakała przy każdej turze)
+    // last-prompt no longer names the hero (the name changed on every turn).
     expect(interpretLine(JSON.stringify({ type: 'last-prompt', lastPrompt: 'Refactor API' }))).toEqual([]);
     expect(interpretLine('to nie jest json{')).toEqual([]);
     expect(interpretLine(JSON.stringify({ type: 'file-history-snapshot' }))).toEqual([]);
   });
 
-  it('filtruje syntetyczne tury z promptów (interrupted, system-reminder, skille, komendy)', () => {
+  it('filters synthetic turns from prompts (interrupted, system-reminder, skills, commands)', () => {
     const user = (text: string) =>
       interpretLine(JSON.stringify({ type: 'user', timestamp: '2026-06-13T10:00:00.000Z', message: { role: 'user', content: text } }));
-    // śmieci → brak faktu prompt
+    // Garbage -> no prompt fact.
     expect(user('[Request interrupted by user]')).toEqual([]);
     expect(user('<system-reminder>uważaj</system-reminder>')).toEqual([]);
     expect(user('<command-name>/compact</command-name>')).toEqual([]);
     expect(user('Base directory for this skill: /Users/x/.claude/plugins/...')).toEqual([]);
     expect(user('Caveat: The messages below were generated...')).toEqual([]);
-    // realne prompty (także markdown i krótkie) → zostają
+    // Real prompts (including markdown and short prompts) are preserved.
     expect(user('# Zadanie: zrób lead z bota')).toContainEqual({ kind: 'prompt', text: '# Zadanie: zrób lead z bota', ts: '2026-06-13T10:00:00.000Z' });
     expect(user('tak deploy')).toContainEqual({ kind: 'prompt', text: 'tak deploy', ts: '2026-06-13T10:00:00.000Z' });
   });
@@ -112,7 +112,7 @@ describe('interpretLine', () => {
     expect(interpretLine(line).find((fact) => fact.kind === 'prompt')).toBeUndefined();
   });
 
-  it('isHumanPrompt: heurystyka prompt człowieka', () => {
+  it('isHumanPrompt: human prompt heuristic', () => {
     expect(isHumanPrompt('napraw testy')).toBe(true);
     expect(isHumanPrompt('# nagłówek markdown')).toBe(true);
     expect(isHumanPrompt('   ')).toBe(false);
@@ -120,7 +120,7 @@ describe('interpretLine', () => {
     expect(isHumanPrompt('<system-reminder>x</system-reminder>')).toBe(false);
   });
 
-  it('wyciąga atrybucję skilla/pluginu/mcp z rekordu assistant', () => {
+  it('extracts skill/plugin/mcp attribution from an assistant record', () => {
     const line = JSON.stringify({
       type: 'assistant',
       timestamp: '2026-06-17T10:00:00.000Z',
@@ -135,7 +135,7 @@ describe('interpretLine', () => {
     });
   });
 
-  it('liczy context z usage (input + cache_read + cache_creation)', () => {
+  it('calculates context from usage (input + cache_read + cache_creation)', () => {
     const line = JSON.stringify({
       type: 'assistant',
       timestamp: '2026-06-17T10:00:00.000Z',
@@ -149,7 +149,7 @@ describe('interpretLine', () => {
     expect(usage).toMatchObject({ kind: 'usage', input: 5100, output: 50, context: 6000 });
   });
 
-  it('skraca bardzo długie prompty', () => {
+  it('truncates very long prompts', () => {
     const line = JSON.stringify({
       type: 'queue-operation',
       operation: 'enqueue',

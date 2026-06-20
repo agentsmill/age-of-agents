@@ -1,5 +1,5 @@
-// Składa pełną autotilowaną mapę offline (jak buildTilemap w silniku) do PNG.
-// Uruchom: npx tsx scripts/preview-tilemap.ts
+// Builds the full offline autotiled map (like buildTilemap in the engine) into PNG.
+// Run: npx tsx scripts/preview-tilemap.ts
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -29,7 +29,7 @@ function blitTile(atlas: PNG, mask: number, dx: number, dy: number) {
   for (let y = 0; y < T; y++)
     for (let x = 0; x < T; x++) {
       const si = (y * atlas.width + (sx + x)) * 4;
-      if (atlas.data[si + 3] === 0) continue; // przezroczyste piksele pomijamy
+      if (atlas.data[si + 3] === 0) continue; // skip transparent pixels
       const px = dx * T + x, py = dy * T + y;
       if (px < 0 || py < 0 || px >= out.width || py >= out.height) continue;
       const di = (py * out.width + px) * 4;
@@ -40,9 +40,9 @@ function blitTile(atlas: PNG, mask: number, dx: number, dy: number) {
 
 const inB = (gx: number, gy: number) => gx >= 0 && gy >= 0 && gx < w && gy < h;
 
-// baza trawy (t_0) wszędzie
+// grass base (t_0) everywhere
 for (let dy = 0; dy <= h; dy++) for (let dx = 0; dx <= w; dx++) blitTile(atlases.water, 0, dx, dy);
-// warstwy przejść
+// transition layers
 for (const { pair, upper } of PAIRS) {
   const isUpper = (gx: number, gy: number) => inB(gx, gy) && map[gy][gx] === upper;
   for (let dy = 0; dy <= h; dy++)
