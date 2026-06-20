@@ -37,6 +37,9 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     app.post('/hooks', async () => ({ ok: true }));
     app.get('/hooks/status', async () => ({ installed: false, demo: true }));
     app.get('/building-stats', async () => ({ updatedAt: new Date().toISOString(), buildings: {} }));
+    app.get('/building-heatmap', async () => ({ updatedAt: new Date().toISOString(), buildings: {} }));
+    app.get('/session-history', async () => []);
+    app.get('/replay', async () => ({ startMs: 0, endMs: 0, frames: [] }));
     // Mapa narzędzie→budynek: w demo nie persystujemy (PUT tylko waliduje, GET = domyślna).
     registerMappingRoutes(app, { persist: false });
     registerModelRoutes(app, { persist: false });
@@ -44,7 +47,9 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     const { SourceWatcher } = await import('./watcher.js');
     const { SOURCES } = await import('./sources/index.js');
     const { translateHook, hooksInstalled, installHooks, uninstallHooks } = await import('./hooks.js');
-    const { getBuildingStats, invalidateBuildingStatsCache } = await import('./building-stats.js');
+    const { getBuildingStats, getBuildingHeatmap, invalidateBuildingStatsCache } = await import('./building-stats.js');
+    const { readSessionLog } = await import('./session-log.js');
+    const { computeReplayTimeline } = await import('./replay.js');
     const watchers = SOURCES.map((source) => new SourceWatcher(world, source));
     // Hooki HTTP są kanałem Claude → kierujemy je do watchera Claude.
     const claudeWatcher = watchers.find((w) => w.id === 'claude') ?? watchers[0];
@@ -55,6 +60,12 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     const dockerPoller = new DockerPoller(world, new CliDockerClient());
 
     app.get('/building-stats', async () => getBuildingStats());
+    app.get('/building-heatmap', async () => getBuildingHeatmap());
+    app.get('/session-history', async () => readSessionLog());
+    app.get('/replay', async (request) => {
+      const w = (request.query as { window?: string }).window;
+      return computeReplayTimeline(w === 'week' ? 'week' : 'today');
+    });
     // Mapa narzędzie→budynek: lokalny serwer = źródło prawdy (plik na dysku usera);
     // zapis invaliduje cache statystyk, by liczby nadążały za nową mapą.
     registerMappingRoutes(app, { persist: true, onSaved: invalidateBuildingStatsCache });

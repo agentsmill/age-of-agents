@@ -9,16 +9,20 @@ interface SettingsStore {
   flipped: boolean;
   /** Czy panel misji (MissionLog) jest zwinięty do paska tytułu. */
   missionsCollapsed: boolean;
+  /** Ambientowy soundscape (Web Audio). Domyślnie OFF — wymaga gestu usera (autoplay). */
+  soundEnabled: boolean;
   setTheme(id: string): void;
   setLang(lang: Lang): void;
   setFlipped(flipped: boolean): void;
   setMissionsCollapsed(collapsed: boolean): void;
+  setSoundEnabled(on: boolean): void;
 }
 
 const STORAGE_KEY = 'agent-citadel.theme';
 const LANG_KEY = 'agent-citadel.lang';
 const FLIP_KEY = 'agent-citadel.flip';
 const MISSIONS_COLLAPSED_KEY = 'agent-citadel.missions-collapsed';
+const SOUND_KEY = 'agent-citadel.sound';
 
 const VALID_LANGS: Lang[] = ['en', 'pl', 'it'];
 
@@ -31,6 +35,7 @@ export const useSettings = create<SettingsStore>((set) => ({
   lang: isValidLang(localStorage.getItem(LANG_KEY)) ? (localStorage.getItem(LANG_KEY) as Lang) : 'en', // domyślnie EN
   flipped: localStorage.getItem(FLIP_KEY) === '1',
   missionsCollapsed: localStorage.getItem(MISSIONS_COLLAPSED_KEY) === '1',
+  soundEnabled: localStorage.getItem(SOUND_KEY) === '1',
   setTheme: (themeId) => {
     localStorage.setItem(STORAGE_KEY, themeId);
     set({ themeId });
@@ -46,5 +51,9 @@ export const useSettings = create<SettingsStore>((set) => ({
   setMissionsCollapsed: (missionsCollapsed) => {
     localStorage.setItem(MISSIONS_COLLAPSED_KEY, missionsCollapsed ? '1' : '0');
     set({ missionsCollapsed });
+  },
+  setSoundEnabled: (soundEnabled) => {
+    localStorage.setItem(SOUND_KEY, soundEnabled ? '1' : '0');
+    set({ soundEnabled });
   },
 }));

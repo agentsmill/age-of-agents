@@ -114,6 +114,24 @@ export type GameEvent =
 export const SERVER_PORT = 8123;
 export const WS_PATH = '/ws';
 
+// ─── Chronicle (#7): replay dnia jako time-lapse ──────────────────────────────
+// Serwer odtwarza transkrypty przez ten sam potok Faktów → World i zwraca
+// CHRONOLOGICZNĄ listę GameEventów ze znacznikami czasu (ms epoch). Klient gra/
+// scrubuje je lokalnie, reużywając całej ścieżki renderu (te same GameEventy).
+
+/** Jedna klatka osi czasu replayu: zdarzenie + jego wirtualny czas (ms epoch). */
+export interface ReplayFrame {
+  tMs: number;
+  event: GameEvent;
+}
+
+/** Pełna oś czasu replayu okna (np. „dziś"). frames posortowane rosnąco po tMs. */
+export interface ReplayTimeline {
+  startMs: number;
+  endMs: number;
+  frames: ReplayFrame[];
+}
+
 // ─── Budynki + mapowanie narzędzie→budynek (serce metafory gry) ───
 // Kanoniczne w shared, bo potrzebują tego ZARÓWNO klient (placement jednostek)
 // JAK I serwer (atrybucja tokenów do budynku w statystykach).
@@ -508,4 +526,29 @@ export interface BuildingWindowStats {
 export interface BuildingStatsResponse {
   updatedAt: string;
   buildings: Partial<Record<BuildingId, BuildingWindowStats>>;
+}
+
+/** Mapa cieplna „rytmu dnia": sumy tokenów wyjściowych per budynek × godzina
+ *  doby (tablica 24 liczb, indeks = godzina 0..23 czasu lokalnego serwera). */
+export interface BuildingHeatmapResponse {
+  updatedAt: string;
+  buildings: Partial<Record<BuildingId, number[]>>;
+}
+
+/** Sekcja zwłok sesji (#4): podsumowanie liczone w chwili usunięcia bohatera
+ *  z mapy (po removeAfterMs bezczynności) i utrwalane na dysk. */
+export interface SessionSummary {
+  sessionId: string;
+  agent: AgentKind;
+  title: string;
+  projectName?: string;
+  model?: string;
+  startedAt: string;
+  endedAt: string;
+  durationMs: number;
+  tokens: { input: number; output: number };
+  /** Liczba błędnych wyników narzędzi w trakcie sesji. */
+  errorCount: number;
+  /** Tokeny wyjściowe przypisane do budynków (mapowanie domyślne). */
+  perBuilding: Partial<Record<BuildingId, number>>;
 }

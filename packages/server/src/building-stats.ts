@@ -6,6 +6,7 @@ import {
   DEFAULT_MAPPING,
   type BuildingId,
   type BuildingStatsResponse,
+  type BuildingHeatmapResponse,
   type BuildingWindowStats,
   type MappingConfig,
 } from '@agent-citadel/shared';
@@ -73,7 +74,7 @@ export function accumulateMessage(
 }
 
 /** Wyciąga próbkę z rekordu assistant (lub null gdy nieistotny). */
-function sampleFromRecord(rec: any): MsgSample | undefined {
+export function sampleFromRecord(rec: any): MsgSample | undefined {
   if (rec?.type !== 'assistant' || !rec.message) return undefined;
   const ts = Date.parse(rec.timestamp);
   if (!ts) return undefined;
@@ -168,6 +169,8 @@ let epoch = 0;
 export function invalidateBuildingStatsCache(): void {
   cache = undefined;
   inflight = undefined; // porzuć trwający przelot — jego wynik jest już nieświeży
+  heatmapCache = undefined; // mapa cieplna używa tej samej mapy narzędzie→budynek
+  heatmapInflight = undefined;
   epoch++;
 }
 
@@ -193,4 +196,98 @@ export async function getBuildingStats(
       throw err;
     });
   return inflight;
+}
+
+// ─── Mapa cieplna „rytmu dnia" (#6) — ten sam skan, oś GODZINY zamiast okien ───
+
+/**
+ * Sumy tokenów wyjściowych per budynek × godzina doby (0..23). Ta sama atrybucja
+ * co statystyki (narzędzia→budynek równym podziałem, rozumowanie→bieżący budynek),
+ * ale grupowana po `getHours()` znacznika czasu wiadomości. Własny skan (krótki,
+ * cache'owany), by nie zmieniać przetestowanego computeBuildingStats.
+ */
+export async function computeBuildingHeatmap(
+  root: string,
+  now: number,
+  config: MappingConfig = DEFAULT_MAPPING,
+): Promise<BuildingHeatmapResponse> {
+  const acc = new Map<BuildingId, number[]>();
+  const add = (b: BuildingId, hour: number, v: number): void => {
+    const arr = acc.get(b) ?? new Array<number>(24).fill(0);
+    arr[hour] += v;
+    acc.set(b, arr);
+  };
+
+  let entries: string[] = [];
+  try {
+    entries = await readdir(root, { recursive: true });
+  } catch {
+    return { updatedAt: new Date(now).toISOString(), buildings: {} };
+  }
+
+  for (const rel of entries) {
+    if (!rel.endsWith('.jsonl')) continue;
+    const path = join(root, rel);
+    try {
+      const s = await stat(path);
+      if (now - s.mtimeMs > MONTH) continue;
+      const content = await readFile(path, 'utf8');
+      let current: BuildingId = 'citadel'; // budynek bieżącej pracy (ostatnie narzędzie)
+      for (const line of content.split('\n')) {
+        if (!line) continue;
+        let rec: unknown;
+        try {
+          rec = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        const sample = sampleFromRecord(rec);
+        if (!sample) continue;
+        const age = now - sample.ts;
+        if (age < 0 || age > MONTH) continue;
+        if (sample.tools.length) {
+          const last = sample.tools[sample.tools.length - 1];
+          current = resolveBuilding(last.name, last.detail, config);
+        }
+        const buildings = sample.tools.length
+          ? [...new Set(sample.tools.map((t) => resolveBuilding(t.name, t.detail, config)))]
+          : [current];
+        const share = sample.output / buildings.length;
+        const hour = new Date(sample.ts).getHours();
+        for (const b of buildings) add(b, hour, share);
+      }
+    } catch {
+      /* pomiń nieczytelny plik */
+    }
+  }
+
+  const buildings: BuildingHeatmapResponse['buildings'] = {};
+  for (const [b, arr] of acc) buildings[b] = arr.map((v) => Math.round(v));
+  return { updatedAt: new Date(now).toISOString(), buildings };
+}
+
+let heatmapCache: { at: number; data: BuildingHeatmapResponse } | undefined;
+let heatmapInflight: Promise<BuildingHeatmapResponse> | undefined;
+
+export async function getBuildingHeatmap(
+  root = join(homedir(), '.claude', 'projects'),
+): Promise<BuildingHeatmapResponse> {
+  const now = Date.now();
+  if (heatmapCache && now - heatmapCache.at < CACHE_TTL) return heatmapCache.data;
+  if (heatmapInflight) return heatmapInflight;
+  const startEpoch = epoch;
+  heatmapInflight = loadMappingConfig()
+    .then((config) => computeBuildingHeatmap(root, now, config))
+    .then((data) => {
+      if (epoch === startEpoch) {
+        heatmapCache = { at: Date.now(), data };
+        heatmapInflight = undefined;
+      }
+      return data;
+    })
+    .catch((err) => {
+      if (epoch === startEpoch) heatmapInflight = undefined;
+      throw err;
+    });
+  return heatmapInflight;
 }

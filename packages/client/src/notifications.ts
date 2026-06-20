@@ -4,7 +4,7 @@ import type { GameEvent, HeroSnapshot } from '@agent-citadel/shared';
 export type NotifKind = 'alert' | 'error' | 'success';
 
 /** Powód powiadomienia — mapuje się na etykietę i18n oraz na NotifKind. */
-export type NotifReason = 'needs-you' | 'error' | 'mission-done' | 'new-session';
+export type NotifReason = 'needs-you' | 'error' | 'mission-done' | 'new-session' | 'context-pressure';
 
 export interface Notification {
   id: string;
@@ -41,6 +41,7 @@ export const REASON_KIND: Record<NotifReason, NotifKind> = {
   error: 'error',
   'mission-done': 'success',
   'new-session': 'success',
+  'context-pressure': 'alert',
 };
 
 /** Fabryka powiadomienia: wylicza kind/ttl z reason, składa stabilne id. */
@@ -103,4 +104,27 @@ export function deriveNotification(
     default:
       return null;
   }
+}
+
+/** Próg „ciśnienia kontekstu" — ostrzeżenie, gdy okno modelu zapełnione w tym ułamku. */
+export const CONTEXT_PRESSURE_THRESHOLD = 0.8;
+
+/**
+ * Wykrywanie KRAWĘDZI ciśnienia kontekstu: alarm pada raz, w momencie przekroczenia
+ * progu w GÓRĘ (prev < próg ≤ teraz). contextWindow wstrzykiwany — czysta, testowalna
+ * funkcja; store podaje okno z rejestru modeli. Brak danych → null.
+ */
+export function contextPressureNotification(
+  prev: HeroSnapshot | undefined,
+  hero: HeroSnapshot,
+  contextWindow: number,
+  now: number,
+): Notification | null {
+  if (!contextWindow || !hero.contextTokens) return null;
+  const frac = hero.contextTokens / contextWindow;
+  const prevFrac = prev?.contextTokens ? prev.contextTokens / contextWindow : 0;
+  if (frac >= CONTEXT_PRESSURE_THRESHOLD && prevFrac < CONTEXT_PRESSURE_THRESHOLD) {
+    return make('context-pressure', hero.sessionId, hero.title, hero.gitBranch, now);
+  }
+  return null;
 }

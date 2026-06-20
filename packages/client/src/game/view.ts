@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Sprite, TextureStyle } from 'pixi.js';
+import { Application, ColorMatrixFilter, Container, Graphics, Sprite, TextureStyle } from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
 import type { HeroSnapshot, MissionSnapshot, PeonSnapshot } from '@agent-citadel/shared';
 import { useWorld } from '../store';
@@ -22,6 +22,8 @@ import { BUILDING_FX, collectActiveBuildings, type WorkerSample } from './buildi
 import { buildingText } from '../i18n';
 import { homeBuilding, awaitingBuilding } from './home-building';
 import { worldLayerTransform, worldToViewport, flipTextNodes } from './flip';
+import { getRealmAudio } from './audio';
+import { deriveCrestSpec, buildCrest } from './heraldry';
 import type { Lang } from '../settings';
 
 /** Docelowa szerokość dekoracji w kaflach (do skalowania sprite'a). */
@@ -99,6 +101,21 @@ export class GameView {
   private particles: Particle[] = [];
   private emitters = new Map<BuildingId, FxEmitter>();
   private elapsed = 0;
+  // Realm Heartbeat: scena przyciemnia/rozjaśnia się wg TEMPA tokenów wyjściowych
+  // (nie zegara) — realm „oddycha". Filtr na app.stage = jeden pełnoekranowy pass
+  // (HUD to osobny DOM, więc nie jest tintowany).
+  private dayNight = new ColorMatrixFilter();
+  private lastTotalOutput = 0;
+  private tokenRate = 0; // wygładzona EMA tokenów/s
+  // Mission Thunderclap: rozchodzące się pierścienie przy ukończeniu misji.
+  private shockwaves: { g: Graphics; life: number; maxLife: number; color: number }[] = [];
+  // Tool Trail: ostatnia pozycja ekranowa, w której jednostka zostawiła ślad.
+  private footAt = new Map<string, { x: number; y: number }>();
+  // Soundscape: poprzedni stan bohatera — do wykrycia wejścia w 'awaiting-input' (cue).
+  private prevHeroState = new Map<string, string>();
+  // Living Banners (#9): herb wybranego projektu nad twierdzą + jego klucz cache.
+  private crest?: Container;
+  private crestKey?: string;
   private missionStatus = new Map<string, string>();
   private graph: WaypointGraph;
   private unsubscribe?: () => void;
@@ -166,6 +183,8 @@ export class GameView {
     this.viewport.drag().pinch().wheel().decelerate();
     this.viewport.clamp({ direction: 'all', underflow: 'center' });
     this.app.stage.addChild(this.viewport);
+    // Realm Heartbeat: filtr dnia/nocy na całej scenie gry (zob. updateDayNight).
+    this.app.stage.filters = [this.dayNight];
 
     // Ręczne sterowanie kamerą (zoom kółkiem, pinch, przeciągnięcie) przejmuje
     // kontrolę → zrywa autofollow. Inaczej followSelected co klatkę cofałby
@@ -276,11 +295,15 @@ export class GameView {
       this.updateRetiring(dt);
       this.updateBuildingFx(dt);
       this.updateParticles(dt);
+      this.updateShockwaves(dt);
+      this.updateDayNight(dt);
+      this.dropFootprints();
     });
 
-    this.unsubscribe = useWorld.subscribe((state) =>
-      this.reconcile(state.heroes, state.peons, state.missions, state.selectedProjectDir),
-    );
+    this.unsubscribe = useWorld.subscribe((state) => {
+      this.reconcile(state.heroes, state.peons, state.missions, state.selectedProjectDir);
+      this.updateCrest();
+    });
     // Zmiana mapy narzędzie→budynek wymusza ponowne wyznaczenie celów: jednostki
     // przechodzą do nowych budynków na żywo (reconcile ma early-return per
     // niezmieniony klucz, więc re-steer jest tani). Bez tego mapa „doganiałaby"
@@ -291,6 +314,7 @@ export class GameView {
     });
     const { heroes, peons, missions, selectedProjectDir } = useWorld.getState();
     this.reconcile(heroes, peons, missions, selectedProjectDir);
+    this.updateCrest();
     activeView = this;
   }
 
@@ -410,6 +434,54 @@ export class GameView {
     return this.theme.buildings.find((b) => b.id === id)!;
   }
 
+  /** Living Banners: zbuduj/odśwież herb wybranego projektu nad twierdzą (#9). */
+  private updateCrest(): void {
+    const { selectedProjectDir, arsenal } = useWorld.getState();
+    const seed = selectedProjectDir;
+    const ar = seed ? arsenal[seed] : undefined;
+    const key = seed ? `${seed}:${ar?.refreshedAt ?? 0}` : '';
+    if (key === this.crestKey) return; // bez zmian → nie przebudowuj (subskrypcja bije często)
+    this.crestKey = key;
+    if (this.crest) {
+      this.crest.parent?.removeChild(this.crest);
+      this.crest.destroy({ children: true });
+      this.crest = undefined;
+    }
+    if (!seed) return; // widok „All" → brak jednego właściciela, brak herbu
+    const spec = deriveCrestSpec({ seed, arsenal: ar });
+    const crest = buildCrest(spec, this.theme.tile * 2.2);
+    const c = this.building('citadel');
+    const top = this.theme.projection.toScreen(c.gx + c.w / 2, c.gy);
+    crest.position.set(top.x, top.y - this.theme.tile * 2.4);
+    crest.zIndex = 1_000_000; // nad budynkami/jednostkami w sortowanej warstwie
+    this.unitLayer.addChild(crest);
+    this.crest = crest;
+  }
+
+  /** Eksport „Realm Card": świeży herb w wysokiej rozdzielczości → PNG (w pełni lokalnie). */
+  exportCrest(projectDir: string): void {
+    const { arsenal } = useWorld.getState();
+    const spec = deriveCrestSpec({ seed: projectDir, arsenal: arsenal[projectDir] });
+    const big = buildCrest(spec, 320);
+    // extract.canvas zwraca HTMLCanvasElement LUB OffscreenCanvas — obsłuż oba.
+    const canvas = this.app.renderer.extract.canvas(big) as unknown as {
+      toBlob?: (cb: (b: Blob | null) => void, type?: string) => void;
+      convertToBlob?: (opts?: { type?: string }) => Promise<Blob>;
+    };
+    big.destroy({ children: true });
+    const download = (blob: Blob | null): void => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `realm-card-${projectDir.split('/').pop() || 'project'}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+    if (typeof canvas.toBlob === 'function') canvas.toBlob(download);
+    else if (typeof canvas.convertToBlob === 'function') canvas.convertToBlob({ type: 'image/png' }).then(download).catch(() => {});
+  }
+
   private reconcile(
     heroes: Record<string, HeroSnapshot>,
     peons: Record<string, PeonSnapshot>,
@@ -434,7 +506,11 @@ export class GameView {
       const prev = this.missionStatus.get(mission.id);
       if (mission.status === 'completed' && prev === 'active') {
         const hero = this.units.get(mission.sessionId);
-        if (hero) this.spawnFireworks(hero.gx, hero.gy, hero.colorIndex);
+        if (hero) {
+          this.spawnFireworks(hero.gx, hero.gy, hero.colorIndex);
+          this.spawnShockwave(hero.gx, hero.gy, hero.colorIndex);
+          getRealmAudio().cue('mission-complete');
+        }
       }
       this.missionStatus.set(mission.id, mission.status);
     }
@@ -469,6 +545,14 @@ export class GameView {
       }
       unit.setName(clipName(hero.title));
       unit.setState(hero.state, hero.state === 'working' ? hero.toolDetail ?? hero.currentTool : undefined);
+      // Soundscape: miękki cue, gdy bohater właśnie wszedł w oczekiwanie na usera.
+      if (hero.state === 'awaiting-input' && this.prevHeroState.get(hero.sessionId) !== 'awaiting-input') {
+        getRealmAudio().cue('awaiting-input');
+      }
+      this.prevHeroState.set(hero.sessionId, hero.state);
+      // Context Pressure: bursztynowy pierścień, gdy okno modelu ≥80% pełne.
+      const ctxWin = resolveModelLive(hero.model).contextWindow;
+      unit.setContextPressure(!!hero.contextTokens && hero.contextTokens / ctxWin >= 0.8);
       this.steer(unit, hero.state, hero.currentTool, hero.toolDetail, hero.teamColor);
     }
 
@@ -499,6 +583,8 @@ export class GameView {
       if (!seen.has(id)) {
         this.units.delete(id);
         this.targets.delete(id);
+        this.footAt.delete(id);
+        this.prevHeroState.delete(id);
         if (unit.isPeon) {
           this.retirePeon(unit);
         } else {
@@ -585,6 +671,9 @@ export class GameView {
       em.intensity += ((on ? 1 : 0) - em.intensity) * Math.min(1, dt * 4);
       const pulse = 0.78 + 0.22 * Math.sin(this.elapsed * 3 + b.gx + b.gy);
       em.glow.alpha = em.intensity * style.glow * pulse;
+      // Soundscape: barwa budynku śpiewa proporcjonalnie do aktywności (lazy/no-op
+      // dopóki user nie włączy dźwięku i nie wznowi AudioContext gestem).
+      getRealmAudio().setBuildingIntensity(b.id, em.intensity);
 
       if (on) {
         em.accum += dt * style.rate * em.intensity;
@@ -596,6 +685,7 @@ export class GameView {
         this.fxLayer.removeChild(em.glow);
         em.glow.destroy();
         this.emitters.delete(b.id);
+        getRealmAudio().setBuildingIntensity(b.id, 0); // wycisz głos budynku
       }
     }
   }
@@ -655,6 +745,82 @@ export class GameView {
         this.fxLayer.removeChild(p.g);
         p.g.destroy();
         this.particles.splice(i, 1);
+      }
+    }
+  }
+
+  /**
+   * Realm Heartbeat: koryto dnia/nocy sterowane TEMPEM tokenów wyjściowych
+   * (suma output po wszystkich bohaterach). Brak pracy → chłodna, przyciemniona
+   * noc; intensywna praca → neutralne południe. Bardzo wolna EMA, by realm
+   * „oddychał", a nie migotał przy każdym evencie.
+   */
+  private updateDayNight(dt: number): void {
+    let total = 0;
+    for (const h of Object.values(useWorld.getState().heroes)) total += h.tokens.output;
+    // Tylko dodatnie przyrosty: zniknięcie sesji obniża sumę, ale to nie „ujemna praca".
+    const delta = Math.max(0, total - this.lastTotalOutput);
+    this.lastTotalOutput = total;
+    const inst = dt > 0 ? delta / dt : 0; // chwilowe tempo tok/s
+    this.tokenRate += (inst - this.tokenRate) * Math.min(1, dt * 0.4);
+    const day = 1 - Math.exp(-this.tokenRate / 40); // ~40 tok/s ≈ pełne południe
+    // Noc: przyciemniona i chłodna (więcej niebieskiego). Dzień: neutralna pełnia.
+    const r = 0.55 + 0.45 * day;
+    const g = 0.62 + 0.38 * day;
+    const b = 0.85 + 0.15 * day;
+    // Macierz 4x5 (RGBA): skalowanie per-kanał, bez przesunięć.
+    this.dayNight.matrix = [r, 0, 0, 0, 0, 0, g, 0, 0, 0, 0, 0, b, 0, 0, 0, 0, 0, 1, 0];
+  }
+
+  /** Tool Trail: jednostki w ruchu zostawiają znikające ślady w barwie drużyny. */
+  private dropFootprints(): void {
+    const step = this.theme.tile * 0.7; // rozstaw śladów (px ekranu)
+    for (const [id, unit] of this.units) {
+      if (!unit.moving) continue;
+      const { x, y } = this.theme.projection.toScreen(unit.gx, unit.gy);
+      const last = this.footAt.get(id);
+      if (last && Math.hypot(x - last.x, y - last.y) < step) continue;
+      this.footAt.set(id, { x, y });
+      const color = TEAM_COLORS[unit.colorIndex % TEAM_COLORS.length];
+      const g = new Graphics();
+      g.ellipse(0, 2, 5, 2.5).fill({ color, alpha: 0.4 });
+      g.position.set(x, y);
+      this.fxLayer.addChild(g);
+      // Ślad to nieruchoma drobinka — recykluje istniejący system cząstek (sam gaśnie).
+      const life = 1.8;
+      this.particles.push({ g, vx: 0, vy: 0, life, maxLife: life, gravity: 0 });
+    }
+  }
+
+  /** Mission Thunderclap: trzy rozchodzące się pierścienie w barwie drużyny. */
+  private spawnShockwave(gx: number, gy: number, colorIndex: number): void {
+    const { x, y } = this.theme.projection.toScreen(gx, gy);
+    const color = TEAM_COLORS[colorIndex % TEAM_COLORS.length];
+    const maxLife = 0.8;
+    for (let i = 0; i < 3; i++) {
+      const g = new Graphics();
+      g.position.set(x, y - 14);
+      g.blendMode = 'add';
+      this.fxLayer.addChild(g);
+      // delay rozkłada pierścienie w czasie (efekt „tętna"); życie startuje po delayu.
+      this.shockwaves.push({ g, life: maxLife + i * 0.08, maxLife, color });
+    }
+  }
+
+  private updateShockwaves(dt: number): void {
+    const maxRadius = 140;
+    for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+      const s = this.shockwaves[i];
+      s.life -= dt;
+      if (s.life > s.maxLife) continue; // jeszcze w fazie opóźnienia
+      const t = 1 - Math.max(0, s.life) / s.maxLife; // 0→1 w miarę rozchodzenia
+      const alpha = Math.max(0, s.life / s.maxLife);
+      s.g.clear();
+      s.g.circle(0, 0, t * maxRadius).stroke({ width: 3, color: s.color, alpha });
+      if (s.life <= 0) {
+        this.fxLayer.removeChild(s.g);
+        s.g.destroy();
+        this.shockwaves.splice(i, 1);
       }
     }
   }

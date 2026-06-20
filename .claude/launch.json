@@ -18,6 +18,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8788", "--directory", "docs"],
       "port": 8788
+    },
+    {
+      "name": "prod",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["dist/cli.js", "--no-open"],
+      "port": 8123
     }
   ]
 }

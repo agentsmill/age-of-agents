@@ -3,6 +3,7 @@ import { sep } from 'node:path';
 import type { PeonSnapshot } from '@agent-citadel/shared';
 import { TailRegistry } from './transcript/tail.js';
 import { DEFAULT_THRESHOLDS, SessionTracker, type StateThresholds } from './state-machine.js';
+import { recordSessionSummary } from './session-log.js';
 import type { AgentSource, ClassifiedFile } from './sources/types.js';
 import type { World } from './world.js';
 
@@ -80,7 +81,7 @@ export class SourceWatcher {
   applyExternalFacts(sessionId: string, projectDir: string, facts: import('./transcript/facts.js').Fact[]): void {
     let tracker = this.trackers.get(sessionId);
     if (!tracker) {
-      tracker = new SessionTracker(this.world, sessionId, projectDir, this.thresholds, this.source.id);
+      tracker = new SessionTracker(this.world, sessionId, projectDir, this.thresholds, this.source.id, {}, recordSessionSummary);
       this.trackers.set(sessionId, tracker);
     }
     for (const fact of facts) tracker.apply(fact);
@@ -118,7 +119,7 @@ export class SourceWatcher {
       const sessionId = target.sessionId!;
       let tracker = this.trackers.get(sessionId);
       if (!tracker) {
-        tracker = new SessionTracker(this.world, sessionId, target.projectDir ?? '', this.thresholds, this.source.id);
+        tracker = new SessionTracker(this.world, sessionId, target.projectDir ?? '', this.thresholds, this.source.id, {}, recordSessionSummary);
         this.trackers.set(sessionId, tracker);
       }
       for (const line of lines) {
