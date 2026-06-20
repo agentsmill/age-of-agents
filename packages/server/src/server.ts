@@ -61,7 +61,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     registerModelRoutes(app, { persist: true });
     app.post('/hooks', async (request) => {
       const translated = translateHook((request.body ?? {}) as never);
-      if (translated) claudeWatcher.applyExternalFacts(translated.sessionId, translated.projectDir, translated.facts);
+      if (translated) claudeWatcher.applyExternalFacts(translated.sessionId, translated.projectDir, translated.facts, translated.cwd);
       return { ok: true };
     });
     app.get('/hooks/status', async () => ({ installed: await hooksInstalled() }));

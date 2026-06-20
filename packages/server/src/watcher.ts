@@ -77,13 +77,34 @@ export class SourceWatcher {
   }
 
   /** Szybki kanał: fakty z hooków HTTP trafiają do tej samej maszyny stanów. */
-  applyExternalFacts(sessionId: string, projectDir: string, facts: import('./transcript/facts.js').Fact[]): void {
+  applyExternalFacts(sessionId: string, projectDir: string, facts: import('./transcript/facts.js').Fact[], cwd?: string): void {
     let tracker = this.trackers.get(sessionId);
+    const isNewTracker = !tracker;
     if (!tracker) {
       tracker = new SessionTracker(this.world, sessionId, projectDir, this.thresholds, this.source.id);
       this.trackers.set(sessionId, tracker);
     }
-    for (const fact of facts) tracker.apply(fact);
+    for (const fact of facts) {
+      // Claude /clear starts a replacement session_id. Route the strike to the
+      // visible old hero in the same cwd when that link is available.
+      if (fact.kind === 'cleared' && isNewTracker && cwd) {
+        (this.mostRecentTrackerByCwd(cwd, sessionId) ?? tracker).apply(fact);
+        continue;
+      }
+      tracker.apply(fact);
+    }
+  }
+
+  private mostRecentTrackerByCwd(cwd: string, excludeSessionId: string): SessionTracker | undefined {
+    let best: { tracker: SessionTracker; atMs: number } | undefined;
+    for (const [id, tracker] of this.trackers) {
+      if (id === excludeSessionId) continue;
+      const hero = this.world.getHero(id);
+      if (!hero || hero.workingDir !== cwd) continue;
+      const atMs = Date.parse(hero.lastActivityAt);
+      if (!best || atMs > best.atMs) best = { tracker, atMs };
+    }
+    return best?.tracker;
   }
 
   private rootFor(path: string): string | undefined {

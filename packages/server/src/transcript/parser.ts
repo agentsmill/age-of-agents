@@ -6,6 +6,10 @@ function clip(text: string, max = 240): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+function isClearCommand(text: string): boolean {
+  return /<command-name>\s*\/clear\s*<\/command-name>/i.test(text);
+}
+
 /**
  * Czy tekst to PROMPT CZŁOWIEKA, a nie syntetyczna tura Claude Code.
  * Transkrypt miesza prawdziwe prompty z: przerwaniami, blokami
@@ -167,14 +171,16 @@ export function interpretLine(line: string): Fact[] {
 
       const content = record.message?.content;
       if (typeof content === 'string') {
-        if (isHumanPrompt(content)) facts.push({ kind: 'prompt', text: clip(content), ts });
+        if (isClearCommand(content)) facts.push({ kind: 'cleared', ts });
+        else if (isHumanPrompt(content)) facts.push({ kind: 'prompt', text: clip(content), ts });
       } else if (Array.isArray(content)) {
         for (const block of content) {
           if (block?.type === 'tool_result') {
             facts.push({ kind: 'tool-result', isError: block.is_error === true, ts });
           }
-          if (block?.type === 'text' && typeof block.text === 'string' && isHumanPrompt(block.text)) {
-            facts.push({ kind: 'prompt', text: clip(block.text), ts });
+          if (block?.type === 'text' && typeof block.text === 'string') {
+            if (isClearCommand(block.text)) facts.push({ kind: 'cleared', ts });
+            else if (isHumanPrompt(block.text)) facts.push({ kind: 'prompt', text: clip(block.text), ts });
           }
         }
       }

@@ -13,8 +13,12 @@ describe('contextPct', () => {
 });
 
 describe('contextColor', () => {
-  it('zielony nisko, czerwony wysoko', () => {
+  it('zielony do 60%, żółty do 80%, czerwony powyżej', () => {
     expect(contextColor(5)).toBe('#5dcaa5');
+    expect(contextColor(60)).toBe('#5dcaa5');
+    expect(contextColor(61)).toBe('#f0d76e');
+    expect(contextColor(80)).toBe('#f0d76e');
+    expect(contextColor(81)).toBe('#e24b4a');
     expect(contextColor(95)).toBe('#e24b4a');
   });
 });

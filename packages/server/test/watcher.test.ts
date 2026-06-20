@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { isLiveAtStartup } from '../src/watcher.js';
+import { isLiveAtStartup, SourceWatcher } from '../src/watcher.js';
 import { DEFAULT_THRESHOLDS } from '../src/state-machine.js';
+import { World } from '../src/world.js';
+import type { AgentSource } from '../src/sources/types.js';
+
+const stubSource: AgentSource = {
+  id: 'claude',
+  roots: () => [],
+  classify: () => ({ kind: 'other' }),
+  parseLine: () => [],
+};
 
 describe('isLiveAtStartup — okno wykrywania sesji przy starcie', () => {
   const now = Date.parse('2026-06-14T12:00:00.000Z');
@@ -18,5 +27,39 @@ describe('isLiveAtStartup — okno wykrywania sesji przy starcie', () => {
 
   it('świeżo zapisana sesja (1 min) jest żywa', () => {
     expect(isLiveAtStartup(now - 60_000, now, W)).toBe(true);
+  });
+});
+
+describe('applyExternalFacts — strike na /clear', () => {
+  it('kieruje cleared do dotychczasowego bohatera w tym samym cwd, nie do nowej sesji', () => {
+    const world = new World();
+    const watcher = new SourceWatcher(world, stubSource);
+    const cwd = '/home/lachlan/age-of-agents';
+
+    watcher.applyExternalFacts('old-session', 'age-of-agents', [{ kind: 'meta', cwd }]);
+    watcher.applyExternalFacts(
+      'new-session',
+      'age-of-agents',
+      [
+        { kind: 'meta', cwd },
+        { kind: 'cleared', ts: new Date().toISOString() },
+      ],
+      cwd,
+    );
+
+    expect(world.getHero('old-session')?.clearedAt).toBeTypeOf('number');
+    expect(world.getHero('new-session')?.clearedAt).toBeUndefined();
+  });
+
+  it('bez cwd dopasowującego inną sesję cleared trafia do nowej sesji', () => {
+    const world = new World();
+    const watcher = new SourceWatcher(world, stubSource);
+
+    watcher.applyExternalFacts('solo-session', 'age-of-agents', [
+      { kind: 'meta', cwd: '/home/lachlan/age-of-agents' },
+      { kind: 'cleared', ts: new Date().toISOString() },
+    ]);
+
+    expect(world.getHero('solo-session')?.clearedAt).toBeTypeOf('number');
   });
 });

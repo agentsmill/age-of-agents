@@ -182,7 +182,7 @@ export function SidePanel() {
       {typeof hero.contextTokens === 'number' && (
         <ContextBar
           tokens={hero.contextTokens}
-          windowSize={resolveContextWindow(hero.model, models)}
+          windowSize={hero.contextWindowTokens ?? resolveContextWindow(hero.model, models)}
           label={t.context}
         />
       )}
@@ -243,4 +243,3 @@ function fmtDuration(startedAt: string, now: number): string {
   const h = Math.floor(m / 60);
   return `${h}h ${Math.round(m % 60)}m`;
 }
-

@@ -53,6 +53,8 @@ export interface HeroSnapshot {
   /** Bieżący rozmiar kontekstu z OSTATNIEJ wiadomości (input + cache_read + cache_creation).
    *  ≠ tokens.input (suma kumulatywna). Brak → nie pokazuj paska kontekstu. */
   contextTokens?: number;
+  /** Rozmiar okna kontekstu zgłoszony przez CLI. Brak → klient używa rejestru modeli. */
+  contextWindowTokens?: number;
   /** Co ta sesja realnie wyciągnęła z arsenału (z atrybucji transkryptu). */
   wielded?: WieldedArsenal;
   /** Tożsamość kontenera Docker, jeśli sesja działa w kontenerze (źródło Docker).
@@ -60,6 +62,8 @@ export interface HeroSnapshot {
   container?: { id: string; name: string; image: string };
   startedAt: string;
   lastActivityAt: string;
+  /** Bumped when a session is cleared so the client can play one cosmetic strike. */
+  clearedAt?: number;
 }
 
 export interface PeonSnapshot {

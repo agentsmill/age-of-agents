@@ -39,9 +39,19 @@ describe('interpretCodexLine', () => {
     expect(web.find((f) => f.kind === 'tool-start')).toMatchObject({ kind: 'tool-start', tool: 'WebSearch', detail: 'rust async' });
   });
 
-  it('token_count → usage-total; task_complete → turn-end', () => {
-    expect(interpretCodexLine(line({ type: 'event_msg', payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 1200, output_tokens: 300 } } } })))
-      .toContainEqual({ kind: 'usage-total', input: 1200, output: 300 });
+  it('token_count → usage-total with current context when present; task_complete → turn-end', () => {
+    expect(interpretCodexLine(line({
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: { input_tokens: 1200, output_tokens: 300 },
+          last_token_usage: { input_tokens: 700, output_tokens: 40, total_tokens: 740 },
+          model_context_window: 258400,
+        },
+      },
+    })))
+      .toContainEqual({ kind: 'usage-total', input: 1200, output: 300, context: 740, contextWindow: 258400 });
     expect(interpretCodexLine(line({ type: 'event_msg', timestamp: '2026-06-14T10:05:00.000Z', payload: { type: 'task_complete' } })))
       .toContainEqual({ kind: 'turn-end', ts: '2026-06-14T10:05:00.000Z' });
   });

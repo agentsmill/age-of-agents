@@ -93,14 +93,31 @@ function codexOutputIsError(output: unknown): boolean {
   return false;
 }
 
-/** Wyciąga kumulatywne użycie tokenów z payloadu token_count (kilka kształtów). */
-function extractCodexUsage(payload: any): { input: number; output: number } | undefined {
-  const u = payload?.info?.total_token_usage ?? payload?.total_token_usage ?? payload;
+const positiveNumber = (v: unknown): number | undefined => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
+
+/** Wyciąga użycie tokenów z payloadu token_count (kilka kształtów). */
+function extractCodexUsage(payload: any): { input: number; output: number; context?: number; contextWindow?: number } | undefined {
+  const info = payload?.info && typeof payload.info === 'object' ? payload.info : payload;
+  const u = info?.total_token_usage ?? payload?.total_token_usage ?? payload;
   if (!u || typeof u !== 'object') return undefined;
   const input = Number(u.input_tokens ?? u.input ?? 0);
   const output = Number(u.output_tokens ?? u.output ?? 0);
   if (!input && !output) return undefined;
-  return { input, output };
+
+  const last = info?.last_token_usage;
+  const context = last && typeof last === 'object'
+    ? positiveNumber(last.total_tokens) ??
+      positiveNumber(
+        Number(last.input_tokens ?? last.input ?? 0) +
+        Number(last.output_tokens ?? last.output ?? 0) +
+        Number(last.reasoning_output_tokens ?? 0),
+      )
+    : undefined;
+  const contextWindow = positiveNumber(info?.model_context_window ?? payload?.model_context_window);
+  return { input, output, ...(context ? { context } : {}), ...(contextWindow ? { contextWindow } : {}) };
 }
 
 function handleMessage(payload: any, ts: string, facts: Fact[]): void {
@@ -180,7 +197,7 @@ export function interpretCodexLine(line: string): Fact[] {
       if (!payload) break;
       if (payload.type === 'token_count') {
         const u = extractCodexUsage(payload);
-        if (u) facts.push({ kind: 'usage-total', input: u.input, output: u.output });
+        if (u) facts.push({ kind: 'usage-total', ...u });
       } else if (payload.type === 'task_complete' || payload.type === 'turn_complete') {
         facts.push({ kind: 'turn-end', ts });
       }

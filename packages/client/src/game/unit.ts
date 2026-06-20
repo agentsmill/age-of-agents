@@ -5,10 +5,13 @@ import type { Projection } from './projection';
 import type { PathNode } from './pathfind';
 import { buildUnitBody, labelStyle, teamColor } from './placeholders';
 import { stateToAnimation } from './archetype';
+import { contextColor } from '../context-progress';
 
 const SPEED_GRID_PER_S = 2.2;
 /** Jak długo (s) dymek roboczy jest widoczny po zmianie treści (potem chowamy — declutter). */
 const BUBBLE_TTL = 7;
+const CONTEXT_BAR_W = 30;
+const CONTEXT_BAR_H = 4;
 
 /** Domyślna skala sprite'a (fantasy/standard ~68px). Motyw nadpisuje przez ThemeDef.heroSprite. */
 const SPRITE_SCALE = 0.8;
@@ -31,6 +34,10 @@ export class Unit {
   private crate = new Graphics();
   private teamRing = new Graphics();
   private selectionRing = new Graphics();
+  private contextBar = new Container();
+  private contextTrack = new Graphics();
+  private contextFill = new Graphics();
+  private contextProgress?: number;
   private selected = false;
   private overlay = new Text({ text: '', style: labelStyle });
   private bubble = new Text({ text: '', style: { ...labelStyle, fontSize: 10 } });
@@ -102,7 +109,13 @@ export class Unit {
     this.nameTag.position.set(0, 6);
     this.nameTag.alpha = 0.9;
 
-    this.container.addChild(this.aura, this.selectionRing, this.teamRing, this.body, this.crate, this.overlay, this.bubble, this.nameTag);
+    this.contextTrack.rect(-CONTEXT_BAR_W / 2 - 1, -1, CONTEXT_BAR_W + 2, CONTEXT_BAR_H + 2).fill(0x0b0b0a);
+    this.contextTrack.rect(-CONTEXT_BAR_W / 2, 0, CONTEXT_BAR_W, CONTEXT_BAR_H).fill({ color: 0x2a2926, alpha: 0.95 });
+    this.contextBar.position.set(0, isPeon ? -30 : -39);
+    this.contextBar.visible = false;
+    this.contextBar.addChild(this.contextTrack, this.contextFill);
+
+    this.container.addChild(this.aura, this.selectionRing, this.teamRing, this.body, this.crate, this.contextBar, this.overlay, this.bubble, this.nameTag);
 
     const badge = buildAgentBadge(agent);
     if (badge) this.container.addChild(badge);
@@ -112,6 +125,24 @@ export class Unit {
 
   setCrate(visible: boolean): void {
     this.crate.visible = visible;
+  }
+
+  setContextProgress(pct: number | undefined): void {
+    if (typeof pct !== 'number' || !Number.isFinite(pct)) {
+      this.contextBar.visible = false;
+      this.contextProgress = undefined;
+      this.contextFill.clear();
+      return;
+    }
+    const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+    this.contextBar.visible = true;
+    if (this.contextProgress === clamped) return;
+    this.contextProgress = clamped;
+    const fillW = Math.round((CONTEXT_BAR_W * clamped) / 100);
+    this.contextFill.clear();
+    if (fillW > 0) {
+      this.contextFill.rect(-CONTEXT_BAR_W / 2, 0, fillW, CONTEXT_BAR_H).fill(parseInt(contextColor(clamped).slice(1), 16));
+    }
   }
 
   setName(name: string): void {
@@ -157,6 +188,7 @@ export class Unit {
     const dimmed = state === 'sleeping';
     this.body.alpha = dimmed ? 0.45 : 1;
     this.nameTag.alpha = dimmed ? 0.45 : 0.9;
+    this.contextBar.alpha = dimmed ? 0.45 : 1;
   }
 
   update(dtSeconds: number): void {

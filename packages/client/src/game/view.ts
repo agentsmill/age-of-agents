@@ -23,6 +23,7 @@ import { buildingText } from '../i18n';
 import { homeBuilding, awaitingBuilding } from './home-building';
 import { worldLayerTransform, worldToViewport, flipTextNodes } from './flip';
 import type { Lang } from '../settings';
+import { contextPct } from '../context-progress';
 
 /** Docelowa szerokość dekoracji w kaflach (do skalowania sprite'a). */
 const DECO_W: Record<DecoKind, number> = { tree: 1.1, rock: 0.8, bush: 0.75, flower: 0.7 };
@@ -98,6 +99,7 @@ export class GameView {
   private userZoomed = false; // wheel/pinch/kontrolki — wstrzymuje auto-dopasowanie przy resize
   private particles: Particle[] = [];
   private emitters = new Map<BuildingId, FxEmitter>();
+  private lastClearedAt = new Map<string, number>();
   private elapsed = 0;
   private missionStatus = new Map<string, string>();
   private graph: WaypointGraph;
@@ -466,10 +468,18 @@ export class GameView {
         // bohaterowie wracają do Twierdzy (fallback w steer/wanderIdle) i stoi
         // ich w piazza. Z domem pamiętanym wracają pod właściwy punkt zbiórki.
         this.lastBuilding.set(hero.sessionId, homeId);
+        this.lastClearedAt.set(hero.sessionId, hero.clearedAt ?? 0);
       }
       unit.setName(clipName(hero.title));
       unit.setState(hero.state, hero.state === 'working' ? hero.toolDetail ?? hero.currentTool : undefined);
+      const contextWindow = hero.contextWindowTokens ?? resolveModelLive(hero.model).contextWindow;
+      unit.setContextProgress(typeof hero.contextTokens === 'number' ? contextPct(hero.contextTokens, contextWindow) : undefined);
       this.steer(unit, hero.state, hero.currentTool, hero.toolDetail, hero.teamColor);
+      const cleared = hero.clearedAt ?? 0;
+      if (cleared !== (this.lastClearedAt.get(hero.sessionId) ?? 0)) {
+        this.lastClearedAt.set(hero.sessionId, cleared);
+        this.smiteOnClear(unit);
+      }
     }
 
     for (const peon of peonList) {
@@ -499,6 +509,7 @@ export class GameView {
       if (!seen.has(id)) {
         this.units.delete(id);
         this.targets.delete(id);
+        this.lastClearedAt.delete(id);
         if (unit.isPeon) {
           this.retirePeon(unit);
         } else {
@@ -550,6 +561,65 @@ export class GameView {
         g,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed - 80,
+        life,
+        maxLife: life,
+        gravity: 220,
+      });
+    }
+  }
+
+  private smiteOnClear(unit: Unit): void {
+    window.setTimeout(() => {
+      if (this.units.get(unit.id) !== unit) return;
+      this.spawnLightning(unit.gx, unit.gy);
+    }, 120);
+  }
+
+  private spawnLightning(gx: number, gy: number): void {
+    const { x, y } = this.theme.projection.toScreen(gx, gy);
+    const pts: number[] = [0, -220];
+    let py = -220;
+    while (py < -14) {
+      py = Math.min(-14, py + 22 + Math.random() * 16);
+      pts.push((Math.random() - 0.5) * 18, py);
+    }
+
+    const bolt = new Graphics();
+    bolt.poly(pts, false).stroke({ color: 0x85c8ff, width: 7, alpha: 0.38 });
+    bolt.poly(pts, false).stroke({ color: 0xfff4bd, width: 2.5, alpha: 0.96 });
+    bolt.blendMode = 'add';
+    bolt.position.set(x, y);
+    this.fxLayer.addChild(bolt);
+    this.particles.push({ g: bolt, vx: 0, vy: 0, life: 0.24, maxLife: 0.24, gravity: 0 });
+
+    const flash = new Graphics();
+    flash.circle(0, -12, 22).fill({ color: 0xd8efff, alpha: 0.42 });
+    flash.circle(0, -12, 9).fill({ color: 0xfff4bd, alpha: 0.78 });
+    flash.blendMode = 'add';
+    flash.position.set(x, y);
+    this.fxLayer.addChild(flash);
+    this.particles.push({ g: flash, vx: 0, vy: 0, life: 0.32, maxLife: 0.32, gravity: 0 });
+
+    const ring = new Graphics();
+    ring.ellipse(0, 2, 18, 7).stroke({ color: 0xfff4bd, width: 2.5, alpha: 0.9 });
+    ring.blendMode = 'add';
+    ring.position.set(x, y);
+    this.fxLayer.addChild(ring);
+    this.particles.push({ g: ring, vx: 0, vy: 0, life: 0.45, maxLife: 0.45, gravity: 0 });
+
+    for (let i = 0; i < 14; i++) {
+      const spark = new Graphics();
+      spark.rect(-2, -2, 4, 4).fill(i % 3 === 0 ? 0xfff4bd : 0x85c8ff);
+      spark.blendMode = 'add';
+      spark.position.set(x, y - 14);
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 60 + Math.random() * 130;
+      const life = 0.55 + Math.random() * 0.4;
+      this.fxLayer.addChild(spark);
+      this.particles.push({
+        g: spark,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 70,
         life,
         maxLife: life,
         gravity: 220,

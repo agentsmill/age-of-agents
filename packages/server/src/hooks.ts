@@ -26,6 +26,7 @@ export interface HookPayload {
   model?: string;
   permission_mode?: string;
   message?: string;
+  source?: string;
 }
 
 /**
@@ -39,7 +40,7 @@ function isIdleWaitingNotice(message: string | undefined): boolean {
   return typeof message === 'string' && /waiting for (your )?input/i.test(message);
 }
 
-export function translateHook(payload: HookPayload): { sessionId: string; projectDir: string; facts: Fact[] } | null {
+export function translateHook(payload: HookPayload): { sessionId: string; projectDir: string; cwd?: string; facts: Fact[] } | null {
   const sessionId = payload.session_id;
   if (!sessionId) return null;
   const projectDir = payload.cwd ? basename(payload.cwd) : 'nieznany';
@@ -49,6 +50,7 @@ export function translateHook(payload: HookPayload): { sessionId: string; projec
   switch (payload.hook_event_name) {
     case 'SessionStart':
       facts.push({ kind: 'meta', model: payload.model, permissionMode: payload.permission_mode, cwd: payload.cwd });
+      if (payload.source === 'clear') facts.push({ kind: 'cleared', ts });
       break;
     case 'UserPromptSubmit':
       if (payload.prompt) facts.push({ kind: 'prompt', text: payload.prompt.slice(0, 240), ts });
@@ -77,7 +79,7 @@ export function translateHook(payload: HookPayload): { sessionId: string; projec
       return null;
   }
 
-  return facts.length > 0 ? { sessionId, projectDir, facts } : null;
+  return facts.length > 0 ? { sessionId, projectDir, cwd: payload.cwd, facts } : null;
 }
 
 // --- Instalator: merge wpisów hooków do ~/.claude/settings.json ---

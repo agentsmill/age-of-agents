@@ -74,6 +74,14 @@ describe('SessionTracker', () => {
     expect(world.getHero('sesja-1')?.tokens).toEqual({ input: 250, output: 90 });
   });
 
+  it('usage-total może ustawić bieżący kontekst i rozmiar okna', () => {
+    const { world, tracker } = setup();
+    tracker.apply({ kind: 'usage-total', input: 1200, output: 300, context: 740, contextWindow: 258400 });
+    const hero = world.getHero('sesja-1');
+    expect(hero?.contextTokens).toBe(740);
+    expect(hero?.contextWindowTokens).toBe(258400);
+  });
+
   it('agent z konstruktora ląduje w HeroSnapshot', () => {
     const world = new World();
     const tracker = new SessionTracker(world, 'sesja-cx', 'projekt-x', DEFAULT_THRESHOLDS, 'codex');

@@ -99,6 +99,19 @@ describe('interpretLine', () => {
     expect(user('tak deploy')).toContainEqual({ kind: 'prompt', text: 'tak deploy', ts: '2026-06-13T10:00:00.000Z' });
   });
 
+  it('wykrywa /clear z serializowanej komendy Claude i emituje cleared zamiast promptu', () => {
+    const line = JSON.stringify({
+      type: 'user',
+      timestamp: '2026-06-19T02:20:00.000Z',
+      message: {
+        role: 'user',
+        content: '<command-name>/clear</command-name>\n<command-message>clear</command-message>\n<command-args></command-args>',
+      },
+    });
+    expect(interpretLine(line)).toContainEqual({ kind: 'cleared', ts: '2026-06-19T02:20:00.000Z' });
+    expect(interpretLine(line).find((fact) => fact.kind === 'prompt')).toBeUndefined();
+  });
+
   it('isHumanPrompt: heurystyka prompt człowieka', () => {
     expect(isHumanPrompt('napraw testy')).toBe(true);
     expect(isHumanPrompt('# nagłówek markdown')).toBe(true);

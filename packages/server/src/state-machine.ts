@@ -39,6 +39,7 @@ export class SessionTracker {
   private seenUsage = new Set<string>();
   private _tokens = { input: 0, output: 0 };
   private contextTokens?: number;
+  private contextWindowTokens?: number;
   /** Publiczny getter do porównywania z nowymi wartościami (np. w OpenCode pollerze). */
   get tokens(): { input: number; output: number } {
     return this._tokens;
@@ -93,6 +94,7 @@ export class SessionTracker {
       tokens: this.tokens,
       recentActions: this.recentActions,
       contextTokens: this.contextTokens,
+      contextWindowTokens: this.contextWindowTokens,
       wielded: this.wielded(),
       startedAt: now,
       lastActivityAt: now,
@@ -195,14 +197,25 @@ export class SessionTracker {
             output: this.tokens.output + fact.output,
           };
           if (typeof fact.context === 'number') this.contextTokens = fact.context;
-          this.patch({ tokens: this._tokens, ...(typeof fact.context === 'number' ? { contextTokens: fact.context } : {}) });
+          if (typeof fact.contextWindow === 'number') this.contextWindowTokens = fact.contextWindow;
+          this.patch({
+            tokens: this._tokens,
+            ...(typeof fact.context === 'number' ? { contextTokens: fact.context } : {}),
+            ...(typeof fact.contextWindow === 'number' ? { contextWindowTokens: fact.contextWindow } : {}),
+          });
         }
         break;
 
       case 'usage-total':
         // Codex: token_count jest kumulatywny → USTAW, nie dodawaj.
         this._tokens = { input: fact.input, output: fact.output };
-        this.patch({ tokens: this._tokens });
+        if (typeof fact.context === 'number') this.contextTokens = fact.context;
+        if (typeof fact.contextWindow === 'number') this.contextWindowTokens = fact.contextWindow;
+        this.patch({
+          tokens: this._tokens,
+          ...(typeof fact.context === 'number' ? { contextTokens: fact.context } : {}),
+          ...(typeof fact.contextWindow === 'number' ? { contextWindowTokens: fact.contextWindow } : {}),
+        });
         break;
 
       case 'tool-result':
@@ -236,6 +249,10 @@ export class SessionTracker {
 
       case 'awaiting':
         this.patch({ state: 'awaiting-input', currentTool: undefined }, fact.ts);
+        break;
+
+      case 'cleared':
+        this.patch({ clearedAt: Date.now() });
         break;
     }
   }
