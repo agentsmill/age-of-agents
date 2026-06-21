@@ -3,6 +3,7 @@ import type {
   GameEvent,
   HeroSnapshot,
   MissionSnapshot,
+  PendingQuestion,
   PeonSnapshot,
   ProjectArsenal,
   TranscriptLine,
@@ -24,6 +25,8 @@ interface WorldStore {
   autofollow: boolean;
   /** Static Arsenal per projectDir (Source A). */
   arsenal: Record<string, ProjectArsenal>;
+  /** Open agent questions awaiting a panel answer, keyed by question id. */
+  pending: Record<string, PendingQuestion>;
   /**
    * Selected project (city). `undefined` = show all (overlay).
    * Affects the side panel: Architect Hall shows only the selected project,
@@ -60,6 +63,7 @@ export const useWorld = create<WorldStore>((set) => ({
   notifications: [],
   autofollow: false,
   arsenal: {},
+  pending: {},
   setConnected: (connected) => set({ connected }),
   // Unit and building selection are mutually exclusive (one right-side panel).
   // Reset autofollow only when the target CHANGES (opt-in per agent): clicking
@@ -92,6 +96,7 @@ export const useWorld = create<WorldStore>((set) => ({
               }, new Map<string, TranscriptLine[]>()),
             ),
             arsenal: Object.fromEntries((event.arsenals ?? []).map((a) => [a.projectDir, a])),
+            pending: {},
           };
         case 'hero-spawned':
         case 'hero-updated': {
@@ -105,11 +110,13 @@ export const useWorld = create<WorldStore>((set) => ({
         case 'hero-removed': {
           const heroes = { ...state.heroes };
           delete heroes[event.sessionId];
-          // The followed hero was removed: clear selection and autofollow (no dead target).
+          const pending = Object.fromEntries(
+            Object.entries(state.pending).filter(([, q]) => q.sessionId !== event.sessionId),
+          );
           if (state.selectedSessionId === event.sessionId) {
-            return { heroes, selectedSessionId: undefined, autofollow: false };
+            return { heroes, pending, selectedSessionId: undefined, autofollow: false };
           }
-          return { heroes };
+          return { heroes, pending };
         }
         case 'peon-spawned':
         case 'peon-updated':
@@ -138,6 +145,13 @@ export const useWorld = create<WorldStore>((set) => ({
         }
         case 'arsenal-updated': {
           return { arsenal: { ...state.arsenal, [event.arsenal.projectDir]: event.arsenal } };
+        }
+        case 'pending-question':
+          return { pending: { ...state.pending, [event.question.id]: event.question } };
+        case 'pending-question-resolved': {
+          const pending = { ...state.pending };
+          delete pending[event.id];
+          return { pending };
         }
         default:
           return state;
