@@ -1,6 +1,8 @@
 import type { ProjectArsenal, WieldedArsenal } from './arsenal.js';
+import type { PendingQuestion } from './pending.js';
 export * from './arsenal.js';
 export * from './providers.js';
+export * from './pending.js';
 
 /** Agent Citadel WebSocket protocol: shared server/client types. */
 
@@ -115,7 +117,9 @@ export type GameEvent =
   | { type: 'mission-started'; mission: MissionSnapshot }
   | { type: 'mission-completed'; mission: MissionSnapshot }
   | { type: 'transcript-line'; line: TranscriptLine }
-  | { type: 'arsenal-updated'; arsenal: ProjectArsenal };
+  | { type: 'arsenal-updated'; arsenal: ProjectArsenal }
+  | { type: 'pending-question'; question: PendingQuestion }
+  | { type: 'pending-question-resolved'; id: string };
 
 export const SERVER_PORT = 8123;
 export const WS_PATH = '/ws';
