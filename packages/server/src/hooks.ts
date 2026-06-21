@@ -12,6 +12,10 @@ import { toolDetail } from './transcript/parser.js';
  */
 
 export const HOOK_URL = `http://localhost:${SERVER_PORT}/hooks`;
+export const DECIDE_URL = `http://localhost:${SERVER_PORT}/hooks/decide`;
+/** PreToolUse blocks while the panel answers; give it room (seconds). */
+export const DECIDE_TIMEOUT_SEC = 600;
+const BLOCKING_EVENTS = new Set(['PreToolUse']);
 const HOOK_COMMAND_MARKER = 'age-of-agents-hook-shim';
 const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop'] as const;
 const MATCHER_EVENTS = new Set(['PreToolUse', 'PostToolUse']);
@@ -99,7 +103,26 @@ async function readSettings(): Promise<Record<string, any>> {
   }
 }
 
-function hookCommand(): string {
+function blockingShim(): string {
+  const script = [
+    `const marker=${JSON.stringify(HOOK_COMMAND_MARKER)};void marker`,
+    `const url=${JSON.stringify(DECIDE_URL)}`,
+    `let body=''`,
+    `process.stdin.setEncoding('utf8')`,
+    `process.stdin.on('data', c => { body += c })`,
+    `process.stdin.on('end', async () => {`,
+    `  try {`,
+    `    const res = await fetch(url, { method:'POST', headers:{'content-type':'application/json'}, body, signal: AbortSignal.timeout(${DECIDE_TIMEOUT_SEC * 1000 - 5000}) })`,
+    `    const out = await res.json()`,
+    `    if (out && out.hookSpecificOutput) process.stdout.write(JSON.stringify(out))`,
+    `  } catch {}`,
+    `  process.exit(0)`,
+    `})`,
+  ].join(';');
+  return `node -e ${JSON.stringify(script)}`;
+}
+
+function fireAndForgetShim(): string {
   // Command hook shim: forwards Claude's stdin JSON when AoA is running, exits
   // cleanly when it is not. This avoids global Claude Code HTTP-hook error spam.
   const script = [
@@ -120,12 +143,23 @@ function hookCommand(): string {
   return `node -e ${JSON.stringify(script)}`;
 }
 
+export function buildHookEntry(event: string): HookEntry {
+  const blocking = BLOCKING_EVENTS.has(event);
+  const entry: HookEntry = {
+    hooks: [{ type: 'command', command: blocking ? blockingShim() : fireAndForgetShim(), timeout: blocking ? DECIDE_TIMEOUT_SEC : 1 }],
+  };
+  if (MATCHER_EVENTS.has(event)) entry.matcher = '*';
+  return entry;
+}
+
 function isOurs(entry: HookEntry): boolean {
   return entry.hooks?.some((h) => h.type === 'http' && h.url === HOOK_URL) ?? false;
 }
 
 function isOursCommand(entry: HookEntry): boolean {
-  return entry.hooks?.some((h) => h.type === 'command' && h.command?.includes(HOOK_COMMAND_MARKER)) ?? false;
+  return entry.hooks?.some(
+    (h) => h.type === 'command' && (h.command?.includes(HOOK_COMMAND_MARKER) || h.command?.includes('/hooks/decide')),
+  ) ?? false;
 }
 
 function isAnyOurs(entry: HookEntry): boolean {
@@ -146,7 +180,11 @@ export async function hooksStatus(): Promise<{ installed: boolean; needsMigratio
     hasAny ||= entries.some(isAnyOurs);
     return entries.some(isOursCommand);
   });
-  return { installed, needsMigration: hasLegacy || (hasAny && !installed) };
+  const pre: HookEntry[] = settings.hooks?.PreToolUse ?? [];
+  const preStale = pre.some(
+    (e) => e.hooks?.some((h) => h.type === 'command' && h.command?.includes(HOOK_COMMAND_MARKER) && (h.timeout ?? 1) < 60),
+  );
+  return { installed, needsMigration: hasLegacy || (hasAny && !installed) || preStale };
 }
 
 /** Adds our hooks (merge; does not touch others' entries). Creates backup. */
@@ -163,9 +201,7 @@ export async function installHooks(): Promise<void> {
     const entries: HookEntry[] = (settings.hooks[event] ??= []);
     if (entries.some(isOursCommand)) continue;
     settings.hooks[event] = entries.filter((entry) => !isOurs(entry));
-    const entry: HookEntry = { hooks: [{ type: 'command', command: hookCommand(), timeout: 1 }] };
-    if (MATCHER_EVENTS.has(event)) entry.matcher = '*';
-    settings.hooks[event].push(entry);
+    settings.hooks[event].push(buildHookEntry(event));
   }
   await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
 }
