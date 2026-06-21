@@ -18,6 +18,8 @@ export default defineConfig({
       '/tool-mapping': 'http://127.0.0.1:8123',
       '/model-config': 'http://127.0.0.1:8123',
       '/permission-policy': 'http://127.0.0.1:8123',
+      '/sessions': 'http://127.0.0.1:8123',
+      '/fs': 'http://127.0.0.1:8123',
     },
   },
 });
