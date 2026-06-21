@@ -18,8 +18,6 @@ export class RealSdkRunner implements SdkRunner {
 
   async launch(params: LaunchParams, hooks: { onSessionId: (id: string) => void }): Promise<LiveSession> {
     const sdk = await import('@anthropic-ai/claude-agent-sdk');
-    // @ts-expect-error optional dependency — zod re-exported by SDK as zod/v4; import directly for tool schema
-    const { z } = await import('zod');
     const sessionKey = randomUUID();
     let realId: string | undefined;
     const idFor = () => realId ?? sessionKey;
@@ -35,11 +33,14 @@ export class RealSdkRunner implements SdkRunner {
       }
     }
 
+    // Empty input schema: avoids a hard `zod` dependency (the SDK builds the schema
+    // with its own bundled zod). For an aliased AskUserQuestion call the question
+    // payload is forwarded from the model's call, so the handler parses it loosely.
     const askTool = sdk.tool(
       'askUserQuestion',
       'Ask the user a multiple-choice question and return their selection.',
-      { questions: z.array(z.any()) },
-      async (args: Record<string, unknown>) => makeAskQuestionHandler(idFor(), this.registry, this.timeoutMs)(args, undefined),
+      {},
+      async (args: Record<string, unknown>, extra: unknown) => makeAskQuestionHandler(idFor(), this.registry, this.timeoutMs)(args, extra),
     );
     const panelServer = sdk.createSdkMcpServer({ name: 'panel', version: '1.0.0', tools: [askTool] });
     const abort = new AbortController();
