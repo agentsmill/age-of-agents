@@ -1,6 +1,6 @@
 {
   "name": "age-of-agents",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Age of Agents: visualize Claude Code sessions as a pixel-art RTS",
   "type": "module",
   "license": "MIT",
