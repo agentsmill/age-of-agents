@@ -827,6 +827,8 @@ EN:
   pqSendPlaceholder: 'Reply to the agent…',
   pqStop: 'Stop agent',
   pqRejectReason: 'Reason (optional)',
+  pqOpenQuestion: 'agent has a question — open',
+  pqClose: 'Close',
 ```
 PL:
 ```ts
@@ -844,6 +846,8 @@ PL:
   pqSendPlaceholder: 'Odpowiedz agentowi…',
   pqStop: 'Zatrzymaj agenta',
   pqRejectReason: 'Powód (opcjonalnie)',
+  pqOpenQuestion: 'agent ma pytanie — otwórz',
+  pqClose: 'Zamknij',
 ```
 IT:
 ```ts
@@ -861,6 +865,8 @@ IT:
   pqSendPlaceholder: 'Rispondi all’agente…',
   pqStop: 'Ferma agente',
   pqRejectReason: 'Motivo (facoltativo)',
+  pqOpenQuestion: 'l’agente ha una domanda — apri',
+  pqClose: 'Chiudi',
 ```
 
 - [ ] **Step 2: Run** `npm run test -w @agent-citadel/client -- i18n` → PASS; build client.
@@ -982,82 +988,165 @@ import { LaunchAgentButton } from './LaunchAgentButton';
 
 ---
 
-## Task 10: client — card actions for SDK sessions (answer question, reject reason, free-text, stop)
+## Task 10: client — AskUserQuestion centered modal + panel trigger + SDK session controls
+
+**Design (per user):** `AskUserQuestion` is NOT shown inline. The hero's panel shows a clickable **trigger** ("📣 agent has a question"); clicking opens a **centered, game-event-style modal** with the question text + options. Read-only (hook/terminal source) → options shown without answer buttons + "answer in the terminal" badge. SDK source → clickable option buttons that send the selection and close the modal. Permission + plan stay as inline cards in the panel (Phase 1 behavior; SDK plan additionally gets reject-with-reason). A reply/stop footer for SDK-launched sessions lives in the panel.
 
 **Files:**
-- Modify: `packages/client/src/hud/PendingQuestionCard.tsx`
+- Modify: `packages/client/src/store.ts` (open-question UI state + sdk session ids)
+- Modify: `packages/client/src/hud/PendingQuestionCard.tsx` (ask-user-question → trigger; SDK plan reject-reason)
+- Create: `packages/client/src/hud/QuestionModal.tsx`
+- Modify: root app component that renders `<SidePanel/>` (render `<QuestionModal/>`) — find with `grep -rn "<SidePanel" packages/client/src`
+- Modify: `packages/client/src/hud/SidePanel.tsx` (SDK reply/stop footer)
+- Modify: `packages/client/src/hud/LaunchAgentDialog.tsx` (mark launched session)
 
-- [ ] **Step 1: Extend the card.** For `source === 'sdk'`:
-  - `ask-user-question` renders a **button per option** → `sendAnswer({ id, decision: { type: 'select', optionLabels: [label] } })` (instead of the read-only hint).
-  - `plan-approval` adds a reason input; **Reject** sends `{ type: 'reject-plan', reason }`.
-  - Always (for the selected SDK hero) show a **free-text reply** box → `sendSessionMessage(sessionId, text)` and a **Stop** button → `stopSession(sessionId)`.
+- [ ] **Step 1: store — open-question + sdk-session state** (`store.ts`):
+  - In `WorldStore` add:
+    ```ts
+      /** Id of the AskUserQuestion shown as a centered modal (undefined = closed). */
+      openQuestionId?: string;
+      /** Session ids the app launched via the SDK (drive the reply/stop footer). */
+      sdkSessionIds: Record<string, true>;
+      openQuestion(id?: string): void;
+      markSdkSession(sessionId: string): void;
+    ```
+  - Initial state: add `sdkSessionIds: {},`
+  - Actions:
+    ```ts
+      openQuestion: (openQuestionId) => set({ openQuestionId }),
+      markSdkSession: (sessionId) => set((s) => ({ sdkSessionIds: { ...s.sdkSessionIds, [sessionId]: true } })),
+    ```
+  - In `apply`, `case 'snapshot'`: add `openQuestionId: undefined` to the reset object.
+  - In `apply`, `case 'pending-question-resolved'`: also clear the modal when it showed that question:
+    ```ts
+        case 'pending-question-resolved': {
+          const pending = { ...state.pending };
+          delete pending[event.id];
+          return { pending, openQuestionId: state.openQuestionId === event.id ? undefined : state.openQuestionId };
+        }
+    ```
 
-  Concrete replacement of the `ask-user-question` branch:
-```tsx
-      {isQuestion && (
-        question.source === 'sdk' ? (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {(question.options ?? []).map((o, i) => (
-              <button key={i} className="ghost" title={o.description}
-                onClick={() => sendAnswer({ id: question.id, decision: { type: 'select', optionLabels: [o.label] } })}>
-                {o.label}
-              </button>
-            ))}
+- [ ] **Step 2: PendingQuestionCard — ask-user-question becomes a trigger** (`PendingQuestionCard.tsx`):
+  - Add `import { useWorld } from '../store';` if not present (it is).
+  - Make the detail/tool line NOT render for `isQuestion` (the modal carries the text now): change the detail block so the `isQuestion` branch renders `null` (keep the mono tool+detail line only for permission/plan).
+  - Replace the whole `isQuestion` body (options/hint) with a single trigger button (both sources):
+    ```tsx
+        {isQuestion && (
+          <button
+            className="ghost"
+            style={{ alignSelf: 'flex-start', color: '#ef9f27', fontWeight: 600 }}
+            onClick={() => useWorld.getState().openQuestion(question.id)}
+          >
+            📣 {t.pqOpenQuestion}
+          </button>
+        )}
+    ```
+  - Keep the `tool-permission` block unchanged. For `plan-approval`: guard the existing approve/reject buttons to `question.source !== 'sdk'`, and add an SDK variant with a reason input:
+    ```tsx
+        {question.kind === 'plan-approval' && question.source === 'sdk' && (
+          <PlanRejectControls id={question.id} t={t} />
+        )}
+    ```
+    helper at the bottom of the file:
+    ```tsx
+    function PlanRejectControls({ id, t }: { id: string; t: ReturnType<typeof useUi> }) {
+      const [reason, setReason] = useState('');
+      return (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="ghost" onClick={() => sendAnswer({ id, decision: { type: 'approve-plan' } })}>{t.pqApprovePlan}</button>
+          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t.pqRejectReason} style={{ flex: 1, minWidth: 100 }} />
+          <button className="ghost" onClick={() => sendAnswer({ id, decision: { type: 'reject-plan', reason: reason || undefined } })}>{t.pqRejectPlan}</button>
+        </div>
+      );
+    }
+    ```
+    (Import `useState` from `react`.) The gating-on-awaiting (from Phase 1) stays for `ask-user-question`.
+
+- [ ] **Step 3: Create `packages/client/src/hud/QuestionModal.tsx`** (centered "game event" overlay):
+    ```tsx
+    import { useEffect } from 'react';
+    import type { PendingQuestion } from '@agent-citadel/shared';
+    import { useWorld } from '../store';
+    import { useUi } from '../i18n';
+    import { sendAnswer } from '../ws';
+
+    /** Centered modal showing one AskUserQuestion (opened from the hero panel trigger). */
+    export function QuestionModal() {
+      const openId = useWorld((s) => s.openQuestionId);
+      const pending = useWorld((s) => s.pending);
+      const heroes = useWorld((s) => s.heroes);
+      const t = useUi();
+      const close = () => useWorld.getState().openQuestion(undefined);
+      const q: PendingQuestion | undefined = openId ? pending[openId] : undefined;
+
+      useEffect(() => {
+        if (!q) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [q]);
+
+      if (!q || q.kind !== 'ask-user-question') return null;
+      const heroName = heroes[q.sessionId]?.title ?? '';
+      const answer = (label: string) => { sendAnswer({ id: q.id, decision: { type: 'select', optionLabels: [label] } }); close(); };
+
+      return (
+        <div onClick={close} style={{ position: 'fixed', inset: 0, background: '#000a', display: 'grid', placeItems: 'center', zIndex: 100 }}>
+          <div onClick={(e) => e.stopPropagation()} className="hud-panel" style={{ width: 520, maxWidth: '92vw', padding: 20, display: 'flex', flexDirection: 'column', gap: 14, boxShadow: '0 0 0 2px #ef9f27, 0 12px 40px #000a' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 22 }}>📣</span>
+              <div style={{ flex: 1 }}>
+                <div className="px" style={{ fontSize: 15, color: '#fac775' }}>{t.pqQuestionTitle}</div>
+                {heroName && <div style={{ fontSize: 12, opacity: 0.7 }}>{heroName}</div>}
+              </div>
+              <button className="ghost" onClick={close}>{t.pqClose}</button>
+            </div>
+            {q.detail && <div style={{ fontSize: 15, lineHeight: 1.5 }}>{q.detail}</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(q.options ?? []).map((o, i) =>
+                q.source === 'sdk' ? (
+                  <button key={i} className="ghost" style={{ textAlign: 'left', padding: '8px 10px' }} onClick={() => answer(o.label)}>
+                    <b>{o.label}</b>{o.description ? <span style={{ opacity: 0.7 }}> — {o.description}</span> : null}
+                  </button>
+                ) : (
+                  <div key={i} style={{ padding: '8px 10px', border: '1px solid #ffffff14' }}>
+                    <b>{o.label}</b>{o.description ? <span style={{ opacity: 0.7 }}> — {o.description}</span> : null}
+                  </div>
+                ),
+              )}
+            </div>
+            {q.source !== 'sdk' && <div style={{ opacity: 0.7, fontSize: 12 }}>{t.pqAnswerInTerminal}</div>}
           </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {question.options && question.options.length > 0 && (
-              <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {question.options.map((o, i) => (
-                  <li key={i}><b>{o.label}</b>{o.description ? <span style={{ opacity: 0.7 }}> — {o.description}</span> : null}</li>
-                ))}
-              </ul>
-            )}
-            <div style={{ opacity: 0.7, fontSize: 12 }}>{t.pqAnswerInTerminal}</div>
-          </div>
-        )
-      )}
-```
-  And add, after the existing `plan-approval` block, an SDK-only reject-with-reason variant (guard the existing plan block to `source !== 'sdk'`, and add):
-```tsx
-      {question.kind === 'plan-approval' && question.source === 'sdk' && (
-        <PlanRejectControls id={question.id} t={t} />
-      )}
-```
-  with a small inline component at the bottom of the file:
-```tsx
-function PlanRejectControls({ id, t }: { id: string; t: ReturnType<typeof useUi> }) {
-  const [reason, setReason] = useState('');
-  return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-      <button className="ghost" onClick={() => sendAnswer({ id, decision: { type: 'approve-plan' } })}>{t.pqApprovePlan}</button>
-      <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t.pqRejectReason} style={{ flex: 1, minWidth: 100 }} />
-      <button className="ghost" onClick={() => sendAnswer({ id, decision: { type: 'reject-plan', reason: reason || undefined } })}>{t.pqRejectPlan}</button>
-    </div>
-  );
-}
-```
-  (Import `useState` and `sendSessionMessage`/`stopSession` from `../sessions`.) Add a free-text + Stop footer shown when the selected hero is an SDK session — derive "is SDK session" by checking the store for any pending with `source:'sdk'` for this session OR track launched session ids in a store slice; simplest MVP: always render the footer when there is ANY `source:'sdk'` pending for the hero, else hide. Keep it minimal:
-```tsx
-      {question.source === 'sdk' && (
-        <SdkFooter sessionId={sessionId} t={t} />
-      )}
-```
-```tsx
-function SdkFooter({ sessionId, t }: { sessionId: string; t: ReturnType<typeof useUi> }) {
-  const [text, setText] = useState('');
-  return (
-    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-      <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t.pqSendPlaceholder} style={{ flex: 1 }} />
-      <button className="ghost" disabled={!text.trim()} onClick={() => { void sendSessionMessage(sessionId, text); setText(''); }}>{t.pqSend}</button>
-      <button className="ghost" onClick={() => void stopSession(sessionId)}>{t.pqStop}</button>
-    </div>
-  );
-}
-```
+        </div>
+      );
+    }
+    ```
 
-- [ ] **Step 2: Build client**; manual smoke in preview deferred to Task 11.
-- [ ] **Step 3: Commit** `git add packages/client/src/hud/PendingQuestionCard.tsx && git commit -m "feat(client): SDK card actions — answer question, reject reason, reply, stop"`
+- [ ] **Step 4: Render `<QuestionModal/>` at app root.** `grep -rn "<SidePanel" packages/client/src` to find the root component; import and render `<QuestionModal />` as a top-level sibling of `<SidePanel/>` so it overlays the whole screen.
+
+- [ ] **Step 5: SidePanel — SDK reply/stop footer** (`SidePanel.tsx`):
+  - Add imports: `import { sendSessionMessage, stopSession } from '../sessions';` and ensure `useState`/`useUi` are imported.
+  - After computing `hero` (before the early return is fine; compute the selector unconditionally near the others): `const isSdk = useWorld((s) => (selected ? !!s.sdkSessionIds[selected] : false));`
+  - In the JSX after the transcript block, add: `{isSdk && <SdkSessionFooter sessionId={selected} />}`
+  - Helper at the bottom of the file:
+    ```tsx
+    function SdkSessionFooter({ sessionId }: { sessionId: string }) {
+      const t = useUi();
+      const [text, setText] = useState('');
+      return (
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t.pqSendPlaceholder} style={{ flex: 1 }} />
+          <button className="ghost" disabled={!text.trim()} onClick={() => { void sendSessionMessage(sessionId, text); setText(''); }}>{t.pqSend}</button>
+          <button className="ghost" onClick={() => void stopSession(sessionId)}>{t.pqStop}</button>
+        </div>
+      );
+    }
+    ```
+
+- [ ] **Step 6: Mark launched sessions** (`LaunchAgentDialog.tsx`): on successful launch, before `onClose()`, when `res.sessionId` is present call `useWorld.getState().markSdkSession(res.sessionId)` (import `useWorld` from `../store`).
+
+- [ ] **Step 7: Build + tests** `npm run build -w @agent-citadel/client && npm run test -w @agent-citadel/client`.
+- [ ] **Step 8: Commit** `git add packages/client/src/store.ts packages/client/src/hud/PendingQuestionCard.tsx packages/client/src/hud/QuestionModal.tsx packages/client/src/hud/SidePanel.tsx packages/client/src/hud/LaunchAgentDialog.tsx <root app file> && git commit -m "feat(client): AskUserQuestion centered modal + SDK session controls"`
 
 ---
 
@@ -1065,15 +1154,16 @@ function SdkFooter({ sessionId, t }: { sessionId: string; t: ReturnType<typeof u
 
 - [ ] **Step 1:** `preview_start` demo; confirm no console errors; `🚀 Launch agent` button visible (note: with the SDK installed `sdkAvailable()` is true; in demo the FakeSdkRunner makes it available too).
 - [ ] **Step 2:** Open the dialog; verify folder browse (`/fs/list`), prompt, model, permission-mode select, cost warning render.
-- [ ] **Step 3:** Inject an SDK question to verify card buttons:
+- [ ] **Step 3:** Inject an SDK AskUserQuestion and verify the **panel trigger → centered modal** flow:
   ```js
   const sid = Object.keys(__world.getState().heroes)[0];
   __world.getState().select(sid);
   __world.getState().apply({ type:'hero-updated', hero: { ...__world.getState().heroes[sid], state:'awaiting-input' } });
-  __world.getState().apply({ type:'pending-question', question: { id:'sdk-q', sessionId:sid, source:'sdk', kind:'ask-user-question', tool:'AskUserQuestion', detail:'Which DB?', options:[{label:'PostgreSQL',description:'pg'},{label:'SQLite',description:'lite'}], createdAt:new Date().toISOString() } });
+  __world.getState().apply({ type:'pending-question', question: { id:'sdk-q', sessionId:sid, source:'sdk', kind:'ask-user-question', tool:'AskUserQuestion', detail:'Which database should I use?', options:[{label:'PostgreSQL',description:'relational'},{label:'SQLite',description:'file-based'}], createdAt:new Date().toISOString() } });
   ```
-  Confirm option **buttons** (not read-only) appear; clicking sends a `select` answer over WS.
-- [ ] **Step 4:** Screenshot as proof; stop preview.
+  Confirm: the panel shows a **trigger** ("📣 agent has a question"), NOT inline options. Click it (or `__world.getState().openQuestion('sdk-q')`) → a **centered modal** appears with the question text + clickable option buttons. Clicking an option sends a `select` answer over WS and closes the modal. Esc / click-outside / Close also dismiss.
+- [ ] **Step 3b:** Repeat with `source:'hook'` → the modal shows options **read-only** + "answer in the terminal" badge (no answer buttons).
+- [ ] **Step 4:** Screenshot the centered modal as proof; stop preview.
 
 ---
 
