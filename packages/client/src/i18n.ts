@@ -127,6 +127,24 @@ export interface UiStrings {
   pqPanelControl: string;
   pqPanelControlOn: string;
   pqPanelControlOff: string;
+  // Launch dialog
+  launchAgent: string;
+  launchTitle: string;
+  launchFolder: string;
+  launchPrompt: string;
+  launchModel: string;
+  launchPermissionMode: string;
+  launchStart: string;
+  launchCancel: string;
+  launchCostWarning: string;
+  launchUnavailable: string;
+  // Question modal & SDK card actions
+  pqSend: string;
+  pqSendPlaceholder: string;
+  pqStop: string;
+  pqRejectReason: string;
+  pqOpenQuestion: string;
+  pqClose: string;
 }
 
 const EN: UiStrings = {
@@ -258,6 +276,24 @@ const EN: UiStrings = {
   pqPanelControl: 'Answer prompts in panel',
   pqPanelControlOn: 'Panel answering: ON',
   pqPanelControlOff: 'Panel answering: OFF',
+  // Launch dialog
+  launchAgent: 'Launch agent',
+  launchTitle: 'Launch a Claude Code agent',
+  launchFolder: 'Working folder',
+  launchPrompt: 'Prompt',
+  launchModel: 'Model (blank = account default)',
+  launchPermissionMode: 'Permission mode',
+  launchStart: 'Launch',
+  launchCancel: 'Cancel',
+  launchCostWarning: 'This runs a real Claude Code session — it uses your account and consumes tokens.',
+  launchUnavailable: 'Claude Agent SDK not installed — run npm i @anthropic-ai/claude-agent-sdk',
+  // Question modal & SDK card actions
+  pqSend: 'Send',
+  pqSendPlaceholder: 'Reply to the agent…',
+  pqStop: 'Stop agent',
+  pqRejectReason: 'Reason (optional)',
+  pqOpenQuestion: 'agent has a question — open',
+  pqClose: 'Close',
 };
 
 const PL: UiStrings = {
@@ -389,6 +425,24 @@ const PL: UiStrings = {
   pqPanelControl: 'Odpowiadaj na prompty w panelu',
   pqPanelControlOn: 'Odpowiadanie w panelu: WŁ.',
   pqPanelControlOff: 'Odpowiadanie w panelu: WYŁ.',
+  // Launch dialog
+  launchAgent: 'Uruchom agenta',
+  launchTitle: 'Uruchom agenta Claude Code',
+  launchFolder: 'Folder roboczy',
+  launchPrompt: 'Prompt',
+  launchModel: 'Model (puste = domyślny konta)',
+  launchPermissionMode: 'Tryb uprawnień',
+  launchStart: 'Uruchom',
+  launchCancel: 'Anuluj',
+  launchCostWarning: 'To uruchamia prawdziwą sesję Claude Code — używa Twojego konta i zużywa tokeny.',
+  launchUnavailable: 'Brak Claude Agent SDK — uruchom npm i @anthropic-ai/claude-agent-sdk',
+  // Question modal & SDK card actions
+  pqSend: 'Wyślij',
+  pqSendPlaceholder: 'Odpowiedz agentowi…',
+  pqStop: 'Zatrzymaj agenta',
+  pqRejectReason: 'Powód (opcjonalnie)',
+  pqOpenQuestion: 'agent ma pytanie — otwórz',
+  pqClose: 'Zamknij',
 };
 
 const IT: UiStrings = {
@@ -520,6 +574,24 @@ const IT: UiStrings = {
   pqPanelControl: 'Rispondi ai prompt nel pannello',
   pqPanelControlOn: 'Risposta nel pannello: ON',
   pqPanelControlOff: 'Risposta nel pannello: OFF',
+  // Launch dialog
+  launchAgent: 'Avvia agente',
+  launchTitle: 'Avvia un agente Claude Code',
+  launchFolder: 'Cartella di lavoro',
+  launchPrompt: 'Prompt',
+  launchModel: 'Modello (vuoto = predefinito account)',
+  launchPermissionMode: 'Modalità permessi',
+  launchStart: 'Avvia',
+  launchCancel: 'Annulla',
+  launchCostWarning: 'Avvia una vera sessione Claude Code — usa il tuo account e consuma token.',
+  launchUnavailable: 'Claude Agent SDK non installato — esegui npm i @anthropic-ai/claude-agent-sdk',
+  // Question modal & SDK card actions
+  pqSend: 'Invia',
+  pqSendPlaceholder: "Rispondi all'agente…",
+  pqStop: 'Ferma agente',
+  pqRejectReason: 'Motivo (facoltativo)',
+  pqOpenQuestion: "l'agente ha una domanda — apri",
+  pqClose: 'Chiudi',
 };
 
 const UI: Record<Lang, UiStrings> = { en: EN, pl: PL, it: IT };
