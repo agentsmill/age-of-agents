@@ -16,7 +16,7 @@ describe('groupBySprite', () => {
     const g = groupBySprite(DEFAULT_MODEL_CONFIG);
     expect(Object.keys(g).sort()).toEqual(['fable', 'haiku', 'opus', 'sonnet']);
     expect(g.opus.name).toBe('Opus 4.8');
-    expect(g.opus.rules.length).toBe(1);
+    expect(g.opus.rules.length).toBeGreaterThanOrEqual(1);
     expect(typeof g.opus.rules[0].index).toBe('number');
   });
   it('spirit bez reguł → pusta lista, brak nazwy', () => {

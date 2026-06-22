@@ -505,11 +505,22 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
     { match: { kind: 'exact', id: 'gpt-5.5' }, sprite: 'fable', displayName: 'GPT-5.5' },
     { match: { kind: 'pattern', pattern: 'gpt-5.4-codex' }, sprite: 'fable', displayName: 'GPT-5.4 Codex' },
     { match: { kind: 'pattern', pattern: 'gpt-5.4-mini' }, sprite: 'haiku', displayName: 'GPT-5.4 Mini' },
+    { match: { kind: 'pattern', pattern: 'gpt-oss' }, sprite: 'fable', displayName: 'GPT-OSS' },
     { match: { kind: 'pattern', pattern: 'gpt-' }, sprite: 'fable', displayName: 'GPT' },
     { match: { kind: 'pattern', pattern: 'opus' }, sprite: 'opus', displayName: 'Opus 4.8' },
     { match: { kind: 'pattern', pattern: 'sonnet' }, sprite: 'sonnet', displayName: 'Sonnet 4.6' },
     { match: { kind: 'pattern', pattern: 'haiku' }, sprite: 'haiku', displayName: 'Haiku 4.5' },
     { match: { kind: 'pattern', pattern: 'fable' }, sprite: 'fable', displayName: 'Fable 5' },
+    // Local model families (Ollama/llama.cpp/vLLM/oMLX). Reuse existing sprites.
+    { match: { kind: 'pattern', pattern: 'llama' }, sprite: 'sonnet', displayName: 'Llama' },
+    { match: { kind: 'pattern', pattern: 'qwen' }, sprite: 'haiku', displayName: 'Qwen' },
+    { match: { kind: 'pattern', pattern: 'ministral' }, sprite: 'opus', displayName: 'Ministral' },
+    { match: { kind: 'pattern', pattern: 'mistral' }, sprite: 'opus', displayName: 'Mistral' },
+    { match: { kind: 'pattern', pattern: 'gemma' }, sprite: 'fable', displayName: 'Gemma' },
+    { match: { kind: 'pattern', pattern: 'phi' }, sprite: 'haiku', displayName: 'Phi' },
+    { match: { kind: 'pattern', pattern: 'bielik' }, sprite: 'sonnet', displayName: 'Bielik' },
+    { match: { kind: 'pattern', pattern: 'glm' }, sprite: 'opus', displayName: 'GLM' },
+    { match: { kind: 'pattern', pattern: 'lfm' }, sprite: 'haiku', displayName: 'LFM' },
   ],
   windows: [
     { match: { kind: 'pattern', pattern: '[1m]' }, contextWindow: 1_000_000 }, // explicit 1M tag beats base model
