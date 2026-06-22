@@ -415,7 +415,7 @@ export function validateMapping(
 // In each table, the first match wins (order is priority).
 
 /** Pool of available hero sprites: the single source of truth imported by the client. */
-export const SPRITE_IDS = ['opus', 'sonnet', 'haiku', 'fable'] as const;
+export const SPRITE_IDS = ['opus', 'sonnet', 'haiku', 'fable', 'local', 'golem', 'familiar', 'oracle'] as const;
 export type SpriteId = (typeof SPRITE_IDS)[number];
 
 const SPRITE_ID_SET: ReadonlySet<string> = new Set(SPRITE_IDS);
@@ -511,16 +511,16 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
     { match: { kind: 'pattern', pattern: 'sonnet' }, sprite: 'sonnet', displayName: 'Sonnet 4.6' },
     { match: { kind: 'pattern', pattern: 'haiku' }, sprite: 'haiku', displayName: 'Haiku 4.5' },
     { match: { kind: 'pattern', pattern: 'fable' }, sprite: 'fable', displayName: 'Fable 5' },
-    // Local model families (Ollama/llama.cpp/vLLM/oMLX). Reuse existing sprites.
-    { match: { kind: 'pattern', pattern: 'llama' }, sprite: 'sonnet', displayName: 'Llama' },
-    { match: { kind: 'pattern', pattern: 'qwen' }, sprite: 'haiku', displayName: 'Qwen' },
-    { match: { kind: 'pattern', pattern: 'ministral' }, sprite: 'opus', displayName: 'Ministral' },
-    { match: { kind: 'pattern', pattern: 'mistral' }, sprite: 'opus', displayName: 'Mistral' },
-    { match: { kind: 'pattern', pattern: 'gemma' }, sprite: 'fable', displayName: 'Gemma' },
-    { match: { kind: 'pattern', pattern: 'phi' }, sprite: 'haiku', displayName: 'Phi' },
-    { match: { kind: 'pattern', pattern: 'bielik' }, sprite: 'sonnet', displayName: 'Bielik' },
-    { match: { kind: 'pattern', pattern: 'glm' }, sprite: 'opus', displayName: 'GLM' },
-    { match: { kind: 'pattern', pattern: 'lfm' }, sprite: 'haiku', displayName: 'LFM' },
+    // Local model families (Ollama/llama.cpp/vLLM/oMLX) — dedicated 'local' sprite.
+    { match: { kind: 'pattern', pattern: 'llama' }, sprite: 'local', displayName: 'Llama' },
+    { match: { kind: 'pattern', pattern: 'qwen' }, sprite: 'local', displayName: 'Qwen' },
+    { match: { kind: 'pattern', pattern: 'ministral' }, sprite: 'local', displayName: 'Ministral' },
+    { match: { kind: 'pattern', pattern: 'mistral' }, sprite: 'local', displayName: 'Mistral' },
+    { match: { kind: 'pattern', pattern: 'gemma' }, sprite: 'local', displayName: 'Gemma' },
+    { match: { kind: 'pattern', pattern: 'phi' }, sprite: 'local', displayName: 'Phi' },
+    { match: { kind: 'pattern', pattern: 'bielik' }, sprite: 'local', displayName: 'Bielik' },
+    { match: { kind: 'pattern', pattern: 'glm' }, sprite: 'local', displayName: 'GLM' },
+    { match: { kind: 'pattern', pattern: 'lfm' }, sprite: 'local', displayName: 'LFM' },
   ],
   windows: [
     { match: { kind: 'pattern', pattern: '[1m]' }, contextWindow: 1_000_000 }, // explicit 1M tag beats base model
