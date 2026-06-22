@@ -2,6 +2,7 @@
   "keys": [
     "fable-default",
     "haiku-default",
+    "local-default",
     "opus-default",
     "sonnet-default"
   ]
