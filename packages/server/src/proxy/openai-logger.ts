@@ -40,9 +40,10 @@ export function fingerprint(messages: any[]): string {
   return createHash('sha1').update(JSON.stringify(anchor ?? null)).digest('hex').slice(0, 32);
 }
 
-/** Pure accumulator for an SSE stream → final assistant content + tool calls. */
-export function accumulateSse(lines: string[]): { content: string; toolCalls: any[] } {
+/** Pure accumulator for an SSE stream → final assistant content + tool calls + usage. */
+export function accumulateSse(lines: string[]): { content: string; toolCalls: any[]; usage: any } {
   let content = '';
+  let usage: any;
   const acc = new Map<number, any>();
   for (const raw of lines) {
     const line = raw.trim();
@@ -55,6 +56,7 @@ export function accumulateSse(lines: string[]): { content: string; toolCalls: an
     } catch {
       continue;
     }
+    if (evt?.usage) usage = evt.usage;
     const delta = evt?.choices?.[0]?.delta;
     if (typeof delta?.content === 'string') content += delta.content;
     for (const tc of Array.isArray(delta?.tool_calls) ? delta.tool_calls : []) {
@@ -66,7 +68,7 @@ export function accumulateSse(lines: string[]): { content: string; toolCalls: an
       acc.set(i, cur);
     }
   }
-  return { content, toolCalls: [...acc.values()] };
+  return { content, toolCalls: [...acc.values()], usage };
 }
 
 export async function startOpenAiLoggerProxy(opts: OpenAiLoggerOptions = {}): Promise<RunningProxy> {
@@ -148,12 +150,18 @@ export async function startOpenAiLoggerProxy(opts: OpenAiLoggerOptions = {}): Pr
       });
       node.on('end', () => {
         res.end();
-        const { content, toolCalls } = accumulateSse(lines);
-        void logLine(state, { type: 'message', ts: new Date().toISOString(), role: 'assistant', content: content || undefined, tool_calls: toolCalls.length ? toolCalls : undefined }).then(() => {
-          state.knownMessages += 1;
-        });
+        const { content, toolCalls, usage } = accumulateSse(lines);
+        void logLine(state, { type: 'message', ts: new Date().toISOString(), role: 'assistant', content: content || undefined, tool_calls: toolCalls.length ? toolCalls : undefined })
+          .then(() => {
+            state.knownMessages += 1;
+            if (usage) return logLine(state, { type: 'usage', input: usage.prompt_tokens ?? 0, output: usage.completion_tokens ?? 0 });
+          })
+          .catch((err) => console.error('openai-logger transcript write error:', err));
       });
-      node.on('error', () => res.end());
+      node.on('error', (err) => {
+        console.error('openai-logger stream error:', err);
+        res.destroy(err as Error);
+      });
       return;
     }
 
