@@ -1,0 +1,420 @@
+{
+  "frames": {
+    "oracle-default__idle_00": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__idle_01": {
+      "frame": {
+        "x": 68,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__idle_02": {
+      "frame": {
+        "x": 136,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__idle_03": {
+      "frame": {
+        "x": 204,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__walk_00": {
+      "frame": {
+        "x": 272,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__walk_01": {
+      "frame": {
+        "x": 0,
+        "y": 68,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__walk_02": {
+      "frame": {
+        "x": 68,
+        "y": 68,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__walk_03": {
+      "frame": {
+        "x": 136,
+        "y": 68,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__walk_04": {
+      "frame": {
+        "x": 204,
+        "y": 68,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__walk_05": {
+      "frame": {
+        "x": 272,
+        "y": 68,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__work_00": {
+      "frame": {
+        "x": 0,
+        "y": 136,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__work_01": {
+      "frame": {
+        "x": 68,
+        "y": 136,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__work_02": {
+      "frame": {
+        "x": 136,
+        "y": 136,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__work_03": {
+      "frame": {
+        "x": 204,
+        "y": 136,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__work_04": {
+      "frame": {
+        "x": 272,
+        "y": 136,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__work_05": {
+      "frame": {
+        "x": 0,
+        "y": 204,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__work_06": {
+      "frame": {
+        "x": 68,
+        "y": 204,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__work_07": {
+      "frame": {
+        "x": 136,
+        "y": 204,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    },
+    "oracle-default__work_08": {
+      "frame": {
+        "x": 204,
+        "y": 204,
+        "w": 68,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 68
+      }
+    }
+  },
+  "animations": {
+    "idle": [
+      "oracle-default__idle_00",
+      "oracle-default__idle_01",
+      "oracle-default__idle_02",
+      "oracle-default__idle_03"
+    ],
+    "walk": [
+      "oracle-default__walk_00",
+      "oracle-default__walk_01",
+      "oracle-default__walk_02",
+      "oracle-default__walk_03",
+      "oracle-default__walk_04",
+      "oracle-default__walk_05"
+    ],
+    "work": [
+      "oracle-default__work_00",
+      "oracle-default__work_01",
+      "oracle-default__work_02",
+      "oracle-default__work_03",
+      "oracle-default__work_04",
+      "oracle-default__work_05",
+      "oracle-default__work_06",
+      "oracle-default__work_07",
+      "oracle-default__work_08"
+    ]
+  },
+  "meta": {
+    "image": "oracle-default.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 340,
+      "h": 272
+    },
+    "scale": "1"
+  }
+}

@@ -1,9 +1,12 @@
 {
   "keys": [
     "fable-default",
+    "familiar-default",
+    "golem-default",
     "haiku-default",
     "local-default",
     "opus-default",
+    "oracle-default",
     "sonnet-default"
   ]
 }
