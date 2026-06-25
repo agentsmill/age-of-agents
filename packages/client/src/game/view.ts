@@ -14,6 +14,7 @@ import { resolveModelLive, pickSpriteLive } from '../model-store';
 import { loadTilemaps, hasTilemaps, buildTilemap } from './tilemap';
 import { loadBuildingSprites, getBuildingSprite } from './building-sprites';
 import { loadDecorationSprites, getDecorationTexture } from './decoration-sprites';
+import { loadCharacterSprites } from './character-sprites';
 import { loadIsoTiles, hasIsoTiles, buildIsoTilemap } from './tilemap-iso';
 import { scatterDecorations, type DecoKind } from './decorations';
 import { peonSpawnScatter, heroSpawnScatter } from './scatter';
@@ -22,6 +23,7 @@ import { BUILDING_FX, collectActiveBuildings, type WorkerSample } from './buildi
 import { buildingText } from '../i18n';
 import { homeBuilding, awaitingBuilding, completedBuilding, recoveryBuilding } from './home-building';
 import { worldLayerTransform, worldToViewport, flipTextNodes } from './flip';
+import { buildRuler, type RulerHandle } from './ruler';
 import type { Lang } from '../settings';
 import { contextPct } from '../context-progress';
 
@@ -102,6 +104,7 @@ export class GameView {
   private userZoomed = false; // wheel/pinch/controls: pauses auto-fit on resize
   private particles: Particle[] = [];
   private emitters = new Map<BuildingId, FxEmitter>();
+  private ruler?: RulerHandle;
   private lastClearedAt = new Map<string, number>();
   private elapsed = 0;
   private missionStatus = new Map<string, string>();
@@ -218,6 +221,7 @@ export class GameView {
       loadEmblems(), // herby providerów — theme-agnostic, idempotentne
       loadBuildingSprites(this.theme.id),
       loadDecorationSprites(this.theme.id),
+      loadCharacterSprites(this.theme.id),
       this.theme.style === 'topdown' ? loadTilemaps(this.theme.id) : loadIsoTiles(this.theme.id),
     ]);
     if (this.destroyed) return; // destroyed while loading assets: do not build the scene
@@ -242,6 +246,13 @@ export class GameView {
       node.cursor = 'pointer';
       node.on('pointertap', () => useWorld.getState().selectBuilding(def.id));
       this.unitLayer.addChild(node);
+    }
+
+    const ruler = buildRuler(this.theme, projection, 'Dario');
+    if (ruler) {
+      if (this.flipped) flipTextNodes(ruler.container);
+      this.unitLayer.addChild(ruler.container);
+      this.ruler = ruler;
     }
 
     // Decorations: flowers/bushes are flat under units (worldLayer before unitLayer);
@@ -282,6 +293,7 @@ export class GameView {
       this.updateRetiring(dt);
       this.updateBuildingFx(dt);
       this.updateParticles(dt);
+      this.ruler?.update(dt);
     });
 
     this.unsubscribe = useWorld.subscribe((state) =>
@@ -410,6 +422,10 @@ export class GameView {
 
   worldGrid(): { w: number; h: number } {
     return this.theme.grid;
+  }
+
+  setRulerReasoning(loops: number): void {
+    this.ruler?.setReasoning(loops);
   }
 
   private building(id: BuildingId) {
