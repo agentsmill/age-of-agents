@@ -30,8 +30,8 @@ function toConnectors(map: unknown, origin: ArsenalOrigin): ArsenalConnector[] {
   }));
 }
 
-/** Efektywny zestaw konektorów: .mcp.json (projekt) + ~/.claude.json (global=user, per-projekt=project),
- *  dedup po nazwie z preferencją origin 'project'. */
+/** Effective connector set: .mcp.json (project) + ~/.claude.json (global=user, per-project=project),
+ *  dedup by name with origin 'project' preferred. */
 export async function readConnectors({ workingDir, homeDir }: Opts): Promise<ArsenalConnector[]> {
   const projectMcp = await readJson(path.join(workingDir, '.mcp.json'));
   const userJson = await readJson(path.join(homeDir, '.claude.json'));
@@ -43,7 +43,7 @@ export async function readConnectors({ workingDir, homeDir }: Opts): Promise<Ars
 
   const seen = new Set<string>();
   const out: ArsenalConnector[] = [];
-  // Kolejność = preferencja origin: najpierw projektowe (plik + per-projekt), potem global.
+  // Order = origin preference: project first (file + per-project), then global.
   for (const c of [...fromProjectFile, ...fromPerProject, ...fromGlobal]) {
     if (seen.has(c.name)) continue;
     seen.add(c.name);

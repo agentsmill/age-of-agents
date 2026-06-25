@@ -78,8 +78,10 @@ export class DockerPoller {
     }
     this.running = true;
     if (await this.client.available()) {
+      if (!this.running) return;
       console.log('[Docker] Poller started');
     } else {
+      if (!this.running) return;
       console.log('[Docker] docker niedostępny — poller czeka (uruchom Docker, by zobaczyć kontenery)');
     }
     this.timer = setInterval(() => void this.poll(), this.intervalMs);
@@ -176,7 +178,10 @@ export class DockerPoller {
       // Dedup: hostowe źródło Claude już śledzi ten UUID (współdzielony ~/.claude) →
       // host wygrywa (kontenerowy bohater zyje pod kluczem `docker:<id>:<uuid>`,
       // hostowy pod surowym `<uuid>` — wiec getHero(uuid) trafia tylko w hosta).
-      if (this.world.getHero(sessionId)) continue;
+      if (this.world.getHero(sessionId)) {
+        this.removeSession(entry, sessionId);
+        continue;
+      }
       await this.readFile(entry, sessionId, file, size);
     }
   }
@@ -200,10 +205,12 @@ export class DockerPoller {
     }
 
     const offset = this.tails.getOffset(key);
-    if (size <= offset) return; // brak przyrostu
+    if (size < offset) this.tails.forget(key);
+    if (size <= this.tails.getOffset(key)) return; // brak przyrostu
 
     // Ogranicz odczyt do (size - offset) bajtow — patrz komentarz przy TAIL_ARGV.
-    const exec = await this.client.exec(entry.info.id, TAIL_ARGV(offset + 1, file, size - offset), {
+    const nextOffset = this.tails.getOffset(key);
+    const exec = await this.client.exec(entry.info.id, TAIL_ARGV(nextOffset + 1, file, size - nextOffset), {
       timeoutMs: EXEC_TIMEOUT_MS,
     });
     if (exec.code !== 0) return;
@@ -212,6 +219,14 @@ export class DockerPoller {
       for (const fact of interpretLine(l)) sess.tracker.apply(fact);
     }
     sess.ended = false;
+  }
+
+  private removeSession(entry: ContainerEntry, sessionId: string): void {
+    const sess = entry.sessions.get(sessionId);
+    if (!sess) return;
+    this.world.removeHero(`docker:${entry.info.id}:${sessionId}`);
+    this.tails.forget(sess.key);
+    entry.sessions.delete(sessionId);
   }
 
   private sweep(liveIds: Set<string>): void {

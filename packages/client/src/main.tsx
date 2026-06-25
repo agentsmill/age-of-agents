@@ -5,7 +5,7 @@ import { useMapping } from './mapping-store';
 import { useModels } from './model-store';
 
 connectWorld();
-// Pobierz zapisane configi z lokalnego serwera (źródło prawdy).
+// Fetch saved configs from the local server (source of truth).
 void useMapping.getState().hydrate();
 void useModels.getState().hydrate();
 

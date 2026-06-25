@@ -8,14 +8,14 @@ import {
 } from '../src/theme/mapping';
 
 /**
- * resolveBuilding to konfigurowalny następca toolToBuilding: ta sama logika,
- * ale tabela jest DANYMI (MappingConfig), nie kodem. DEFAULT_MAPPING musi
- * odtwarzać 1:1 dotychczasowe zachowanie (patrz mapping.test.ts).
+ * resolveBuilding is the configurable successor to toolToBuilding: same logic,
+ * but the table is DATA (MappingConfig), not code. DEFAULT_MAPPING must
+ * reproduce the existing behavior 1:1 (see mapping.test.ts).
  */
-describe('resolveBuilding z DEFAULT_MAPPING', () => {
+describe('resolveBuilding with DEFAULT_MAPPING', () => {
   const r = (tool?: string, detail?: string) => resolveBuilding(tool, detail, DEFAULT_MAPPING);
 
-  it('exact: narzędzia mapują na swoje budynki', () => {
+  it('exact: tools map to their buildings', () => {
     expect(r('Edit')).toBe('forge');
     expect(r('Write')).toBe('forge');
     expect(r('Read')).toBe('library');
@@ -28,34 +28,34 @@ describe('resolveBuilding z DEFAULT_MAPPING', () => {
     expect(r('KillShell')).toBe('mine');
   });
 
-  it('detail: Bash + git → market (bije exact Bash→mine)', () => {
+  it('detail: Bash + git -> market (beats exact Bash->mine)', () => {
     expect(r('Bash', 'git commit -m "x"')).toBe('market');
     expect(r('Bash', 'git push origin main')).toBe('market');
   });
 
-  it('detail: Bash bez git → mine', () => {
+  it('detail: Bash without git -> mine', () => {
     expect(r('Bash', 'ls -la')).toBe('mine');
     expect(r('Bash', 'echo git is mentioned')).toBe('mine');
   });
 
-  it('prefix: mcp__* → guild', () => {
+  it('prefix: mcp__* -> guild', () => {
     expect(r('mcp__pixellab__get_balance')).toBe('guild');
     expect(r('mcp__whatever')).toBe('guild');
   });
 
-  it('fallback: nieznane / brak → citadel', () => {
+  it('fallback: unknown / missing -> citadel', () => {
     expect(r('TotallyUnknownTool')).toBe('citadel');
     expect(r(undefined)).toBe('citadel');
   });
 });
 
-describe('resolveBuilding z customowym configiem', () => {
-  it('honoruje przemapowanie exact (Edit→library)', () => {
+describe('resolveBuilding with custom config', () => {
+  it('honors exact remapping (Edit->library)', () => {
     const cfg: MappingConfig = { rules: [{ kind: 'exact', tool: 'Edit', building: 'library' }], fallback: 'citadel' };
     expect(resolveBuilding('Edit', undefined, cfg)).toBe('library');
   });
 
-  it('warunek detail jest edytowalny (inny regex)', () => {
+  it('detail condition is editable (different regex)', () => {
     const cfg: MappingConfig = {
       rules: [
         { kind: 'detail', tool: 'Bash', pattern: 'docker\\s+build', building: 'forge' },
@@ -67,7 +67,7 @@ describe('resolveBuilding z customowym configiem', () => {
     expect(resolveBuilding('Bash', 'ls', cfg)).toBe('mine');
   });
 
-  it('precedencja: detail > prefix > exact > fallback', () => {
+  it('precedence: detail > prefix > exact > fallback', () => {
     const cfg: MappingConfig = {
       rules: [
         { kind: 'exact', tool: 'mcp__x', building: 'forge' },
@@ -75,11 +75,11 @@ describe('resolveBuilding z customowym configiem', () => {
       ],
       fallback: 'citadel',
     };
-    // prefix bije exact w tej implementacji (specyficzność: prefix > exact)
+    // prefix beats exact in this implementation (specificity: prefix > exact)
     expect(resolveBuilding('mcp__x', undefined, cfg)).toBe('guild');
   });
 
-  it('przy wielu prefiksach wygrywa najdłuższy', () => {
+  it('with many prefixes, the longest wins', () => {
     const cfg: MappingConfig = {
       rules: [
         { kind: 'prefix', prefix: 'mcp__', building: 'guild' },
@@ -91,7 +91,7 @@ describe('resolveBuilding z customowym configiem', () => {
     expect(resolveBuilding('mcp__other', undefined, cfg)).toBe('guild');
   });
 
-  it('niepoprawny regex w detail nie wywala — pomija regułę', () => {
+  it('invalid regex in detail does not crash - skips the rule', () => {
     const cfg: MappingConfig = {
       rules: [
         { kind: 'detail', tool: 'Bash', pattern: '(', building: 'forge' },
@@ -99,54 +99,54 @@ describe('resolveBuilding z customowym configiem', () => {
       ],
       fallback: 'citadel',
     };
-    expect(resolveBuilding('Bash', 'cokolwiek (', cfg)).toBe('mine');
+    expect(resolveBuilding('Bash', 'anything (', cfg)).toBe('mine');
   });
 });
 
 describe('validateMapping', () => {
-  it('akceptuje DEFAULT_MAPPING', () => {
+  it('accepts DEFAULT_MAPPING', () => {
     const res = validateMapping(DEFAULT_MAPPING);
     expect(res.ok).toBe(true);
   });
 
-  it('akceptuje poprawny JSON-config', () => {
+  it('accepts valid JSON config', () => {
     const res = validateMapping({ rules: [{ kind: 'exact', tool: 'Edit', building: 'forge' }], fallback: 'citadel' });
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.config.rules).toHaveLength(1);
   });
 
-  it('odrzuca nieznany BuildingId', () => {
+  it('rejects unknown BuildingId', () => {
     const res = validateMapping({ rules: [{ kind: 'exact', tool: 'Edit', building: 'nope' }], fallback: 'citadel' });
     expect(res.ok).toBe(false);
   });
 
-  it('odrzuca nieznany fallback', () => {
+  it('rejects unknown fallback', () => {
     const res = validateMapping({ rules: [], fallback: 'nope' });
     expect(res.ok).toBe(false);
   });
 
-  it('odrzuca zły kształt (brak rules)', () => {
+  it('rejects bad shape (missing rules)', () => {
     expect(validateMapping({ fallback: 'citadel' }).ok).toBe(false);
     expect(validateMapping(null).ok).toBe(false);
     expect(validateMapping('xxx').ok).toBe(false);
   });
 
-  it('odrzuca niepoprawny regex w regule detail', () => {
+  it('rejects invalid regex in detail rule', () => {
     const res = validateMapping({ rules: [{ kind: 'detail', tool: 'Bash', pattern: '(', building: 'market' }], fallback: 'citadel' });
     expect(res.ok).toBe(false);
   });
 
-  it('odrzuca regułę o nieznanym kind', () => {
+  it('rejects rule with unknown kind', () => {
     const res = validateMapping({ rules: [{ kind: 'weird', tool: 'Edit', building: 'forge' }], fallback: 'citadel' });
     expect(res.ok).toBe(false);
   });
 
-  it('odrzuca pusty pattern w detail (inaczej byłby cichym catch-all)', () => {
+  it('rejects empty pattern in detail (otherwise it would be a silent catch-all)', () => {
     const res = validateMapping({ rules: [{ kind: 'detail', tool: 'Bash', pattern: '', building: 'market' }], fallback: 'citadel' });
     expect(res.ok).toBe(false);
   });
 
-  it('sanityzuje: usuwa nieznane pola z reguł i z configu', () => {
+  it('sanitizes: removes unknown fields from rules and config', () => {
     const res = validateMapping({
       extra: 1,
       rules: [{ kind: 'exact', tool: 'Edit', building: 'forge', foo: 9, pattern: '(' }],
@@ -161,7 +161,7 @@ describe('validateMapping', () => {
 });
 
 describe('BUILDING_IDS', () => {
-  it('zawiera kanoniczne budynki i nie ma duplikatów', () => {
+  it('contains canonical buildings and has no duplicates', () => {
     expect(BUILDING_IDS).toContain('citadel');
     expect(BUILDING_IDS).toContain('forge');
     expect(BUILDING_IDS).toContain('guild');

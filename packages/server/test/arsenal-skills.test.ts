@@ -21,7 +21,7 @@ describe('readSkills', () => {
     await fs.rm(wd, { recursive: true, force: true });
   });
 
-  it('czyta skille z projektu, usera i pluginu z tagiem origin', async () => {
+  it('reads skills from project, user, and plugin with origin tag', async () => {
     await writeSkill(path.join(wd, '.claude', 'skills', 'local-skill'), 'local-skill', 'projektowy');
     await writeSkill(path.join(home, '.claude', 'skills', 'user-skill'), 'user-skill', 'userowy');
     await writeSkill(path.join(home, '.claude', 'plugins', 'cache', 'mkt', 'superpowers', '5.1.0', 'skills', 'brainstorming'), 'brainstorming', 'pluginowy');
@@ -35,11 +35,11 @@ describe('readSkills', () => {
     expect(byId['user-skill'].description).toBe('userowy');
   });
 
-  it('zwraca pustą listę gdy nic nie ma', async () => {
+  it('returns an empty list when nothing exists', async () => {
     expect(await readSkills({ workingDir: wd, homeDir: home })).toEqual([]);
   });
 
-  it('pluginNameFromPath pomija segment wersji', () => {
+  it('pluginNameFromPath skips the version segment', () => {
     expect(pluginNameFromPath('/x/plugins/cache/mkt/superpowers/5.1.0/skills/foo/SKILL.md')).toBe('superpowers');
     expect(pluginNameFromPath('/x/plugins/frontend-design/skills/foo/SKILL.md')).toBe('frontend-design');
   });

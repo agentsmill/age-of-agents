@@ -1,10 +1,10 @@
-/** Predykat: czy logiczna komórka (gx,gy) należy do terenu "upper" danej pary. */
+/** Predicate: whether logical cell (gx,gy) belongs to the pair's "upper" terrain. */
 export type IsUpper = (gx: number, gy: number) => boolean;
 
 /**
- * Maska 4 narożników dla render-kafla siatki display (dx,dy).
- * Bity: NW=1, NE=2, SW=4, SE=8. Poza siatką = baza (false).
- * Render-kafel leży na styku 4 komórek logicznych przesuniętych o -1 w NW.
+ * 4-corner mask for display-grid render tile (dx,dy).
+ * Bits: NW=1, NE=2, SW=4, SE=8. Outside grid = base (false).
+ * The render tile lies at the junction of 4 logical cells shifted by -1 in NW.
  */
 export function cornerMask(dx: number, dy: number, isUpper: IsUpper): number {
   const nw = isUpper(dx - 1, dy - 1) ? 1 : 0;
@@ -16,7 +16,7 @@ export function cornerMask(dx: number, dy: number, isUpper: IsUpper): number {
 
 /**
  * Lookup maska(0..15) → indeks klatki w atlasie tilesetu.
- * DOMYŚLNIE tożsamościowy (klatka == maska) — zakłada atlas ułożony wg maski.
+ * Identity by DEFAULT (frame == mask), assuming an atlas arranged by mask.
  * Po wygenerowaniu prawdziwego tilesetu PixelLab (Task 6) podmieniany na
  * realne mapowanie i ZAMYKANY testem na faktycznym sheecie.
  */

@@ -5,33 +5,34 @@ import { useMenuKeyboard } from './useMenuKeyboard';
 import type { AgentKind, HeroStateKind } from '@agent-citadel/shared';
 import { ProviderEmblem } from './ProviderEmblem';
 
-/** Emoji per stato agente (gadżet wizualny w przyciskach miast). */
+/** Emoji per agent state (visual flourish in city buttons). */
 const STATE_ICON: Record<HeroStateKind, string> = {
   working: '⚙️',
   thinking: '💭',
   'awaiting-input': '✋',
   error: '⚠️',
+  recovering: '⚕️',
   idle: '⏸️',
   sleeping: '💤',
   returning: '🚶',
 };
 
-/** Kształtowanie nazwy projektu: path Windows-encoded przez Kodę (np. "C-Users-pietr-progetti-learneoo")
- * zamień na basename, a gdy basename wygląda na ścieżkę zakodowaną, spróbuj zdekodować w odwrotną stronę. */
+/** Shape the project name: Koda Windows-encoded path (for example "C-Users-pietr-progetti-learneoo")
+ * becomes a basename; when basename looks like an encoded path, try decoding it back. */
 function prettifyName(raw: string, fallback: string): string {
-  // Jeśli to normalna ścieżka (ma "/" lub "\") — basename.
+  // If this is a normal path (has "/" or "\"), use basename.
   if (/[\\/]/.test(raw)) {
     const parts = raw.split(/[\\/]/).filter(Boolean);
     return prettifyName(parts[parts.length - 1], fallback);
   }
-  // Koda encoding: "C-Users-pietr-progetti-learneoo" (myślniki zamiast separatorów)
-  // Szukamy stałych markerów w ścieżce: "Users-<user>-progetti-<basename>"
-  // albo "Users-<user>-<directorio>-<basename>" (gdy path nie ma "progetti").
+  // Koda encoding: "C-Users-pietr-progetti-learneoo" (hyphens instead of separators).
+  // Look for stable markers in the path: "Users-<user>-progetti-<basename>"
+  // or "Users-<user>-<directorio>-<basename>" when the path lacks "progetti".
   const withProgetti = raw.match(/^[A-Z]-Users-[^-]+-progetti-(.+)$/);
   if (withProgetti) return withProgetti[1];
   const withoutProgetti = raw.match(/^[A-Z]-Users-[^-]+-[^-]+-(.+)$/);
   if (withoutProgetti) return withoutProgetti[1];
-  // Próba dekodowania: "--" → "/" (niektóre warianty Kodę używają podwójnych myślników)
+  // Decode attempt: "--" -> "/" (some Koda variants use double hyphens).
   const decoded = raw
     .replace(/-{2,}/g, '/')
     .replace(/^([A-Z])[\-/]/i, '$1:/');
@@ -39,7 +40,7 @@ function prettifyName(raw: string, fallback: string): string {
     const parts = decoded.split(/[\\/]/).filter(Boolean);
     return parts[parts.length - 1] || fallback;
   }
-  // Wygląda OK — zwróć jak jest.
+  // Looks OK: return as-is.
   return raw || fallback;
 }
 
@@ -52,19 +53,20 @@ interface CityInfo {
 }
 
 /**
- * Przełącznik miast jako DROPDOWN: jeden kompaktowy trigger zamiast poziomej belki.
+ * City switcher as DROPDOWN: one compact trigger instead of a horizontal bar.
  *
- *  - Trigger pokazuje nagłówek (🏙️ CITIES · n miast · m agentów) + aktualnie wybrane
- *    miasto (lub 🌍 „All") + strzałkę. Dzięki temu HUD nie rozjeżdża się poziomo,
- *    niezależnie od liczby projektów.
- *  - Po kliknięciu rozwija się lista: „All" (widok ogólny) + jeden wiersz per
- *    aktywne miasto (nazwa + liczba sesji + odznaki agentów C/O/K + ikony stanów).
- *  - Lista jest przewijalna (maxHeight), więc skaluje się do wielu projektów.
+ *  - Trigger shows header (CITIES · n cities · m agents) + current city (or "All")
+ *    + arrow. This keeps the HUD from stretching horizontally regardless of
+ *    project count.
+ *  - Click expands a list: "All" (overview) + one row per active city (name +
+ *    session count + C/O/K agent badges + state icons).
+ *  - The list scrolls (maxHeight), so it scales to many projects.
  *
- *  TYLKO projekty z aktywnymi sesjami są widoczne (count > 0). Gdy wszyscy agenci
- *  miasta skończą, miasto znika z listy. Zamykanie: klik poza, Esc, wybór miasta.
+ *  ONLY projects with active sessions are visible (count > 0). When all city
+ *  agents finish, the city disappears from the list. Closing: outside click, Esc,
+ *  city selection.
  */
-export function ProjectSwitcher() {
+export function ProjectSwitcher({ inline = false }: { inline?: boolean } = {}) {
   const heroes = useWorld((s) => s.heroes);
   const selected = useWorld((s) => s.selectedProjectDir);
   const selectProject = useWorld((s) => s.selectProject);
@@ -98,7 +100,7 @@ export function ProjectSwitcher() {
     return acc;
   }, [heroes]);
 
-  // Zamknij dropdown po kliknięciu poza panelem lub naciśnięciu Esc.
+  // Close dropdown after outside panel click or Esc.
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -107,7 +109,7 @@ export function ProjectSwitcher() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setOpen(false);
-        triggerRef.current?.focus(); // przywróć focus na trigger (zamknięcie z klawiatury)
+        triggerRef.current?.focus(); // restore focus to trigger (keyboard close)
       }
     };
     document.addEventListener('mousedown', onDown);
@@ -118,57 +120,53 @@ export function ProjectSwitcher() {
     };
   }, [open]);
 
-  // Gdy wybrane miasto zniknie (jego agenci skończą pracę), wróć do widoku „Wszystkie".
-  // Inaczej trigger pokazuje miasto z licznikiem 0, lista go nie zawiera, a mapa/panel
-  // architekta zostają odfiltrowane do pustego projektu — wszystko „znika" bez śladu.
+  // When the selected city disappears (its agents finished working), return to
+  // "All". Otherwise the trigger shows a city with count 0, the list omits it,
+  // and map/architect panel are filtered to an empty project: everything "vanishes".
   useEffect(() => {
-    // Reset TYLKO gdy realnie połączeni i świat NIE jest pusty. Pusty snapshot przy
-    // reconnekcie/restarcie serwera ≠ „miasto skończyło pracę" — inaczej wybór gubiłby się
-    // bezpowrotnie przy każdym restarcie dev-servera.
+    // Reset ONLY when really connected and the world is NOT empty. Empty snapshot
+    // on reconnect/server restart is not "city finished work"; otherwise selection
+    // would be lost permanently on every dev-server restart.
     const selectable = new Set<string>(cities.keys());
     if (connected && Object.keys(heroes).length > 0 && selected !== undefined && !selectable.has(selected)) {
       selectProject(undefined);
     }
   }, [connected, heroes, selected, cities, selectProject]);
 
-  // Nawigacja klawiaturą wewnątrz rozwiniętej listy (ArrowUp/Down/Home/End + focus po otwarciu).
+  // Keyboard navigation inside the expanded list (ArrowUp/Down/Home/End + focus after opening).
   useMenuKeyboard(open, menuRef);
 
-  // Pokaż TYLKO miasta z aktywnymi sesjami (count > 0).
+  // Show ONLY cities with active sessions (count > 0).
   const activeCities = [...cities.values()].filter((c) => c.count > 0);
-  // Sortuj malejąco po aktywnych sesjach, potem alfabetycznie.
+  // Sort descending by active sessions, then alphabetically.
   activeCities.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
   const displayCities = activeCities;
 
-  if (displayCities.length === 0) return null; // brak aktywnych miast = czysty widok
+  if (displayCities.length === 0) return null; // no active cities = clean view
 
   const totalSessions = activeCities.reduce((sum, c) => sum + c.count, 0);
-  // Wybrane miasto (z sesją lub domowe); inaczej trigger pokaże „All".
+  // Selected city (with session or home); otherwise trigger shows "All".
   const selectedCity = selected !== undefined ? displayCities.find((c) => c.dir === selected) : undefined;
 
   const choose = (dir?: string) => {
     selectProject(dir);
     setOpen(false);
-    // przywróć focus na trigger tylko przy wyborze z klawiatury (focus był w panelu)
+    // restore focus to trigger only for keyboard selection (focus was in panel)
     if (rootRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
   };
 
   return (
     <div
       ref={rootRef}
-      className="hud-panel px"
-      style={{
-        position: 'absolute',
-        top: 16,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        padding: 0,
-        zIndex: 20,
-        maxWidth: '92vw',
-      }}
+      className={inline ? 'px' : 'hud-panel px'}
+      style={
+        inline
+          ? { position: 'relative', padding: 0 }
+          : { position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', padding: 0, zIndex: 20, maxWidth: '92vw' }
+      }
     >
-      {/* ── Trigger (kompaktowy, klikalny) ── */}
+      {/* Compact clickable trigger. */}
       <button
         ref={triggerRef}
         type="button"
@@ -189,7 +187,7 @@ export function ProjectSwitcher() {
 
         <span style={{ width: 2, alignSelf: 'stretch', background: '#3a3a36' }} />
 
-        {/* Aktualny wybór: All albo nazwa miasta + licznik. */}
+        {/* Current selection: All or city name + counter. */}
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           {selected === undefined ? (
             <>
@@ -222,9 +220,9 @@ export function ProjectSwitcher() {
         </span>
       </button>
 
-      {/* ── Rozwijana lista miast ── */}
+      {/* Expanded city list. */}
       {open && (
-        <div ref={menuRef} className="hud-panel px proj-dropdown" id="proj-city-menu" role="menu" aria-label={t.cities}>
+        <div ref={menuRef} className="hud-panel px proj-dropdown" id="proj-city-menu" role="menu" aria-label={t.cities} style={inline ? { left: 0, transform: 'none' } : undefined}>
           <OptionRow
             icon="🌍"
             label={t.allCities}
@@ -304,7 +302,7 @@ function OptionRow({
   );
 }
 
-/** Odznaki agentów (C/O/K) + ikony stanów (⚙️3 ⏸️1) dla wiersza miasta. */
+/** Agent badges (C/O/K) + state icons (for example gear 3, pause 1) for a city row. */
 function CityMeta({ city, active }: { city: CityInfo; active: boolean }) {
   const topStates = [...city.states.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
   return (

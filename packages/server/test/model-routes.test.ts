@@ -19,8 +19,8 @@ const CFG = {
   fallback: { sprite: 'sonnet', contextWindow: 200_000 },
 };
 
-describe('registerModelRoutes — persist=true', () => {
-  it('PUT zapisuje plik, GET zwraca zapis', async () => {
+describe('registerModelRoutes - persist=true', () => {
+  it('PUT saves file, GET returns saved config', async () => {
     const path = tmpPath();
     const app = Fastify();
     registerModelRoutes(app, { persist: true, modelConfigPath: path });
@@ -35,7 +35,7 @@ describe('registerModelRoutes — persist=true', () => {
     await app.close();
   });
 
-  it('PUT niepoprawny config → 400', async () => {
+  it('PUT invalid config -> 400', async () => {
     const path = tmpPath();
     const app = Fastify();
     registerModelRoutes(app, { persist: true, modelConfigPath: path });
@@ -47,8 +47,8 @@ describe('registerModelRoutes — persist=true', () => {
   });
 });
 
-describe('registerModelRoutes — persist=false (demo)', () => {
-  it('PUT waliduje + echo, nie zapisuje; GET zwraca DEFAULT', async () => {
+describe('registerModelRoutes - persist=false (demo)', () => {
+  it('PUT validates + echoes, does not save; GET returns DEFAULT', async () => {
     const path = tmpPath();
     const app = Fastify();
     registerModelRoutes(app, { persist: false, modelConfigPath: path });

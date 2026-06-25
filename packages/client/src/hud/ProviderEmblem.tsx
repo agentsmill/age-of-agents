@@ -18,11 +18,14 @@ export function ProviderEmblem({
 }): ReactNode {
   const { kind, label, labelShort, color } = resolveProvider(agent);
   const [imgFailed, setImgFailed] = useState(false);
+  if (color === null) return null;
 
   if (!imgFailed) {
+    const src = emblemSrc(kind);
+    if (!src) return null;
     const img = (
       <img
-        src={emblemSrc(kind)}
+        src={src}
         alt={label}
         title={label}
         width={16}
@@ -46,8 +49,7 @@ export function ProviderEmblem({
     return img;
   }
 
-  // Fallback (brak assetu): dawny kolorowy chip/pigułka. Claude (color null) → nic.
-  if (color === null) return null;
+  // Fallback (brak assetu): dawny kolorowy chip/pigułka.
   if (variant === 'pill') {
     return (
       <span

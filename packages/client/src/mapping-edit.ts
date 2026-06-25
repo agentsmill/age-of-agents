@@ -1,9 +1,9 @@
 /**
- * Czyste helpery edycji mapy narzędzie→budynek (wydzielone z komponentu, by
- * były testowalne — patrz spec §Granice jednostek).
+ * Pure helpers for editing the tool->building map (extracted from the component
+ * so they are testable; see spec section "Unit boundaries").
  */
 
-/** Rozbij wpis usera po `,` lub `;` na osobne, oczyszczone nazwy narzędzi. */
+/** Split user input by `,` or `;` into separate, trimmed tool names. */
 export function parseTriggers(value: string): string[] {
   return value
     .split(/[,;]/)

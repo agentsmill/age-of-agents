@@ -1,5 +1,5 @@
-// Składa pełną scenę offline (teren autotiling + budynki) do PNG — jak silnik.
-// Uruchom: npx tsx scripts/preview-scene.ts
+// Builds a full offline scene (terrain autotiling + buildings) into PNG, like the engine.
+// Run: npx tsx scripts/preview-scene.ts
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -8,7 +8,7 @@ import { cornerMask } from '../packages/client/src/game/autotile.ts';
 import { FANTASY } from '../packages/client/src/theme/fantasy.ts';
 import { scatterDecorations, type DecoKind } from '../packages/client/src/game/decorations.ts';
 
-const T = 32; // px na kafel (proporcje budynek:teren jak w grze)
+const T = 32; // px per tile (building:terrain proportions as in-game)
 const tileDir = 'packages/client/public/assets/fantasy/tilemap';
 const bldDir = 'packages/client/public/assets/fantasy/buildings';
 const decoDir = 'packages/client/public/assets/fantasy/decorations';
@@ -25,7 +25,7 @@ const out = new PNG({ width: w * T, height: h * T, fill: true });
 function px(dst: PNG, x: number, y: number, r: number, g: number, b: number, a: number) {
   if (x < 0 || y < 0 || x >= dst.width || y >= dst.height || a === 0) return;
   const i = (y * dst.width + x) * 4;
-  // alfa-blend na istniejący piksel
+  // alpha-blend over the existing pixel
   const ia = a / 255, ib = 1 - ia;
   dst.data[i] = Math.round(dst.data[i] * ib + r * ia);
   dst.data[i + 1] = Math.round(dst.data[i + 1] * ib + g * ia);
@@ -41,7 +41,7 @@ function blitTile(a: PNG, mask: number, dx: number, dy: number) {
 }
 const inB = (gx: number, gy: number) => gx >= 0 && gy >= 0 && gx < w && gy < h;
 
-// teren: baza + warstwy
+// terrain: base + layers
 for (let dy = 0; dy <= h; dy++) for (let dx = 0; dx <= w; dx++) blitTile(atlas.water, 0, dx, dy);
 for (const { pair, upper } of PAIRS) {
   const isUpper = (gx: number, gy: number) => inB(gx, gy) && map[gy][gx] === upper;
@@ -51,7 +51,7 @@ for (const { pair, upper } of PAIRS) {
   }
 }
 
-// helper: rysuj obiekt z kotwicą w stopie (footGx,footGy), szerokość targetTilesW kafli
+// helper: draw an object with a foot anchor (footGx,footGy), targetTilesW tiles wide
 const objCache: Record<string, PNG> = {};
 const loadObj = (p: string) => (objCache[p] ??= PNG.sync.read(readFileSync(p)));
 function drawObj(src: PNG, footGx: number, footGy: number, targetTilesW: number) {
@@ -66,10 +66,10 @@ function drawObj(src: PNG, footGx: number, footGy: number, targetTilesW: number)
 }
 
 const decos = scatterDecorations(FANTASY, map);
-// płaskie dekoracje (kwiaty/krzaki) pod spodem
+// flat decorations (flowers/bushes) underneath
 for (const p of decos)
   if (p.kind === 'flower' || p.kind === 'bush') drawObj(loadObj(join(decoDir, `${p.kind}.png`)), p.gx, p.gy, DECO_W[p.kind]);
-// sortowane po głębokości: budynki (gy+h) + zasłaniające dekoracje (gy)
+// sorted by depth: buildings (gy+h) + occluding decorations (gy)
 type Item = { depth: number; draw: () => void };
 const items: Item[] = [];
 for (const def of FANTASY.buildings)
@@ -81,4 +81,4 @@ for (const it of items) it.draw();
 
 mkdirSync('downloads', { recursive: true });
 writeFileSync('downloads/scene-preview.png', PNG.sync.write(out));
-console.log(`scene-preview.png ${out.width}x${out.height} (${FANTASY.buildings.length} budynków, ${decos.length} dekoracji)`);
+console.log(`scene-preview.png ${out.width}x${out.height} (${FANTASY.buildings.length} buildings, ${decos.length} decorations)`);

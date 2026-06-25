@@ -3,57 +3,57 @@ import { computeCoverage } from '../src/coverage';
 import { DEFAULT_MAPPING, type MappingConfig } from '../src/theme/mapping';
 
 describe('computeCoverage', () => {
-  it('liczy budynki robocze (z regułą) dla DEFAULT', () => {
+  it('counts working buildings (with a rule) for DEFAULT', () => {
     const cov = computeCoverage(DEFAULT_MAPPING, []);
     expect(cov.coveredCount).toBe(cov.workingBuildings.length);
     expect(cov.workingBuildings).toContain('forge');
     expect(cov.workingBuildings).toContain('guild');
     expect(cov.workingBuildings).toContain('market');
-    // citadel to fallback (kosz), nie cel reguły → nie liczony jako „roboczy"
+    // citadel is fallback (bucket), not a rule target -> not counted as "working"
     expect(cov.workingBuildings).not.toContain('citadel');
   });
 
-  it('coveredCount liczy tylko budynki z podanego zbioru roboczego (socjalne pomija)', () => {
+  it('coveredCount counts only buildings from the provided working set (skips social)', () => {
     const cfg: MappingConfig = {
       rules: [
         { kind: 'exact', tool: 'X', building: 'forge' },
-        { kind: 'exact', tool: 'Y', building: 'tavern' }, // socjalny — poza zbiorem
+        { kind: 'exact', tool: 'Y', building: 'tavern' }, // social - outside the set
       ],
       fallback: 'citadel',
     };
     const working = ['tower', 'forge', 'library', 'mine', 'barracks', 'market', 'guild', 'citadel'] as const;
     const cov = computeCoverage(cfg, [], working);
-    expect(cov.coveredCount).toBe(1); // tylko forge; tavern nie liczony mimo reguły
+    expect(cov.coveredCount).toBe(1); // only forge; tavern is not counted despite the rule
   });
 
-  it('uncoveredTools: narzędzia spadające do fallback', () => {
+  it('uncoveredTools: tools falling to fallback', () => {
     const cov = computeCoverage(DEFAULT_MAPPING, ['Edit', 'TodoWrite', 'ExitPlanMode']);
     expect(cov.uncoveredTools).toContain('TodoWrite');
     expect(cov.uncoveredTools).toContain('ExitPlanMode');
     expect(cov.uncoveredTools).not.toContain('Edit');
   });
 
-  it('uncoveredTools deduplikuje', () => {
+  it('uncoveredTools deduplicates', () => {
     const cov = computeCoverage(DEFAULT_MAPPING, ['Foo', 'Foo']);
     expect(cov.uncoveredTools.filter((t) => t === 'Foo')).toHaveLength(1);
   });
 
-  it('prefix mcp__* uznaje narzędzia mcp za pokryte', () => {
+  it('prefix mcp__* treats mcp tools as covered', () => {
     const cov = computeCoverage(DEFAULT_MAPPING, ['mcp__slack__send']);
     expect(cov.uncoveredTools).not.toContain('mcp__slack__send');
   });
 
-  it('detail-regułę dla narzędzia traktuje jako pokrycie (po nazwie)', () => {
+  it('detail rule for a tool counts as coverage (by name)', () => {
     const cov = computeCoverage(DEFAULT_MAPPING, ['Bash']);
     expect(cov.uncoveredTools).not.toContain('Bash');
   });
 
-  it('detail+exact dla tego samego narzędzia to NIE konflikt (różne tiery, precedencja)', () => {
-    // DEFAULT ma Bash: detail→market ORAZ exact→mine — to projekt, nie sprzeczność.
+  it('detail+exact for the same tool is NOT a conflict (different tiers, precedence)', () => {
+    // DEFAULT has Bash: detail->market AND exact->mine - that is design, not a conflict.
     expect(computeCoverage(DEFAULT_MAPPING, ['Bash']).conflicts).toHaveLength(0);
   });
 
-  it('wykrywa konflikt: dwie reguły exact tego samego narzędzia → różne budynki', () => {
+  it('detects conflict: two exact rules for the same tool -> different buildings', () => {
     const cfg: MappingConfig = {
       rules: [
         { kind: 'exact', tool: 'Edit', building: 'forge' },
@@ -66,7 +66,7 @@ describe('computeCoverage', () => {
     expect([...cov.conflicts[0].buildings].sort()).toEqual(['forge', 'library']);
   });
 
-  it('wykrywa konflikt: ten sam prefiks → różne budynki', () => {
+  it('detects conflict: same prefix -> different buildings', () => {
     const cfg: MappingConfig = {
       rules: [
         { kind: 'prefix', prefix: 'mcp__', building: 'guild' },
@@ -77,7 +77,7 @@ describe('computeCoverage', () => {
     expect(computeCoverage(cfg, []).conflicts).toHaveLength(1);
   });
 
-  it('duplikat tej samej reguły na ten sam budynek to NIE konflikt', () => {
+  it('duplicate of the same rule for the same building is NOT a conflict', () => {
     const cfg: MappingConfig = {
       rules: [
         { kind: 'exact', tool: 'Edit', building: 'forge' },
@@ -88,7 +88,7 @@ describe('computeCoverage', () => {
     expect(computeCoverage(cfg, []).conflicts).toHaveLength(0);
   });
 
-  it('konflikty nie zależą od seenTools (sprzeczność tkwi w configu)', () => {
+  it('conflicts do not depend on seenTools (contradiction is in config)', () => {
     const cfg: MappingConfig = {
       rules: [
         { kind: 'exact', tool: 'Edit', building: 'forge' },

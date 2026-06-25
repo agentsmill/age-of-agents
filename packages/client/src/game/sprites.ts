@@ -6,8 +6,8 @@ let peonSheet: Spritesheet | null = null;
 let currentTheme = '';
 
 /**
- * Eager-load atlasów bohaterów danego motywu wg index.json.
- * (Faza 2 zamieni to na leniwe ładowanie per-archetyp obecny na mapie.)
+ * Eager-load hero atlases for a theme from index.json.
+ * (Phase 2 will turn this into lazy loading per archetype present on the map.)
  * Brak index.json / pojedynczego atlasu → cicho zostawiamy fallback placeholdera.
  *
  * CRITICAL: Pixi 8's Assets cache is keyed by alias. To support theme switching
@@ -57,8 +57,8 @@ export async function loadThemeSprites(themeId: string): Promise<void> {
 // Old theme entries remain in cache harmlessly. See loadThemeSprites docstring.
 
 /**
- * Spritesheet bohatera dla klucza archetypu. Degraduje brakujący wariant trybu do
- * atlasu `<model>-default` (a potem globalnego fallbacku), więc bohater w trybie ≠
+ * Hero spritesheet for an archetype key. Degrades a missing mode variant to the
+ * `<model>-default` atlas (then global fallback), so a hero in non-default mode
  * default dostaje sprite SWOJEGO modelu zamiast placeholdera. null → placeholder.
  */
 export function getHeroSheet(key: string): Spritesheet | null {
@@ -69,7 +69,7 @@ export function getHeroSheet(key: string): Spritesheet | null {
   return null;
 }
 
-/** Spritesheet peona (Faza 1: brak → null → placeholder). */
+/** Peon spritesheet (Phase 1: missing -> null -> placeholder). */
 export function getPeonSheet(): Spritesheet | null {
   return peonSheet;
 }

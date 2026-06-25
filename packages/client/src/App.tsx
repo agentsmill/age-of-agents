@@ -5,10 +5,10 @@ import { Minimap } from './hud/Minimap';
 import { Portraits } from './hud/Portraits';
 import { ResourceBar } from './hud/ResourceBar';
 import { SidePanel } from './hud/SidePanel';
+import { QuestionModal } from './hud/QuestionModal';
 import { BuildingPanel } from './hud/BuildingPanel';
 import { ThemeSwitch } from './hud/ThemeSwitch';
 import { ZoomControls } from './hud/ZoomControls';
-import { ProjectSwitcher } from './hud/ProjectSwitcher';
 import { ArchitectHall } from './hud/ArchitectHall';
 import { HeatmapPanel } from './hud/HeatmapPanel';
 import { SessionHistoryPanel } from './hud/SessionHistoryPanel';
@@ -25,8 +25,8 @@ export function App() {
       <MissionLog />
       <NotificationFeed />
       <SidePanel />
+      <QuestionModal />
       <BuildingPanel />
-      <ProjectSwitcher />
       <ArchitectHall />
       <Portraits />
       <ZoomControls />

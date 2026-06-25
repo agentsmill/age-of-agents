@@ -13,12 +13,12 @@ import { computeCoverage } from '../coverage';
 import { parseTriggers } from '../mapping-edit';
 import { parseUploadedMapping, downloadMapping } from './mapping-io';
 
-/** Budynki „robocze" (cel narzędzi). citadel = dom/fallback, ale pozwalamy mu na własne reguły. */
+/** "Working" buildings (tool targets). citadel = home/fallback, but allow its own rules. */
 const WORKING_BUILDINGS: BuildingId[] = [
   'tower', 'forge', 'library', 'mine', 'barracks', 'market', 'guild', 'citadel',
 ];
 
-/** Budynki socjalne per motyw (sterowane stanem sesji, bez wyzwalaczy narzędzi). */
+/** Social buildings per theme (driven by session state, without tool triggers). */
 const SOCIAL_BY_THEME: Record<string, BuildingId[]> = {
   fantasy: ['arena', 'tavern', 'garden', 'bar', 'shrine'],
   scifi: ['holodeck', 'mess', 'hydroponics', 'lounge', 'medbay'],
@@ -33,7 +33,7 @@ export function BuildingReactionsEditor() {
   const heroes = useWorld((s) => s.heroes);
   const t = useUi();
 
-  // Narzędzia faktycznie widziane w żywych logach — baza do analizy pokrycia.
+  // Tools actually seen in live logs: basis for coverage analysis.
   const seenTools = useMemo(() => {
     const set = new Set<string>();
     for (const h of Object.values(heroes)) {
@@ -61,7 +61,7 @@ export function BuildingReactionsEditor() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ fontSize: 12, opacity: 0.75 }}>{t.buildingReactionsHint}</div>
 
-      {/* Pasek pokrycia. */}
+      {/* Coverage strip. */}
       <div className="cov-strip">
         <span className="px" style={{ opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 11 }}>
           {t.coverage}
@@ -75,20 +75,20 @@ export function BuildingReactionsEditor() {
         </span>
       </div>
 
-      {/* Nieprzypisane narzędzia z żywych logów — przypisz jednym klikiem. */}
+      {/* Unassigned tools from live logs: assign with one click. */}
       {coverage.uncoveredTools.length > 0 && (
         <UnassignedTools tools={coverage.uncoveredTools} onAssign={(tool, building) =>
           addRules([{ kind: 'exact', tool, building }])} t={t} />
       )}
 
-      {/* Legenda typów chipów. */}
+      {/* Chip type legend. */}
       <div style={{ display: 'flex', gap: 10, fontSize: 11.5, opacity: 0.8 }}>
         <LegendDot cls="bre-chip--exact" label={t.kindName} />
         <LegendDot cls="bre-chip--prefix" label={t.kindPattern} />
         <LegendDot cls="bre-chip--detail" label={t.kindCondition} />
       </div>
 
-      {/* Karty budynków. */}
+      {/* Building cards. */}
       <div className="bre-grid">
         {WORKING_BUILDINGS.map((id) => (
           <BuildingCard
@@ -109,12 +109,12 @@ export function BuildingReactionsEditor() {
         ))}
       </div>
 
-      {/* Budynki socjalne — informacyjnie. */}
+      {/* Social buildings: informational. */}
       <div style={{ fontSize: 12, opacity: 0.6 }}>
         🏘 {t.socialBuildings} <span style={{ opacity: 0.85 }}>{social}</span>
       </div>
 
-      {/* JSON pod spodem. */}
+      {/* JSON below. */}
       <JsonEditor mapping={mapping} setMapping={setMapping} t={t} />
 
       <div>
@@ -338,14 +338,14 @@ function JsonEditor({
   const applyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Gdy mapa zmieni się z panelu (chipy), odśwież textarea — ale nie podczas pisania.
+  // When the map changes from the panel (chips), refresh textarea, but not while typing.
   useEffect(() => {
     if (focused.current) return;
     setText(JSON.stringify(mapping, null, 2));
     setError(undefined);
   }, [mapping]);
 
-  // Sprzątanie debounce'a przy odmontowaniu.
+  // Clean up debounce on unmount.
   useEffect(() => () => clearTimeout(applyTimer.current), []);
 
   const onChange = (v: string) => {
@@ -392,7 +392,7 @@ function JsonEditor({
           style={{ display: 'none' }}
           onChange={async (e) => {
             const file = e.target.files?.[0];
-            e.target.value = ''; // pozwól wgrać ten sam plik ponownie
+            e.target.value = ''; // allow uploading the same file again
             if (!file) return;
             const res = parseUploadedMapping(await file.text());
             if (res.ok) {

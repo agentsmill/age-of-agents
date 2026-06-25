@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Text, type Container as PixiContainer } from 'pixi.js';
 import { worldLayerTransform, worldToViewport, flipAxis, flipTextNodes } from '../src/game/flip';
+import { Unit } from '../src/game/unit';
+import { topdown } from '../src/game/projection';
 
 // Granice świata przykładowej planszy (jak liczone w GameView.init).
 const minX = -100;
@@ -72,5 +74,18 @@ describe('flipTextNodes', () => {
     expect(topText.scale.x).toBe(-1);
     expect(nestedText.scale.x).toBe(-1);
     expect(graphic.scale.x).toBe(1);
+  });
+});
+
+describe('Unit screen-facing overlays under world flip', () => {
+  it('counter-flips the context bar so fill direction stays left-to-right on screen', () => {
+    const unit = new Unit('u1', 0, false, 'Hero', { gx: 1, gy: 1 }, topdown(16));
+    const contextBar = (unit as unknown as { contextBar: PixiContainer }).contextBar;
+
+    expect(contextBar.scale.x).toBe(1);
+    unit.setScreenFlipped(true);
+    expect(contextBar.scale.x).toBe(-1);
+    unit.setScreenFlipped(false);
+    expect(contextBar.scale.x).toBe(1);
   });
 });

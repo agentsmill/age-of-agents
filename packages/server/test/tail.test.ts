@@ -17,7 +17,7 @@ describe('TailRegistry', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it('dostarcza tylko pełne linie, częściową trzyma w buforze', async () => {
+  it('delivers only complete lines and keeps partial line in buffer', async () => {
     const tails = new TailRegistry();
     await writeFile(file, '{"a":1}\n{"b":2}\n{"c":');
     expect(await tails.readNewLines(file)).toEqual(['{"a":1}', '{"b":2}']);
@@ -27,16 +27,16 @@ describe('TailRegistry', () => {
     expect(await tails.readNewLines(file)).toEqual([]);
   });
 
-  it('registerAtEnd pomija historię', async () => {
+  it('registerAtEnd skips history', async () => {
     const tails = new TailRegistry();
-    await writeFile(file, '{"stare":1}\n');
+    await writeFile(file, '{"old":1}\n');
     await tails.registerAtEnd(file);
     expect(await tails.readNewLines(file)).toEqual([]);
-    await appendFile(file, '{"nowe":2}\n');
-    expect(await tails.readNewLines(file)).toEqual(['{"nowe":2}']);
+    await appendFile(file, '{"new":2}\n');
+    expect(await tails.readNewLines(file)).toEqual(['{"new":2}']);
   });
 
-  it('wykrywa skrócenie pliku i zaczyna od zera', async () => {
+  it('detects file truncation and starts from zero', async () => {
     const tails = new TailRegistry();
     await writeFile(file, '{"a":1}\n{"b":2}\n');
     await tails.readNewLines(file);

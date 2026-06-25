@@ -7,7 +7,7 @@ function hero(over: Partial<HeroSnapshot>): HeroSnapshot {
 }
 
 describe('aggregateWielded', () => {
-  it('łączy wielded bohaterów danego miasta i normalizuje nazwy skilli', () => {
+  it('combines wielded heroes for a city and normalizes skill names', () => {
     const heroes = {
       a: hero({ sessionId: 'a', projectDir: 'PD', wielded: { skills: ['superpowers:brainstorming'], connectors: ['visualize'], plugins: ['superpowers'] } }),
       b: hero({ sessionId: 'b', projectDir: 'PD', wielded: { skills: ['code-review'], connectors: [], plugins: [] } }),
@@ -18,7 +18,7 @@ describe('aggregateWielded', () => {
     expect(w.connectors).toEqual(['visualize']);
   });
 
-  it('bareName ucina namespace pluginu', () => {
+  it('bareName cuts plugin namespace', () => {
     expect(bareName('superpowers:brainstorming')).toBe('brainstorming');
     expect(bareName('plain')).toBe('plain');
   });

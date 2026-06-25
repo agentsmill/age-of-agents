@@ -1,5 +1,13 @@
-import type { BuildingId } from '@agent-citadel/shared';
-import type { HeroSnapshot } from '@agent-citadel/shared';
+import {
+  activityBuildingForAction,
+  activityBuildingForHero,
+  awaitingBuildingForTheme,
+  homeBuildingForTheme,
+  completedBuildingForTheme,
+  recoveryBuildingForTheme,
+  type BuildingId,
+  type HeroSnapshot,
+} from '@agent-citadel/shared';
 import type { ThemeDef } from '../theme/types';
 
 /**
@@ -23,28 +31,24 @@ const HOME_BUILDINGS: Record<string, BuildingId[]> = {
  *  fantasy: kaplica (shrine); sci-fi: poczekalnia (lounge); fallback: citadel. */
 const AWAITING_BY_THEME: Record<string, BuildingId> = { fantasy: 'shrine', scifi: 'lounge', cyberpunk: 'lounge' };
 export function awaitingBuilding(themeId: string): BuildingId {
-  return AWAITING_BY_THEME[themeId] ?? 'citadel';
+  return awaitingBuildingForTheme(themeId);
 }
 
-/** djb2 — veloce, deterministico, sufficiente per spalmare 100+ progetti. */
-function projectHash(s: string): number {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
+export function completedBuilding(themeId: string): BuildingId {
+  return completedBuildingForTheme(themeId);
+}
+
+export function recoveryBuilding(themeId: string): BuildingId {
+  return recoveryBuildingForTheme(themeId);
 }
 
 /**
- * Restituisce l'id del building in cui una NUOVA unità di questa sessione
- * dovrebbe apparire. Se il tema non ha punti di raccolta o manca il progetto,
- * fallback alla citadella (la destinazione originale).
+ * Returns the building id where a NEW unit for this session should appear. If
+ * the theme has no gathering points or the project is missing, fall back to the
+ * citadel (the original destination).
  */
-export function homeBuilding(theme: ThemeDef, hero: Pick<HeroSnapshot, 'projectName' | 'projectDir'>): BuildingId {
-  const options = HOME_BUILDINGS[theme.id];
-  if (!options || options.length === 0) return 'citadel';
-  // Preferiamo projectName (più corto e stabile di un path assoluto), ma
-  // se manca usiamo projectDir come fallback. Entrambi portano alla stessa
-  // destinazione se lo stesso progetto si presenta più volte.
-  const key = hero.projectName ?? hero.projectDir ?? '';
-  if (!key) return 'citadel';
-  return options[projectHash(key) % options.length];
+export function homeBuilding(theme: ThemeDef, hero: Pick<HeroSnapshot, 'sessionId' | 'projectName' | 'projectDir'>): BuildingId {
+  return homeBuildingForTheme(theme.id, hero);
 }
+
+export { activityBuildingForAction, activityBuildingForHero };

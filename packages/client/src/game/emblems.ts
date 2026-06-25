@@ -7,7 +7,7 @@ import { emblemSrc } from '../theme/emblems';
  * buildAgentBadge (synchroniczne, w konstruktorze Unit) używa getEmblemTexture od ręki;
  * brak tekstury → fallback proceduralny (kółko + litera).
  */
-const KINDS: AgentKind[] = ['claude', 'codex', 'opencode', 'koda'];
+const KINDS: AgentKind[] = ['claude', 'codex', 'opencode', 'koda', 'local-llm'];
 const textures = new Map<AgentKind, Texture>();
 let loaded = false;
 
@@ -16,8 +16,10 @@ export async function loadEmblems(): Promise<void> {
   loaded = true;
   await Promise.all(
     KINDS.map(async (kind) => {
+      const src = emblemSrc(kind);
+      if (!src) return;
       try {
-        const tex = await Assets.load<Texture>({ alias: `emblem/${kind}`, src: emblemSrc(kind) });
+        const tex = await Assets.load<Texture>({ alias: `emblem/${kind}`, src });
         if (tex) textures.set(kind, tex);
       } catch (err) {
         console.warn(`[emblems] nie wczytano ${kind}:`, err);

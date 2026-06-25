@@ -14,24 +14,24 @@ import { cleanTitle, isSubstantialPrompt } from './transcript/title.js';
 import type { World } from './world.js';
 
 /**
- * Progi czasowe sterujące cyklem życia jednostek na mapie.
- * To decyzje UX gry, nie technikalia — patrz profil DEFAULT_THRESHOLDS niżej.
+ * Time thresholds controlling unit lifecycle on the map.
+ * These are game UX decisions, not technicalities; see DEFAULT_THRESHOLDS below.
  */
 export interface StateThresholds {
-  /** Po ilu ms od ostatniej aktywności bohater przechodzi w 'idle' (stoi przy twierdzy). */
+  /** After how many ms since last activity the hero switches to 'idle' (stands by citadel). */
   idleAfterMs: number;
-  /** Po ilu ms 'idle' zmienia się w 'sleeping' (desaturacja, zzz). */
+  /** After how many ms 'idle' changes to 'sleeping' (desaturation, zzz). */
   sleepAfterMs: number;
-  /** Po ilu ms snu bohater znika z mapy. */
+  /** After how many ms asleep the hero disappears from the map. */
   removeAfterMs: number;
-  /** Jak długo bohater pokazuje stan 'error' zanim wróci do pracy/idle. */
+  /** How long the hero shows 'error' before returning to work/idle. */
   errorFlashMs: number;
-  /** Po ilu ms bez zapisu transkryptu peon (subagent) uznawany jest za ukończonego. */
+  /** After how many ms without transcript writes a peon (subagent) is considered completed. */
   peonDoneAfterMs: number;
 }
 
-// Profil "zrównoważony" — wybór projektowy użytkownika (2026-06-13):
-// rytm zbliżony do AgentCrafta (sen po 5 min bezczynności).
+// "Balanced" profile: user project choice (2026-06-13), rhythm similar to
+// AgentCraft (sleep after 5 min idle).
 export const DEFAULT_THRESHOLDS: StateThresholds = {
   idleAfterMs: 30_000,
   sleepAfterMs: 5 * 60_000,
@@ -40,15 +40,18 @@ export const DEFAULT_THRESHOLDS: StateThresholds = {
   peonDoneAfterMs: 90_000,
 };
 
+type SessionTrackerExtra = Partial<Pick<HeroSnapshot, 'container'>>;
+
 /**
- * Maszyna stanów jednej sesji: konsumuje Fakty (z transkryptu lub hooków)
- * i mutuje World. Nie zna formatu JSONL ani źródła danych.
+ * State machine for one session: consumes Facts (from transcript or hooks) and
+ * mutates World. Knows neither JSONL format nor data source.
  */
 export class SessionTracker {
   private seenUsage = new Set<string>();
   private _tokens = { input: 0, output: 0 };
   private contextTokens?: number;
-  /** Publiczny getter do porównywania z nowymi wartościami (np. w OpenCode pollerze). */
+  private contextWindowTokens?: number;
+  /** Public getter for comparing with new values (for example in OpenCode poller). */
   get tokens(): { input: number; output: number } {
     return this._tokens;
   }
@@ -56,12 +59,12 @@ export class SessionTracker {
   private activeMissionId?: string;
   private errorUntil = 0;
   private lastPrompt = { text: '', atMs: 0 };
-  // Kandydaci na nazwę bohatera, wg malejącego priorytetu (patrz displayTitle()).
-  private explicitTitle?: string; // jawny tytuł z CLI (custom-title/ai-title), jeśli wersja Claude go zapisze
+  // Hero-name candidates in descending priority (see displayTitle()).
+  private explicitTitle?: string; // explicit CLI title (custom-title/ai-title), if Claude version records it
   private firstSubstantialPrompt?: string; // pierwszy SENSOWNY prompt (nie "ok"/"dawaj") — stabilna nazwa
   private projectName?: string; // basename cwd, np. "RTS agents"
-  private workingDir?: string; // pełny cwd z transkryptu — realna ścieżka do konfiguracji arsenału
-  private recentActions: ActionEntry[] = []; // ostatnie narzędzia, najnowsze pierwsze (oś aktywności w panelu)
+  private workingDir?: string; // full cwd from transcript: real path to arsenal config
+  private recentActions: ActionEntry[] = []; // recent tools, newest first (activity axis in panel)
   private wieldedSkills = new Set<string>();
   private wieldedConnectors = new Set<string>();
   private wieldedPlugins = new Set<string>();
@@ -108,15 +111,16 @@ export class SessionTracker {
       tokens: this.tokens,
       recentActions: this.recentActions,
       contextTokens: this.contextTokens,
+      contextWindowTokens: this.contextWindowTokens,
       wielded: this.wielded(),
       startedAt: now,
       lastActivityAt: now,
-      ...this.extra,
+      ...(this.extra.container ? { container: this.extra.container } : {}),
     };
   }
 
-  /** Nazwa bohatera wg priorytetu: jawny tytuł → pierwszy SENSOWNY prompt → projekt → UUID.
-   *  Konwersacyjne openery ("ok"/"dawaj"/"realizuj plan") NIGDY nie zostają nazwą. */
+  /** Hero name by priority: explicit title -> first MEANINGFUL prompt -> project -> UUID.
+   *  Conversational openers ("ok"/"dawaj"/"realizuj plan") NEVER become the name. */
   private displayTitle(): string {
     return this.explicitTitle ?? this.firstSubstantialPrompt ?? this.projectName ?? this.sessionId.slice(0, 8);
   }
@@ -133,7 +137,7 @@ export class SessionTracker {
   apply(fact: Fact): void {
     switch (fact.kind) {
       case 'prompt': {
-        // Hook i watcher widzą ten sam prompt dwoma kanałami — deduplikuj.
+        // Hook and watcher see the same prompt through two channels: deduplicate.
         const atMs = Date.parse(fact.ts) || Date.now();
         if (fact.text === this.lastPrompt.text && Math.abs(atMs - this.lastPrompt.atMs) < 15_000) break;
         this.lastPrompt = { text: fact.text, atMs };
@@ -177,6 +181,9 @@ export class SessionTracker {
         });
         break;
 
+      case 'subagent-meta':
+        break;
+
       case 'thinking':
         if (!this.inErrorFlash()) this.patch({ state: 'thinking', currentTool: undefined, toolDetail: undefined }, fact.ts);
         break;
@@ -214,14 +221,25 @@ export class SessionTracker {
             output: this.tokens.output + fact.output,
           };
           if (typeof fact.context === 'number') this.contextTokens = fact.context;
-          this.patch({ tokens: this._tokens, ...(typeof fact.context === 'number' ? { contextTokens: fact.context } : {}) });
+          if (typeof fact.contextWindow === 'number') this.contextWindowTokens = fact.contextWindow;
+          this.patch({
+            tokens: this._tokens,
+            ...(typeof fact.context === 'number' ? { contextTokens: fact.context } : {}),
+            ...(typeof fact.contextWindow === 'number' ? { contextWindowTokens: fact.contextWindow } : {}),
+          });
         }
         break;
 
       case 'usage-total':
-        // Codex: token_count jest kumulatywny → USTAW, nie dodawaj.
+        // Codex: token_count is cumulative -> SET, do not add.
         this._tokens = { input: fact.input, output: fact.output };
-        this.patch({ tokens: this._tokens });
+        if (typeof fact.context === 'number') this.contextTokens = fact.context;
+        if (typeof fact.contextWindow === 'number') this.contextWindowTokens = fact.contextWindow;
+        this.patch({
+          tokens: this._tokens,
+          ...(typeof fact.context === 'number' ? { contextTokens: fact.context } : {}),
+          ...(typeof fact.contextWindow === 'number' ? { contextWindowTokens: fact.contextWindow } : {}),
+        });
         break;
 
       case 'tool-result':
@@ -245,6 +263,14 @@ export class SessionTracker {
         }
         break;
 
+      case 'turn-aborted':
+        this.patch({ state: 'recovering', currentTool: undefined, toolDetail: undefined }, fact.ts);
+        if (this.activeMissionId) {
+          this.world.completeMission(this.activeMissionId, 'failed', fact.ts);
+          this.activeMissionId = undefined;
+        }
+        break;
+
       case 'attribution': {
         let changed = false;
         if (fact.skill && !this.wieldedSkills.has(fact.skill)) { this.wieldedSkills.add(fact.skill); changed = true; }
@@ -256,6 +282,13 @@ export class SessionTracker {
 
       case 'awaiting':
         this.patch({ state: 'awaiting-input', currentTool: undefined }, fact.ts);
+        break;
+
+      case 'cleared':
+        {
+          const parsed = Date.parse(fact.ts);
+          this.patch({ clearedAt: Number.isFinite(parsed) ? parsed : Date.now() }, fact.ts);
+        }
         break;
     }
   }
@@ -304,7 +337,7 @@ export class SessionTracker {
       this.world.upsertHero({ ...hero, state: 'sleeping' });
     } else if (
       sinceActivity > this.thresholds.idleAfterMs &&
-      (hero.state === 'returning' || hero.state === 'working' || hero.state === 'thinking')
+      (hero.state === 'returning' || hero.state === 'recovering' || hero.state === 'working' || hero.state === 'thinking')
     ) {
       this.world.upsertHero({ ...hero, state: 'idle', currentTool: undefined, toolDetail: undefined });
     }

@@ -3,7 +3,7 @@ import { contextPct, contextColor } from './context-bar';
 
 const SEGMENTS = 24;
 
-/** Segmentowany pixel-pasek zapełnienia okna kontekstu (per-bohater). Czysty: dostaje gotowe okno. */
+/** Segmented pixel context-window fill bar (per hero). Pure: receives a resolved window. */
 export function ContextBar({ tokens, windowSize, label }: { tokens: number; windowSize: number; label: string }) {
   const pct = contextPct(tokens, windowSize);
   const c = contextColor(pct);

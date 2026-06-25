@@ -12,24 +12,24 @@ function tmpPath(name = 'tool-mapping.json'): string {
 beforeEach(() => invalidateMappingCache());
 
 describe('loadMappingConfig', () => {
-  it('brak pliku → DEFAULT_MAPPING', async () => {
+  it('missing file -> DEFAULT_MAPPING', async () => {
     expect(await loadMappingConfig(tmpPath())).toEqual(DEFAULT_MAPPING);
   });
 
-  it('poprawny plik → wczytany config', async () => {
+  it('valid file -> loaded config', async () => {
     const p = tmpPath();
     const custom: MappingConfig = { rules: [{ kind: 'exact', tool: 'Edit', building: 'library' }], fallback: 'citadel' };
     writeFileSync(p, JSON.stringify(custom));
     expect(await loadMappingConfig(p)).toEqual(custom);
   });
 
-  it('uszkodzony JSON → DEFAULT_MAPPING', async () => {
+  it('broken JSON -> DEFAULT_MAPPING', async () => {
     const p = tmpPath();
     writeFileSync(p, '{ to nie json');
     expect(await loadMappingConfig(p)).toEqual(DEFAULT_MAPPING);
   });
 
-  it('niepoprawny config (zły building) → DEFAULT_MAPPING', async () => {
+  it('invalid config (bad building) -> DEFAULT_MAPPING', async () => {
     const p = tmpPath();
     writeFileSync(p, JSON.stringify({ rules: [{ kind: 'exact', tool: 'Edit', building: 'nope' }], fallback: 'citadel' }));
     expect(await loadMappingConfig(p)).toEqual(DEFAULT_MAPPING);
@@ -37,7 +37,7 @@ describe('loadMappingConfig', () => {
 });
 
 describe('saveMappingConfig', () => {
-  it('tworzy brakujący katalog i zapisuje plik', async () => {
+  it('creates missing directory and saves file', async () => {
     const p = join(mkdtempSync(join(tmpdir(), 'aoa-map-')), 'nested', 'tool-mapping.json');
     const custom: MappingConfig = { rules: [{ kind: 'prefix', prefix: 'mcp__', building: 'guild' }], fallback: 'citadel' };
     const saved = await saveMappingConfig(custom, p);
@@ -46,14 +46,14 @@ describe('saveMappingConfig', () => {
     expect(JSON.parse(readFileSync(p, 'utf8'))).toEqual(custom);
   });
 
-  it('po zapisie load zwraca nowy config', async () => {
+  it('after save, load returns new config', async () => {
     const p = tmpPath();
     const custom: MappingConfig = { rules: [{ kind: 'exact', tool: 'Read', building: 'forge' }], fallback: 'citadel' };
     await saveMappingConfig(custom, p);
     expect(await loadMappingConfig(p)).toEqual(custom);
   });
 
-  it('odrzuca niepoprawny config', async () => {
+  it('rejects invalid config', async () => {
     await expect(saveMappingConfig({ rules: [], fallback: 'nope' } as unknown as MappingConfig, tmpPath())).rejects.toThrow();
   });
 });

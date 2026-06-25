@@ -1,22 +1,22 @@
 import type { Projection } from '../game/projection';
 import type { BuildingId } from '@agent-citadel/shared';
 
-// BuildingId jest kanoniczny w @agent-citadel/shared (serwer też go potrzebuje).
+// BuildingId is canonical in @agent-citadel/shared (the server needs it too).
 export type { BuildingId };
 
 export interface BuildingDef {
   id: BuildingId;
-  /** Nazwa wyświetlana w danym motywie (np. Kuźnia / Fabryka dronów). */
+  /** Display name in a given theme (for example Forge / Drone Factory). */
   label: string;
-  /** Pozycja na siatce logicznej (lewy-górny róg). */
+  /** Position on the logical grid (top-left corner). */
   gx: number;
   gy: number;
-  /** Rozmiar w kaflach siatki. */
+  /** Size in grid tiles. */
   w: number;
   h: number;
-  /** Węzeł grafu ścieżek przy wejściu budynku. */
+  /** Path graph node at the building entrance. */
   door: { gx: number; gy: number };
-  /** Kolor placeholdera (zanim wgrasz assety). */
+  /** Placeholder color before assets are installed. */
   placeholderColor: number;
 }
 
@@ -49,23 +49,23 @@ export interface NeonStyle {
 export interface ThemeDef {
   id: 'fantasy' | 'scifi' | 'cyberpunk';
   name: string;
-  /** Styl rysowania placeholderów: domek top-down vs blok izometryczny. */
+  /** Placeholder drawing style: top-down house vs isometric block. */
   style: 'topdown' | 'iso';
   projection: Projection;
-  /** Rozmiar kafla w px (do terenu i skali jednostek). */
+  /** Tile size in px (for terrain and unit scale). */
   tile: number;
   /**
-   * Kalibracja sprite'ów bohaterów, zależna od źródła generacji PixelLab
-   * (fantasy = standard 68px, sci-fi = v3 92px). `scale` skaluje canvas do
-   * rozmiaru jednostki; `footAnchor` (0..1) ustawia stopę na pozycji jednostki.
-   * Punkt strojenia usera.
+   * Hero sprite calibration, depending on the PixelLab generation source
+   * (fantasy = standard 68px, sci-fi = v3 92px). `scale` scales the canvas to
+   * unit size; `footAnchor` (0..1) places the foot at the unit position.
+   * User tuning point.
    */
   heroSprite: { scale: number; footAnchor: number };
   grid: { w: number; h: number };
   buildings: BuildingDef[];
-  /** Dodatkowe węzły-skrzyżowania; drzwi budynków dochodzą automatycznie. */
+  /** Additional crossing nodes; building doors are added automatically. */
   crossroads: WaypointNode[];
-  /** Krawędzie grafu ścieżek: pary id węzłów ('door:citadel', 'x1', ...). */
+  /** Path graph edges: pairs of node ids ('door:citadel', 'x1', ...). */
   edges: [string, string][];
   terrain: { base: number; alt: number; path: number };
   /** Gdy obecne → renderer rysuje neonowo-szklane bryły i abstrakcyjne awatary. */

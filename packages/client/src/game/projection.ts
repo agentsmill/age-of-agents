@@ -1,11 +1,11 @@
 /**
- * Projekcje: logiczna siatka kartezjańska (gx, gy) -> piksele ekranu.
- * Logika gry (ścieżki, ruch, pozycje) NIGDY nie działa na współrzędnych
- * ekranowych — tylko renderowanie przechodzi przez projekcję.
+ * Projections: logical Cartesian grid (gx, gy) -> screen pixels.
+ * Game logic (paths, movement, positions) NEVER works in screen coordinates;
+ * only rendering goes through projection.
  */
 export interface Projection {
   toScreen(gx: number, gy: number): { x: number; y: number };
-  /** Wartość do sortowania głębokości (zIndex) jednostek/budynków. */
+  /** Value for depth-sorting (zIndex) units/buildings. */
   depth(gx: number, gy: number): number;
 }
 
@@ -16,7 +16,7 @@ export function topdown(tile: number): Projection {
   };
 }
 
-/** Klasyczny diament 2:1 (szerokość kafla 2× wysokość). */
+/** Classic 2:1 diamond (tile width 2x height). */
 export function isometric(tileW: number, tileH: number): Projection {
   return {
     toScreen: (gx, gy) => ({ x: ((gx - gy) * tileW) / 2, y: ((gx + gy) * tileH) / 2 }),

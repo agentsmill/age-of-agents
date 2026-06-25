@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500&display=swap');
 
 /* Chrome panelu w stylu pixel-art RTS (Wariant B): ostre rogi, ramka 3D z bevelem,
-   nity w narożnikach, ciemny kontur. Wspólne dla WSZYSTKICH paneli HUD. */
+   corner rivets, dark outline. Shared by ALL HUD panels. */
 .hud-panel {
   position: absolute;
   background-color: #1f1e1b;
@@ -18,12 +18,12 @@
   image-rendering: pixelated;
 }
 
-/* Pixel font — TYLKO tytuły/etykiety/liczby (gęsty tekst zostaje czytelny). */
+/* Pixel font: ONLY titles/labels/numbers (dense text stays readable). */
 .px {
   font-family: 'Pixelify Sans', system-ui, sans-serif;
 }
 
-/* ── Przełącznik miast: kompaktowy trigger + rozwijana lista ── */
+/* City switcher: compact trigger + dropdown list. */
 .proj-trigger {
   display: flex;
   align-items: center;
@@ -40,11 +40,11 @@
   background: #323130;
 }
 
-/* Lista rozwijana — własny chrome .hud-panel, zakotwiczona pod triggerem. */
+/* Dropdown list: its own .hud-panel chrome, anchored under the trigger. */
 .proj-dropdown {
   top: 100%;
-  /* Wyśrodkuj pod triggerem (kontener jest wyśrodkowany translateX(-50%)),
-     żeby szeroka lista nie wyjeżdżała poza prawą krawędź i nie była przycinana. */
+  /* Center under trigger (container is centered with translateX(-50%)) so a wide
+     list does not run past the right edge or get clipped. */
   left: 50%;
   transform: translateX(-50%);
   margin-top: 4px;
@@ -57,8 +57,8 @@
   z-index: 30;
 }
 
-/* Wspólny wygląd opcji dropdownu — używany przez ProjectSwitcher (.proj-option)
-   i przełącznik języka w ThemeSwitch (.hud-dd-option). */
+/* Shared dropdown option look, used by ProjectSwitcher (.proj-option) and the
+   language switcher in ThemeSwitch (.hud-dd-option). */
 .proj-option,
 .hud-dd-option {
   display: flex;
@@ -91,7 +91,7 @@
   color: #f1efe8;
 }
 
-/* Generyczne menu dropdownu (krótkie listy, np. język) — chrome z .hud-panel,
+/* Generic dropdown menu (short lists, e.g. language): chrome from .hud-panel,
    zakotwiczone pod triggerem w kontenerze position:relative. */
 .hud-dd-menu {
   top: 100%;
@@ -103,7 +103,7 @@
   z-index: 30;
 }
 
-/* Beveled kafelek statystyki (ostre rogi, światło lewa-góra / cień prawy-dół). */
+/* Beveled stat tile (sharp corners, top-left light / bottom-right shadow). */
 .stat-tile {
   background: #2a2926;
   box-shadow: inset 1px 1px 0 #45443f, inset -1px -1px 0 #15140f;
@@ -131,12 +131,12 @@
   justify-content: center;
   cursor: pointer;
   gap: 2px;
-  user-select: none; /* dwuklik (focus+zoom) nie zaznacza tekstu kafelka */
+  user-select: none; /* double-click (focus+zoom) does not select tile text */
   transition: transform .12s ease, box-shadow .12s ease;
 }
 
-/* Zaznaczenie: uniesienie + poświata w kolorze drużyny (inline) — NIE biały outline,
-   który zasłaniał kolorową ramkę drużyny. */
+/* Selection: lift + team-color glow (inline), NOT a white outline that covered
+   the colored team frame. */
 .portrait.selected {
   transform: translateY(-3px);
 }
@@ -286,17 +286,19 @@
 
 .minimap {
   bottom: 12px;
-  right: 12px;
+  right: 56px;
   padding: 6px;
 }
 
 .zoom-controls {
-  bottom: 156px;
+  bottom: 12px;
   right: 12px;
   padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-height: 120px;
+  justify-content: center;
 }
 
 .zoom-controls button.ghost {
@@ -330,7 +332,7 @@ button.ghost {
 .notif-feed {
   position: absolute;
   /* Pod panelem sterowania (ThemeSwitch, top:12 wys. ~40px) — inaczej toasty
-     zasłaniają i blokują przyciski motywu/języka, póki nie znikną. */
+     cover and block theme/language buttons until they disappear. */
   top: 64px;
   left: 12px;
   display: flex;
@@ -338,11 +340,11 @@ button.ghost {
   gap: 10px;
   width: 300px;
   max-width: 32vw;
-  pointer-events: none; /* tło mapy klikalne między toastami */
+  pointer-events: none; /* map background clickable between toasts */
   z-index: 5;
 }
 
-/* .notif współdzieli chrome .hud-panel; nadpisujemy pozycję na statyczną w flexie. */
+/* .notif shares .hud-panel chrome; override position to static in flex. */
 .notif {
   position: relative;
   pointer-events: auto;
@@ -456,7 +458,7 @@ button.ghost {
 .arsenal-scroll::-webkit-scrollbar-thumb:hover { background: #5a5952; }
 .arsenal-scroll { scrollbar-width: thin; scrollbar-color: #45443f #2a2926; }
 
-/* ── Modal ustawień (reakcje budynków) ── */
+/* Settings modal (building reactions). */
 .settings-overlay {
   position: fixed;
   inset: 0;
@@ -501,7 +503,7 @@ button.ghost {
   color: #e24b4a;
 }
 
-/* Siatka kart budynków. */
+/* Building card grid. */
 .bre-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -605,7 +607,7 @@ button.ghost {
   border-color: #e24b4a;
 }
 
-/* Zakładki ustawień. */
+/* Settings tabs. */
 .settings-tabs {
   display: flex;
   gap: 4px;

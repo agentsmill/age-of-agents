@@ -1,5 +1,5 @@
-// Podgląd logicznej mapy biomów do PNG (offline, bez przeglądarki).
-// Uruchom: npx tsx scripts/preview-terrain.ts
+// Preview the logical biome map as PNG (offline, no browser).
+// Run: npx tsx scripts/preview-terrain.ts
 import { PNG } from 'pngjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { buildTerrainMap, type TerrainId } from '../packages/client/src/game/terrain-map.ts';
@@ -24,7 +24,7 @@ for (let gy = 0; gy < h; gy++)
     const col = C[map[gy][gx]];
     for (let y = 0; y < CELL; y++) for (let x = 0; x < CELL; x++) set(gx * CELL + x, gy * CELL + y, col);
   }
-// budynki: ciemny prostokąt footprintu + biała kropka drzwi
+// buildings: dark footprint rectangle + white door dot
 for (const b of FANTASY.buildings) {
   for (let y = 0; y < b.h * CELL; y++)
     for (let x = 0; x < b.w * CELL; x++) {

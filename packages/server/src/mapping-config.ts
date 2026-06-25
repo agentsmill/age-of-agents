@@ -4,13 +4,13 @@ import { join, dirname } from 'node:path';
 import { DEFAULT_MAPPING, validateMapping, type MappingConfig } from '@agent-citadel/shared';
 
 /**
- * Trwałość edytowalnej mapy narzędzie→budynek. Lokalny serwer = źródło prawdy:
- * plik na dysku usera (`~/.age-of-agents/tool-mapping.json`). Brak/uszkodzony plik
- * → DEFAULT_MAPPING (serwer nigdy się nie wywala). Atrybucja tokenów
- * (building-stats) czyta TO SAMO źródło, więc statystyki honorują zmiany usera.
+ * Persistence for the editable tool-to-building map. The local server is the
+ * source of truth: a file on the user's disk (`~/.age-of-agents/tool-mapping.json`).
+ * Missing or damaged files fall back to DEFAULT_MAPPING so the server never crashes.
+ * Token attribution (building-stats) reads the same source, so stats honor user edits.
  *
- * Cache keyowany ścieżką — testy z osobnymi tmp-plikami się nie zazębiają, a
- * `saveMappingConfig` od razu odświeża cache dla swojej ścieżki.
+ * Cache is keyed by path, so tests using separate temp files do not overlap, and
+ * `saveMappingConfig` refreshes the cache for its path immediately.
  */
 
 export function defaultMappingPath(): string {
@@ -33,7 +33,7 @@ export async function loadMappingConfig(path = defaultMappingPath()): Promise<Ma
     const res = validateMapping(parsed);
     if (res.ok) config = res.config;
   } catch {
-    /* brak pliku / zły JSON → DEFAULT_MAPPING */
+    /* missing file / bad JSON -> DEFAULT_MAPPING */
   }
   cache.set(path, config);
   return config;
@@ -49,7 +49,7 @@ export async function saveMappingConfig(
   await mkdir(dirname(path), { recursive: true });
   const tmp = `${path}.tmp`;
   await writeFile(tmp, JSON.stringify(res.config, null, 2), 'utf8');
-  await rename(tmp, path); // zapis atomowy: rename nie zostawia połowicznego pliku
+  await rename(tmp, path); // atomic write: rename does not leave a partial file
   cache.set(path, res.config);
   return res.config;
 }

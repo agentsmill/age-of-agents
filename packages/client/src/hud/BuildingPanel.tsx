@@ -6,11 +6,12 @@ import { useSettings } from '../settings';
 import { useUi, buildingText } from '../i18n';
 import { clip, formatK, relTime } from '../util';
 import { teamColorHex } from '../game/placeholders';
+import { activityBuildingForAction, activityBuildingForHero } from '../game/home-building';
 import { StatTile } from './StatTile';
 
 const EMPTY: BuildingWindowStats = { today: 0, week: 0, month: 0 };
 
-/** Panel budynku: opis (co reprezentuje) + ile teraz pracuje + tokeny dziś/7d/30d. */
+/** Building panel: description (what it represents) + current workers + tokens today/7d/30d. */
 export function BuildingPanel() {
   const buildingId = useWorld((s) => s.selectedBuildingId);
   const heroes = useWorld((s) => s.heroes);
@@ -18,13 +19,13 @@ export function BuildingPanel() {
   const select = useWorld((s) => s.selectBuilding);
   const themeId = useSettings((s) => s.themeId);
   const lang = useSettings((s) => s.lang);
-  const mapping = useMapping((s) => s.mapping); // re-render gdy user przemapuje narzędzia
+  const mapping = useMapping((s) => s.mapping); // re-render when user remaps tools
   const t = useUi();
   const [stats, setStats] = useState<BuildingStatsResponse | undefined>();
   const [loading, setLoading] = useState(false);
 
-  // Statystyki historyczne: skan transkryptów po stronie serwera (cache 60 s).
-  // Odświeżamy przy otwarciu i co 60 s, dopóki panel jest widoczny.
+  // Historical statistics: server-side transcript scan (60s cache).
+  // Refresh on open and every 60s while the panel is visible.
   useEffect(() => {
     if (!buildingId) return;
     let alive = true;
@@ -49,21 +50,21 @@ export function BuildingPanel() {
   const bt = buildingText(themeId, buildingId as BuildingId, lang);
   const win = stats?.buildings[buildingId as keyof typeof stats.buildings] ?? EMPTY;
 
-  // "Teraz pracuje" — na żywo ze stanu świata (bohaterowie + peony przy tym budynku).
-  const workerHeroes = Object.values(heroes).filter(
-    (h) => h.state === 'working' && resolveBuilding(h.currentTool, h.toolDetail, mapping) === buildingId,
+  // Current presence: live from world state (heroes + peons at this building).
+  const presentHeroes = Object.values(heroes).filter(
+    (h) => activityBuildingForHero(themeId, h, mapping) === buildingId,
   );
-  const workerPeons = Object.values(peons).filter(
+  const presentPeons = Object.values(peons).filter(
     (p) => p.state === 'working' && resolveBuilding(p.currentTool, undefined, mapping) === buildingId,
   );
-  const workingNow = workerHeroes.length + workerPeons.length;
+  const presentNow = presentHeroes.length + presentPeons.length;
 
-  // Lista „co się tu działo" — ostatnie akcje WSZYSTKICH bohaterów odfiltrowane do
-  // tego budynku (z bufora recentActions), najnowsze pierwsze.
+  // "What happened here" list: latest actions from ALL heroes filtered to this
+  // building (from recentActions buffer), newest first.
   const now = Date.now();
   const activity = Object.values(heroes)
     .flatMap((h) => (h.recentActions ?? []).map((a) => ({ a, hero: h })))
-    .filter(({ a }) => resolveBuilding(a.tool, a.detail, mapping) === buildingId)
+    .filter(({ a }) => activityBuildingForAction({ kind: 'tool', tool: a.tool, detail: a.detail }, themeId, mapping) === buildingId)
     .sort((x, y) => y.a.ts.localeCompare(x.a.ts))
     .slice(0, 8);
 
@@ -74,8 +75,8 @@ export function BuildingPanel() {
           <strong className="px" style={{ fontSize: 15, color: '#fac775' }}>{bt.label}</strong>
           <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>{bt.desc}</div>
           <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
-            {t.workingNow}: <b>{workingNow}</b>
-            {workingNow > 0 ? ` (${workerHeroes.length} ${t.sessions}, ${workerPeons.length} ${t.peons})` : ''}
+            {t.workingNow}: <b>{presentNow}</b>
+            {presentNow > 0 ? ` (${presentHeroes.length} ${t.sessions}, ${presentPeons.length} ${t.peons})` : ''}
           </div>
         </div>
         <button className="ghost" onClick={() => select(undefined)}>
@@ -83,14 +84,14 @@ export function BuildingPanel() {
         </button>
       </div>
 
-      {workingNow > 0 && (
+      {presentNow > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-          {workerHeroes.map((h) => (
+          {presentHeroes.map((h) => (
             <div key={h.sessionId} className="line assistant" style={{ alignSelf: 'stretch', maxWidth: '100%' }}>
-              🦸 {clip(h.title, 40)} · {h.toolDetail ? clip(h.toolDetail, 30) : h.currentTool}
+              🦸 {clip(h.title, 40)} · {h.toolDetail ? clip(h.toolDetail, 30) : h.currentTool ?? h.state}
             </div>
           ))}
-          {workerPeons.map((p) => (
+          {presentPeons.map((p) => (
             <div key={p.agentId} className="line assistant" style={{ alignSelf: 'stretch', maxWidth: '100%' }}>
               ⛏️ {clip(p.description ?? 'peon', 40)}
             </div>
@@ -133,4 +134,3 @@ export function BuildingPanel() {
     </div>
   );
 }
-

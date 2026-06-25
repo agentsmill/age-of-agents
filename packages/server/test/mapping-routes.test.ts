@@ -15,8 +15,8 @@ beforeEach(() => invalidateMappingCache());
 
 const CFG = { rules: [{ kind: 'exact', tool: 'Edit', building: 'library' }], fallback: 'citadel' };
 
-describe('registerMappingRoutes — persist=true (realny serwer)', () => {
-  it('PUT zapisuje plik, GET zwraca zapis, onSaved wołane', async () => {
+describe('registerMappingRoutes - persist=true (real server)', () => {
+  it('PUT saves file, GET returns saved config, onSaved called', async () => {
     const path = tmpPath();
     let saved = 0;
     const app = Fastify();
@@ -33,7 +33,7 @@ describe('registerMappingRoutes — persist=true (realny serwer)', () => {
     await app.close();
   });
 
-  it('PUT niepoprawny config → 400, bez onSaved', async () => {
+  it('PUT invalid config -> 400, no onSaved', async () => {
     const path = tmpPath();
     let saved = 0;
     const app = Fastify();
@@ -48,8 +48,8 @@ describe('registerMappingRoutes — persist=true (realny serwer)', () => {
   });
 });
 
-describe('registerMappingRoutes — persist=false (demo)', () => {
-  it('PUT waliduje + echo, NIE zapisuje; GET zwraca DEFAULT', async () => {
+describe('registerMappingRoutes - persist=false (demo)', () => {
+  it('PUT validates + echoes, does NOT save; GET returns DEFAULT', async () => {
     const path = tmpPath();
     const app = Fastify();
     registerMappingRoutes(app, { persist: false, mappingPath: path });
@@ -57,7 +57,7 @@ describe('registerMappingRoutes — persist=false (demo)', () => {
     const put = await app.inject({ method: 'PUT', url: '/tool-mapping', payload: CFG });
     expect(put.statusCode).toBe(200);
     expect(JSON.parse(put.body)).toEqual(CFG);
-    expect(existsSync(path)).toBe(false); // demo nie dotyka dysku
+    expect(existsSync(path)).toBe(false); // demo does not touch disk
 
     const get = await app.inject({ method: 'GET', url: '/tool-mapping' });
     expect(JSON.parse(get.body)).toEqual(DEFAULT_MAPPING);

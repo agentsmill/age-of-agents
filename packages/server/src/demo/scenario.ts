@@ -2,15 +2,15 @@ import type { HeroSnapshot, HeroStateKind } from '@agent-citadel/shared';
 import type { World } from '../world.js';
 
 /**
- * Tryb demo — zapętlona opowieść z trzech scen (wybór użytkownika, 2026-06-13):
- *  1. Wyprawa peona po skarb: subagent pracuje i wraca ze skrzynką.
- *  2. Awaria i naprawa: błąd narzędzia, dym, poprawka, fajerwerki.
- *  3. Karawana git: po pracy bohater zanosi kod na targ (commit + push).
- * Klient nie odróżnia demo od prawdziwych sesji — te same zdarzenia.
+ * Demo mode: looped story of three scenes (user choice, 2026-06-13):
+ *  1. Peon treasure run: subagent works and returns with a crate.
+ *  2. Failure and repair: tool error, smoke, fix, fireworks.
+ *  3. Git caravan: after work, the hero carries code to the market (commit + push).
+ * Client does not distinguish demo from real sessions: same events.
  */
 
 interface Step {
-  at: number; // sekundy od startu pętli
+  at: number; // seconds from loop start
   run: (world: World, iteration: number) => void;
 }
 
@@ -27,7 +27,7 @@ function makeHero(world: World, sessionId: string, title: string): HeroSnapshot 
     teamColor: world.claimTeamColor(),
     state: 'idle',
     tokens: { input: 0, output: 0 },
-    contextTokens: 24_000, // bieżący rozmiar kontekstu — pasek startuje widoczny, rośnie w patch()
+    contextTokens: 24_000, // current context size: bar starts visible and grows in patch()
     startedAt: now,
     lastActivityAt: now,
   };
@@ -50,7 +50,7 @@ function patch(
     toolDetail: undefined,
     ...fields,
     tokens,
-    // Symuluj rosnący kontekst (cap 900k), by pasek zapełniał się w trakcie pętli.
+    // Simulate growing context (cap 900k) so the bar fills during the loop.
     contextTokens: Math.min(900_000, (hero.contextTokens ?? 24_000) + 16_000),
     lastActivityAt: new Date().toISOString(),
   });
@@ -68,7 +68,7 @@ const H2 = 'demo-scout';
 const PEON = 'demo-peon-1';
 
 const TIMELINE: Step[] = [
-  // --- Scena: awaria i naprawa + karawana git (bohater 1) ---
+  // --- Scene: failure and repair + git caravan (hero 1) ---
   {
     at: 1,
     run: (w, i) => {
@@ -106,7 +106,7 @@ const TIMELINE: Step[] = [
   },
   { at: 50, run: (w) => patch(w, H1, { state: 'idle' }) },
 
-  // --- Scena: wyprawa peona po skarb (bohater 2) ---
+  // --- Scene: peon treasure run (hero 2) ---
   {
     at: 6,
     run: (w, i) => {
@@ -136,7 +136,7 @@ const TIMELINE: Step[] = [
   },
   { at: 14, run: (w) => patch(w, H2, { state: 'thinking' }) },
   { at: 19, run: (w) => w.upsertPeon({ agentId: PEON, parentSessionId: H2, state: 'working', currentTool: 'Bash', description: 'Research export formats' }) },
-  { at: 27, run: (w) => w.completePeon(PEON) }, // wraca ze skrzynką do bohatera
+  { at: 27, run: (w) => w.completePeon(PEON) }, // returns to the hero with a crate
   {
     at: 29,
     run: (w) => {

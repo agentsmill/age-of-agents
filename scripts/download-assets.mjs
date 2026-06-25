@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Półautomatyczny instalator assetów.
+ * Semi-automated asset installer.
  *
- * Itch.io nie udostępnia stabilnych bezpośrednich URL-i (pobranie wymaga
- * kliknięcia na stronie paczki), więc przepływ jest następujący:
- *   1. Pobierz zip ze strony paczki (pole "page" w assets-manifest.json)
- *   2. Zapisz go jako downloads/<id>.zip
- *   3. Uruchom `npm run assets` — skrypt rozpakuje wszystko co znajdzie
- *      do packages/client/public/assets/<target> i wypisze czego brakuje.
+ * Itch.io does not expose stable direct URLs (downloads require clicking on the
+ * pack page), so the flow is:
+ *   1. Download the zip from the pack page (the "page" field in assets-manifest.json).
+ *   2. Save it as downloads/<id>.zip.
+ *   3. Run `npm run assets`; the script unpacks everything it finds into
+ *      packages/client/public/assets/<target> and lists what is missing.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
@@ -29,7 +29,7 @@ for (const pack of manifest.packs) {
   const targetDir = join(assetsDir, pack.target);
 
   if (existsSync(targetDir)) {
-    console.log(`✓ ${pack.name} — już zainstalowana (${pack.target})`);
+    console.log(`✓ ${pack.name} - already installed (${pack.target})`);
     installed++;
     continue;
   }
@@ -39,19 +39,19 @@ for (const pack of manifest.packs) {
   }
   mkdirSync(targetDir, { recursive: true });
   execFileSync('unzip', ['-oq', zipPath, '-d', targetDir]);
-  console.log(`✓ ${pack.name} — rozpakowano do ${pack.target}`);
+  console.log(`✓ ${pack.name} - unpacked to ${pack.target}`);
   installed++;
 }
 
 if (missing.length > 0) {
-  console.log('\nBrakujące paczki — pobierz ręcznie (przycisk Download na stronie):');
+  console.log('\nMissing packs - download manually (Download button on the page):');
   for (const pack of missing) {
     console.log(`\n  ${pack.name} (${pack.license.split('—')[0].trim()})`);
-    console.log(`    strona:  ${pack.page}`);
-    console.log(`    zapisz:  downloads/${pack.id}.zip`);
-    console.log(`    rola:    ${pack.role}`);
+    console.log(`    page:  ${pack.page}`);
+    console.log(`    save:  downloads/${pack.id}.zip`);
+    console.log(`    role:  ${pack.role}`);
   }
-  console.log('\nPotem uruchom ponownie: npm run assets');
+  console.log('\nThen run again: npm run assets');
 } else {
-  console.log(`\nKomplet: ${installed}/${manifest.packs.length} paczek zainstalowanych.`);
+  console.log(`\nComplete: ${installed}/${manifest.packs.length} packs installed.`);
 }

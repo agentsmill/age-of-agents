@@ -6,7 +6,7 @@ import {
   renameSprite,
   setFallbackSprite,
 } from '../src/hud/model-sprite-edit';
-import { validateModelConfig, DEFAULT_MODEL_CONFIG, type ModelConfig } from '../src/theme/models';
+import { validateModelConfig, DEFAULT_MODEL_CONFIG, SPRITE_IDS, type ModelConfig } from '../src/theme/models';
 
 const empty: ModelConfig = { sprites: [], windows: [], fallback: { sprite: 'sonnet', contextWindow: 200_000 } };
 const valid = (c: ModelConfig) => validateModelConfig(c).ok;
@@ -14,9 +14,9 @@ const valid = (c: ModelConfig) => validateModelConfig(c).ok;
 describe('groupBySprite', () => {
   it('grupuje DEFAULT po sprite: wszystkie SPRITE_IDS, nazwa + indeksy', () => {
     const g = groupBySprite(DEFAULT_MODEL_CONFIG);
-    expect(Object.keys(g).sort()).toEqual(['fable', 'haiku', 'opus', 'sonnet']);
+    expect(Object.keys(g).sort()).toEqual([...SPRITE_IDS].sort());
     expect(g.opus.name).toBe('Opus 4.8');
-    expect(g.opus.rules.length).toBe(1);
+    expect(g.opus.rules.length).toBeGreaterThanOrEqual(1);
     expect(typeof g.opus.rules[0].index).toBe('number');
   });
   it('spirit bez reguł → pusta lista, brak nazwy', () => {

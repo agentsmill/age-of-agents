@@ -1,8 +1,8 @@
 /**
- * Mapowanie aktywności agenta na budynek-cel — serce metafory gry.
- * Kanoniczna implementacja żyje w @agent-citadel/shared, bo serwer używa jej
- * do atrybucji tokenów do budynków (statystyki). Tu tylko re-eksport, żeby
- * istniejące importy klienta ('../theme/mapping') działały bez zmian.
+ * Maps agent activity to the target building: the heart of the game metaphor.
+ * The canonical implementation lives in @agent-citadel/shared because the
+ * server uses it to attribute tokens to buildings (statistics). This file only
+ * re-exports it so existing client imports ('../theme/mapping') keep working.
  */
 export {
   toolToBuilding,

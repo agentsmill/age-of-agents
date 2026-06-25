@@ -25,3 +25,11 @@ describe('translateHook — Notification', () => {
     expect(r?.facts).toEqual([expect.objectContaining({ kind: 'turn-end' })]);
   });
 });
+
+describe('translateHook — SessionStart clear', () => {
+  it('source=clear emituje cleared i zachowuje cwd do dopasowania starej sesji', () => {
+    const r = translateHook({ session_id: 'new', cwd: '/Users/x/proj', hook_event_name: 'SessionStart', source: 'clear' });
+    expect(r?.cwd).toBe('/Users/x/proj');
+    expect(r?.facts).toContainEqual(expect.objectContaining({ kind: 'cleared' }));
+  });
+});

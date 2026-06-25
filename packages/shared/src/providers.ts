@@ -23,12 +23,16 @@ export const AGENT_PROVIDERS: Record<AgentKind, ProviderInfo> = {
   codex: { kind: 'codex', label: 'Codex', labelShort: 'C', color: '#10a37f' }, // zielony OpenAI
   opencode: { kind: 'opencode', label: 'OpenCode', labelShort: 'O', color: '#f59e0b' }, // amber-500
   koda: { kind: 'koda', label: 'Koda', labelShort: 'K', color: '#8b5cf6' }, // violet-500
+  'local-llm': { kind: 'local-llm', label: 'Local LLM', labelShort: 'L', color: '#22d3ee' }, // cyan-400
 };
 
 /**
  * Metadane providera dla danego agenta. Nieznany/undefined → claude
  * (zgodność wsteczna z HeroSnapshot.agent? + bezpieczna degradacja korupcji danych).
  */
-export function resolveProvider(agent: AgentKind | undefined): ProviderInfo {
-  return (agent && AGENT_PROVIDERS[agent]) || AGENT_PROVIDERS.claude;
+export function resolveProvider(agent: unknown): ProviderInfo {
+  if (typeof agent === 'string' && Object.hasOwn(AGENT_PROVIDERS, agent)) {
+    return AGENT_PROVIDERS[agent as AgentKind];
+  }
+  return AGENT_PROVIDERS.claude;
 }

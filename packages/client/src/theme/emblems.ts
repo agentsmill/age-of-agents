@@ -8,7 +8,9 @@ import { resolveProvider, type AgentKind } from '@agent-citadel/shared';
  */
 export const EMBLEM_BASE = '/assets/emblems';
 
-/** Ścieżka PNG herba dla agenta. Nieznany/undefined → claude (przez resolveProvider). */
-export function emblemSrc(agent: AgentKind | undefined): string {
-  return `${EMBLEM_BASE}/${resolveProvider(agent).kind}.png`;
+/** Ścieżka PNG herba dla agenta. Claude/nieznany/undefined → brak widocznego herba. */
+export function emblemSrc(agent: AgentKind | undefined): string | undefined {
+  const provider = resolveProvider(agent);
+  if (provider.color === null) return undefined;
+  return `${EMBLEM_BASE}/${provider.kind}.png`;
 }

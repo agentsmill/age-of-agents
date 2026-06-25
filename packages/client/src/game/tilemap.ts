@@ -8,7 +8,7 @@ import { cornerMask, frameForMask } from './autotile';
 const sheets = new Map<string, Spritesheet>(); // pair -> sheet
 let tilePx = 32;
 
-/** Pary przejść i ich teren "upper", w kolejności priorytetu (później = wyżej). */
+/** Transition pairs and their "upper" terrain, in priority order (later = higher). */
 const PAIRS: { pair: string; upper: TerrainId }[] = [
   { pair: 'water', upper: 'water' },
   { pair: 'dirt', upper: 'dirt' },
@@ -24,11 +24,11 @@ export async function loadTilemaps(themeId: string): Promise<void> {
       try {
         sheets.set(pair, await Assets.load<Spritesheet>(`/assets/${themeId}/tilemap/${pair}.json`));
       } catch {
-        /* brak pojedynczej pary → pomijamy */
+        /* single missing pair: skip it */
       }
     }
   } catch {
-    /* brak tilesetów → drawTerrain fallback w view.ts */
+    /* no tilesets -> drawTerrain fallback in view.ts */
   }
 }
 
@@ -37,9 +37,9 @@ export function hasTilemaps(): boolean {
 }
 
 /**
- * Buduje warstwę terenu: pełnoekranowa baza grass + po jednej warstwie dual-grid
- * na parę. Skala kafla = theme.tile / tilePx. Warstwa jest płaskim tłem —
- * dodawana do worldLayer PRZED unitLayer, nigdy nie wchodzi w depth-sort.
+ * Builds the terrain layer: full-screen grass base + one dual-grid layer per
+ * pair. Tile scale = theme.tile / tilePx. The layer is a flat background,
+ * added to worldLayer BEFORE unitLayer, and never enters depth-sort.
  */
 export function buildTilemap(theme: ThemeDef): Container {
   const root = new Container();
@@ -48,7 +48,7 @@ export function buildTilemap(theme: ThemeDef): Container {
   const inBounds = (gx: number, gy: number) => gx >= 0 && gy >= 0 && gx < theme.grid.w && gy < theme.grid.h;
   const isUpperFor = (upper: TerrainId) => (gx: number, gy: number) => inBounds(gx, gy) && map[gy][gx] === upper;
 
-  // Baza grass pod spodem (każdy render-kafel klatką t_0 dowolnej pary).
+  // Grass base underneath (each render tile uses frame t_0 from any pair).
   const baseSheet = sheets.get('dirt') ?? sheets.values().next().value;
   if (baseSheet) {
     const baseLayer = new CompositeTilemap();
@@ -62,7 +62,7 @@ export function buildTilemap(theme: ThemeDef): Container {
     root.addChild(baseLayer);
   }
 
-  // Warstwy przejść wg priorytetu.
+  // Transition layers by priority.
   for (const { pair, upper } of PAIRS) {
     const sheet = sheets.get(pair);
     if (!sheet) continue;
@@ -72,7 +72,7 @@ export function buildTilemap(theme: ThemeDef): Container {
     for (let dy = 0; dy <= theme.grid.h; dy++) {
       for (let dx = 0; dx <= theme.grid.w; dx++) {
         const mask = cornerMask(dx, dy, isUpper);
-        if (mask === 0) continue; // sama baza
+        if (mask === 0) continue; // base only
         const tex = sheet.textures[`t_${frameForMask(mask)}`];
         if (tex) layer.tile(tex, dx * tilePx - tilePx / 2, dy * tilePx - tilePx / 2);
       }

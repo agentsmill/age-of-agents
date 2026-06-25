@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useUi } from '../i18n';
+import { apiFetch } from '../api';
 
-type Status = 'loading' | 'installed' | 'absent' | 'demo' | 'error';
+type Status = 'loading' | 'installed' | 'legacy' | 'absent' | 'demo' | 'error';
 
 /**
  * Tryb turbo: hooki HTTP Claude Code. Instalacja modyfikuje
- * ~/.claude/settings.json — wymaga jawnego potwierdzenia użytkownika.
+ * ~/.claude/settings.json; requires explicit user confirmation.
  */
 export function HooksPanel() {
   const [status, setStatus] = useState<Status>('loading');
@@ -16,7 +17,7 @@ export function HooksPanel() {
     try {
       const res = await fetch('/hooks/status');
       const data = await res.json();
-      setStatus(data.demo ? 'demo' : data.installed ? 'installed' : 'absent');
+      setStatus(data.demo ? 'demo' : data.needsMigration ? 'legacy' : data.installed ? 'installed' : 'absent');
     } catch {
       setStatus('error');
     }
@@ -29,12 +30,12 @@ export function HooksPanel() {
   if (status === 'loading' || status === 'demo' || status === 'error') return null;
 
   const toggle = async () => {
-    const installing = status === 'absent';
-    const message = installing ? t.hooksInstall : t.hooksUninstall;
+    const installing = status === 'absent' || status === 'legacy';
+    const message = status === 'legacy' ? t.hooksRepair : installing ? t.hooksInstall : t.hooksUninstall;
     if (!window.confirm(message)) return;
     setBusy(true);
     try {
-      await fetch(installing ? '/hooks/install' : '/hooks/uninstall', { method: 'POST' });
+      await apiFetch(installing ? '/hooks/install' : '/hooks/uninstall', { method: 'POST' });
       await refresh();
     } finally {
       setBusy(false);
@@ -43,7 +44,7 @@ export function HooksPanel() {
 
   return (
     <button className="ghost" disabled={busy} onClick={toggle} title={t.hooksTitle}>
-      {status === 'installed' ? t.hooksOn : t.hooksOff}
+      {status === 'installed' ? t.hooksOn : status === 'legacy' ? t.hooksRepairShort : t.hooksOff}
     </button>
   );
 }

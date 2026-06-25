@@ -17,7 +17,7 @@ const hero = (over: Partial<HeroSnapshot>): HeroSnapshot => ({
 const NOW = 1_000_000;
 
 describe('deriveNotification', () => {
-  it('alarm gdy bohater WCHODZI w awaiting-input', () => {
+  it('alerts when hero ENTERS awaiting-input', () => {
     const prev = hero({ state: 'working' });
     const ev: GameEvent = { type: 'hero-updated', hero: hero({ state: 'awaiting-input' }) };
     const n = deriveNotification(prev, ev, NOW);
@@ -27,13 +27,13 @@ describe('deriveNotification', () => {
     expect(n?.ttl).toBe(12_000);
   });
 
-  it('null gdy nadal awaiting-input (brak zbocza)', () => {
+  it('null when still awaiting-input (no edge)', () => {
     const prev = hero({ state: 'awaiting-input' });
     const ev: GameEvent = { type: 'hero-updated', hero: hero({ state: 'awaiting-input' }) };
     expect(deriveNotification(prev, ev, NOW)).toBeNull();
   });
 
-  it('error przy wejściu w error', () => {
+  it('error when entering error', () => {
     const prev = hero({ state: 'working' });
     const ev: GameEvent = { type: 'hero-updated', hero: hero({ state: 'error' }) };
     expect(deriveNotification(prev, ev, NOW)?.reason).toBe('error');
@@ -48,14 +48,14 @@ describe('deriveNotification', () => {
     expect(deriveNotification(undefined, fail, NOW)).toBeNull();
   });
 
-  it('spawn spokojny → new-session; spawn w awaiting-input → needs-you (alarm wygrywa)', () => {
+  it('calm spawn -> new-session; spawn in awaiting-input -> needs-you (alert wins)', () => {
     const calm: GameEvent = { type: 'hero-spawned', hero: hero({ state: 'idle' }) };
     const busy: GameEvent = { type: 'hero-spawned', hero: hero({ state: 'awaiting-input' }) };
     expect(deriveNotification(undefined, calm, NOW)?.reason).toBe('new-session');
     expect(deriveNotification(undefined, busy, NOW)?.reason).toBe('needs-you');
   });
 
-  it('typ nieobsługiwany → null', () => {
+  it('unsupported type -> null', () => {
     const ev: GameEvent = {
       type: 'transcript-line',
       line: { sessionId: 's1', role: 'assistant', text: 'hi', ts: 'x' },

@@ -5,14 +5,14 @@ import { loadModelConfig, saveModelConfig } from './model-config.js';
 export interface ModelRoutesOptions {
   /** true → PUT zapisuje na dysk; false (demo) → tylko waliduje i echo. */
   persist: boolean;
-  /** Ścieżka pliku gdy persist. Domyślnie ~/.age-of-agents/model-config.json. */
+  /** File path when persistent. Defaults to ~/.age-of-agents/model-config.json. */
   modelConfigPath?: string;
 }
 
 /**
- * Rejestruje GET/PUT /model-config. Bliźniak registerMappingRoutes, ale BEZ
- * onSaved — okno kontekstu używane tylko na kliencie, więc serwer nie ma
- * cache'a zależnego od rejestru. PUT po prostu zapisuje.
+ * Registers GET/PUT /model-config. Twin of registerMappingRoutes, but WITHOUT
+ * onSaved: context window is used only on the client, so the server has no cache
+ * dependent on the registry. PUT simply saves.
  */
 export function registerModelRoutes(app: FastifyInstance, opts: ModelRoutesOptions): void {
   app.get('/model-config', async () =>
@@ -28,7 +28,7 @@ export function registerModelRoutes(app: FastifyInstance, opts: ModelRoutesOptio
     try {
       return await saveModelConfig(request.body as ModelConfig, opts.modelConfigPath);
     } catch (err) {
-      return reply.code(400).send({ error: err instanceof Error ? err.message : 'niepoprawny config' });
+      return reply.code(400).send({ error: err instanceof Error ? err.message : 'invalid config' });
     }
   });
 }

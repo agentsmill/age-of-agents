@@ -1,20 +1,20 @@
 import type { BuildingId, MappingConfig, MappingRule } from './theme/mapping';
 
 /**
- * „Jak to jest pokryte" — czysta analiza mapy względem narzędzi faktycznie
- * widzianych w żywych logach (`seenTools`). Bez I/O, w pełni testowalna.
+ * "How well is this covered" - pure map analysis against tools actually seen
+ * in live logs (`seenTools`). No I/O, fully testable.
  */
 export interface Coverage {
-  /** Budynki będące celem ≥1 reguły (budynki „robocze"). */
+  /** Buildings targeted by at least one rule ("working" buildings). */
   workingBuildings: BuildingId[];
   coveredCount: number;
-  /** Widziane narzędzia, których żadna reguła nie łapie → spadają do fallbacku. */
+  /** Seen tools that no rule catches -> they fall back to the default target. */
   uncoveredTools: string[];
-  /** Sprzeczne reguły: ten sam wyzwalacz (tier+klucz) wskazuje RÓŻNE budynki. */
+  /** Conflicting rules: the same trigger (tier+key) points to DIFFERENT buildings. */
   conflicts: { label: string; buildings: BuildingId[] }[];
 }
 
-/** Czy reguła łapie nazwę narzędzia (detail — po nazwie narzędzia, bez ewaluacji regexu). */
+/** Whether a rule catches the tool name (detail = by tool name, without evaluating the regex). */
 function ruleMatchesTool(rule: MappingRule, tool: string): boolean {
   if (rule.kind === 'exact') return rule.tool === tool;
   if (rule.kind === 'detail') return rule.tool === tool;
@@ -22,10 +22,10 @@ function ruleMatchesTool(rule: MappingRule, tool: string): boolean {
 }
 
 /**
- * Klucz tożsamości wyzwalacza w obrębie tieru. Konflikt liczymy TYLKO między
- * regułami tego samego klucza — bo precedencja (detail > prefix > exact)
- * deterministycznie rozstrzyga reguły różnych tierów (np. Bash detail→market
- * vs Bash exact→mine to projekt, nie sprzeczność).
+ * Trigger identity key within a tier. Count conflicts ONLY between rules with
+ * the same key, because precedence (detail > prefix > exact) deterministically
+ * resolves rules across different tiers (for example Bash detail->market vs
+ * Bash exact->mine is design, not a conflict).
  */
 function ruleKey(rule: MappingRule): string {
   if (rule.kind === 'exact') return `exact:${rule.tool}`;
@@ -39,18 +39,18 @@ export function computeCoverage(
   workingSet?: readonly BuildingId[],
 ): Coverage {
   const workingBuildings = [...new Set(config.rules.map((r) => r.building))];
-  // coveredCount liczy budynki ROBOCZE z regułą — jeśli podano zbiór roboczy,
-  // pomija budynki socjalne (etykieta paska mówi „budynki robocze pokryte").
+  // coveredCount includes WORKING buildings that have a rule; if a working set
+  // is provided, skip social buildings (the bar says "working buildings covered").
   const coveredCount = workingSet
     ? workingBuildings.filter((b) => workingSet.includes(b)).length
     : workingBuildings.length;
 
-  // Nieprzypisane: widziane narzędzia, których żadna reguła nie łapie (po nazwie).
+  // Unassigned: seen tools that no rule catches (by name).
   const uncoveredTools = [...new Set(seenTools)].filter(
     (tool) => !config.rules.some((rule) => ruleMatchesTool(rule, tool)),
   );
 
-  // Konflikty: ten sam klucz wyzwalacza prowadzi do >1 różnego budynku.
+  // Conflicts: the same trigger key leads to more than one distinct building.
   const byKey = new Map<string, Set<BuildingId>>();
   for (const rule of config.rules) {
     const key = ruleKey(rule);

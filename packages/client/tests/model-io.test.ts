@@ -3,15 +3,15 @@ import { parseUploadedModelConfig } from '../src/hud/model-io';
 import { DEFAULT_MODEL_CONFIG } from '../src/theme/models';
 
 describe('parseUploadedModelConfig', () => {
-  it('poprawny config → ok', () => {
+  it('valid config -> ok', () => {
     const res = parseUploadedModelConfig(JSON.stringify(DEFAULT_MODEL_CONFIG));
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.config.windows.length).toBe(DEFAULT_MODEL_CONFIG.windows.length);
   });
-  it('niepoprawny JSON → błąd', () => {
-    expect(parseUploadedModelConfig('{ to nie json').ok).toBe(false);
+  it('invalid JSON -> error', () => {
+    expect(parseUploadedModelConfig('{ not json').ok).toBe(false);
   });
-  it('poprawny JSON, zła struktura → błąd', () => {
+  it('valid JSON, bad structure -> error', () => {
     expect(parseUploadedModelConfig('{"foo":1}').ok).toBe(false);
   });
 });

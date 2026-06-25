@@ -1,10 +1,10 @@
 // Dev-entry: w trybie deweloperskim klienta serwuje Vite (proxy na /ws, /hooks...).
-// Dystrybucja npm używa src/cli.ts (z webRoot). Tu NIE podajemy webRoot.
+// npm distribution uses src/cli.ts (with webRoot). Do NOT pass webRoot here.
 import { SERVER_PORT } from '@agent-citadel/shared';
 import { startServer } from './server.js';
 
-// Siatka bezpieczeństwa: pojedynczy nieobsłużony błąd nie może wygasić serwera
-// wizualizacji — wtedy klient zostaje bez źródła danych. Logujemy i działamy dalej.
+// Safety net: a single unhandled error must not shut down the visualization
+// server, which would leave the client without a data source. Log and keep going.
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled promise rejection — server keeps running:', reason);
 });

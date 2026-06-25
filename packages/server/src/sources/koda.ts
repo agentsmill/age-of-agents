@@ -1,15 +1,16 @@
 import { homedir } from 'node:os';
 import { basename, join, sep } from 'node:path';
 import type { Fact } from '../transcript/facts.js';
+import { rootIfExists } from './config.js';
 import type { AgentSource, ClassifiedFile } from './types.js';
 
 /**
- * Źródło Koda (https://openadapter.dev/):
+ * Koda source (https://openadapter.dev/):
  * ~/.koda/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl
  *
- * Koda jest open-source AI coding agentem zbudowanym na openadapter.dev.
- * Format: każda linia JSONL ma type='session'|'model_change'|'message'|...
- * Wiadomości: {type:'message', message:{role, content:[{type,text|name,arguments,id,output}]}}
+ * Koda is an open-source AI coding agent built on openadapter.dev.
+ * Format: each JSONL line has type='session'|'model_change'|'message'|...
+ * Messages: {type:'message', message:{role, content:[{type,text|name,arguments,id,output}]}}
  */
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
@@ -21,7 +22,7 @@ function clip(text: string, max = 240): string {
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 
 /* ─────────────────────────────────────────────────────────────────
- * Mapowanie narzędzi Koda → nazwa kanoniczna gry
+ * Koda tool mapping -> canonical game name.
  * ───────────────────────────────────────────────────────────────── */
 export function kodaToolToCanonical(name: string): string {
   switch (name) {
@@ -61,14 +62,14 @@ export function kodaToolToCanonical(name: string): string {
     case 'skill':
       return 'skill';
     default:
-      // Narzędzia MCP: 'serwer__narzędzie' albo 'serwer.narzędzie'
+      // MCP tools: 'server__tool' or 'server.tool'.
       if (name.includes('__')) return `mcp__${name}`;
       if (name.includes('.')) return `mcp__${name.replace(/\./g, '__')}`;
       return name;
   }
 }
 
-/** Detal do dymka z argumentów tool. */
+/** Bubble detail from tool arguments. */
 function kodaToolDetail(name: string, args: Record<string, unknown> | undefined): string | undefined {
   if (!args) return undefined;
   
@@ -103,7 +104,7 @@ function kodaToolDetail(name: string, args: Record<string, unknown> | undefined)
   return str(args.description) ?? str(args.prompt) ?? str(args.filePath) ?? str(args.path);
 }
 
-/** Czy wynik toolCall wskazuje błąd. */
+/** Whether toolCall result indicates an error. */
 function kodaOutputIsError(output: unknown): boolean {
   if (output && typeof output === 'object') {
     const o = output as any;
@@ -117,7 +118,7 @@ function kodaOutputIsError(output: unknown): boolean {
   return false;
 }
 
-/** Wyciąga tekst z content bloku wiadomości. */
+/** Extracts text from message content block. */
 function extractText(content: unknown): string | undefined {
   if (!Array.isArray(content)) return undefined;
   const parts: string[] = [];
@@ -129,7 +130,7 @@ function extractText(content: unknown): string | undefined {
   return parts.length > 0 ? parts.join('\n') : undefined;
 }
 
-/** Sprawdza czy tekst to prompt człowieka (nie wstrzykiwany). */
+/** Checks whether text is a human prompt (not injected). */
 export function isKodaHumanPrompt(text: string, role: string | undefined): boolean {
   if (role !== 'user') return false;
   const t = text.trim();
@@ -141,7 +142,7 @@ export function isKodaHumanPrompt(text: string, role: string | undefined): boole
   return true;
 }
 
-/** Parsuje pojedynczą wiadomość Koda → Fakty. */
+/** Parses one Koda message -> Facts. */
 function handleMessage(record: any, facts: Fact[]): void {
   const msg = record.message;
   if (!msg) return;
@@ -188,7 +189,7 @@ function handleMessage(record: any, facts: Fact[]): void {
 }
 
 /**
- * Parsuje jedną linię JSONL Koda → Fakty. Nieznany/uszkodzony rekord → [].
+ * Parses one Koda JSONL line -> Facts. Unknown/broken record -> [].
  */
 export function interpretKodaLine(line: string): Fact[] {
   let record: any;
@@ -203,7 +204,7 @@ export function interpretKodaLine(line: string): Fact[] {
   
   switch (record.type) {
     case 'session': {
-      // Pierwsza linia - metadane sesji
+      // First line - session metadata.
       const cwd = str(record.cwd);
       const id = str(record.id);
       facts.push({
@@ -211,7 +212,7 @@ export function interpretKodaLine(line: string): Fact[] {
         cwd,
         model: str(record.model) ?? (cwd ? basename(cwd) : undefined),
       });
-      // Title: spróbuj z initial prompt jeśli dostępny
+      // Title: try from initial prompt when available.
       if (record.title) {
         facts.push({ kind: 'title', title: str(record.title) ?? '' });
       }
@@ -243,13 +244,13 @@ export function interpretKodaLine(line: string): Fact[] {
   return facts;
 }
 
-/** Dekoduje ścieżkę katalogu sesji Koda (np. "--C--Users-pietr--progetti-age-of-agents--") do ścieżki Windows. */
+/** Decodes Koda session directory path (e.g. "--C--Users-pietr--progetti-age-of-agents--") to Windows path. */
 function decodeKodaDir(encoded: string): string {
   // Format: --C--Users-pietr--progetti-age-of-agents--
-  // Pierwsze 2 myślniki to "//C:/" - na Windows to dysk
-  // Ogólnie: każda para "--" to separator
-  // "C--" na początku to "C:/"
-  // Usuwamy końcowe "--"
+  // First 2 hyphens are "//C:/" - on Windows this is the drive.
+  // Generally: each "--" pair is a separator.
+  // "C--" at the start is "C:/".
+  // Remove trailing "--".
   let s = encoded.replace(/^--/, '').replace(/--$/, '');
   // Pierwszy segment "C" to litera dysku
   const firstSep = s.indexOf('--');
@@ -262,17 +263,17 @@ function decodeKodaDir(encoded: string): string {
 }
 
 /**
- * Źródło Koda: ~/.koda/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl
+ * Koda source: ~/.koda/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl
  */
 export const kodaSource: AgentSource = {
   id: 'koda',
-  roots: () => [join(homedir(), '.koda', 'agent', 'sessions')],
+  roots: () => rootIfExists(join(homedir(), '.koda', 'agent', 'sessions')),
   depth: 4,
   classify(path: string, root: string): ClassifiedFile {
     const rel = path.slice(root.length + 1);
     const parts = rel.split(sep);
-    // parts[0] = zakodowany katalog roboczy
-    // parts[1] = plik sesji <ts>_<uuid>.jsonl
+    // parts[0] = encoded working directory
+    // parts[1] = session file <ts>_<uuid>.jsonl
     if (parts.length !== 2) return { kind: 'other' };
     const file = parts[1];
     if (!file.endsWith('.jsonl')) return { kind: 'other' };

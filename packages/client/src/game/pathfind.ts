@@ -7,9 +7,9 @@ export interface PathNode {
 }
 
 /**
- * Graf waypointów motywu (drzwi budynków + skrzyżowania) i Dijkstra.
- * Jednostki chodzą po "drogach" — wygląda naturalnie i nie wymaga
- * pełnego A* po siatce przy ambientowej skali 5-20 jednostek.
+ * Theme waypoint graph (building doors + intersections) and Dijkstra.
+ * Units walk along "roads"; it looks natural and avoids full A* over the grid
+ * at the ambient scale of 5-20 units.
  */
 export class WaypointGraph {
   private nodes = new Map<string, PathNode>();
@@ -31,7 +31,7 @@ export class WaypointGraph {
   private addEdge(a: string, b: string): void {
     const na = this.nodes.get(a);
     const nb = this.nodes.get(b);
-    if (!na || !nb) throw new Error(`Krawędź do nieznanego węzła: ${a} - ${b}`);
+    if (!na || !nb) throw new Error(`Edge to unknown node: ${a} - ${b}`);
     const cost = Math.hypot(na.gx - nb.gx, na.gy - nb.gy);
     this.adjacency.get(a)!.push({ to: b, cost });
     this.adjacency.get(b)!.push({ to: a, cost });
@@ -41,7 +41,7 @@ export class WaypointGraph {
     return this.nodes.get(id);
   }
 
-  /** Najbliższy węzeł grafu dla dowolnej pozycji na siatce. */
+  /** Nearest graph node for any grid position. */
   nearest(gx: number, gy: number): PathNode {
     let best: PathNode | undefined;
     let bestDist = Infinity;
@@ -55,7 +55,7 @@ export class WaypointGraph {
     return best!;
   }
 
-  /** Dijkstra: lista węzłów od startu do celu (włącznie). */
+  /** Dijkstra: list of nodes from start to target (inclusive). */
   route(fromId: string, toId: string): PathNode[] {
     if (fromId === toId) return [this.nodes.get(fromId)!];
     const dist = new Map<string, number>();

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Age of Agents — watch your AI coding sessions grow a peaceful pixel realm</title>
-<meta name="description" content="Age of Agents turns every Claude Code, Codex, OpenCode and Koda session into a settler in a calm, Age-of-Empires-style pixel realm. Tools become workshops, subagents become workers, tokens become harvest. Run it with npx age-of-agents.">
+<meta name="description" content="Age of Agents turns every Claude Code, Codex, OpenCode and Koda session into a settler in a calm, Age-of-Empires-style pixel realm. Tools become workshops, subagents become workers, tokens become harvest. Install with npm i -g age-of-agents and run it with the short aoa command.">
 <meta name="theme-color" content="#0e1410">
 <meta property="og:title" content="Age of Agents">
 <meta property="og:description" content="Watch your AI coding sessions grow a peaceful pixel-art realm.">
@@ -168,6 +168,7 @@
     <a class="lnk" href="#worlds">Worlds</a>
     <a class="lnk" href="#how">How it works</a>
     <a class="lnk" href="#make-it-yours">Make it yours</a>
+    <a class="lnk" href="#launch-agent">Launch agent</a>
     <a class="lnk" href="#start">Get started</a>
     <a class="btn" href="https://github.com/agentsmill/age-of-agents" target="_blank" rel="noopener">★ GitHub</a>
     <a class="btn" href="https://ko-fi.com/powerczuk" target="_blank" rel="noopener">☕ Support</a>
@@ -180,8 +181,8 @@
       <div class="ornament rv"><span class="rule"></span><span class="eyebrow">A peaceful RTS for Claude Code, Codex, OpenCode &amp; Koda</span><span class="rule r"></span></div>
       <h1 class="rv" data-d="1">Age of<span class="em">Agents</span></h1>
       <p class="lede rv" data-d="2">Watch your AI coding sessions grow a calm, living pixel realm. Every session is a settler that walks out of the keep, gathers and builds; the tool it runs decides which workshop it visits, subagents become workers, and tokens fill the storehouse. No combat — just a quiet kingdom of work, at a glance.</p>
-      <div class="npx rv" data-d="3"><span class="pr">❯</span><code class="cmd" id="npxCmd">npx age-of-agents</code><button class="copy" id="copyBtn" type="button" aria-label="Copy command">copy</button></div>
-      <div class="ver rv" data-d="3"><a href="https://www.npmjs.com/package/age-of-agents" target="_blank" rel="noopener"><img alt="age-of-agents on npm" src="https://img.shields.io/npm/v/age-of-agents?color=6e9b46&amp;label=npm&amp;logo=npm&amp;logoColor=white"></a><span>one command, no install · needs Node 22+</span></div>
+      <div class="npx rv" data-d="3"><span class="pr">❯</span><code class="cmd" id="npxCmd">npm i -g age-of-agents</code><button class="copy" id="copyBtn" type="button" aria-label="Copy command">copy</button></div>
+      <div class="ver rv" data-d="3"><a href="https://www.npmjs.com/package/age-of-agents" target="_blank" rel="noopener"><img alt="age-of-agents on npm" src="https://img.shields.io/npm/v/age-of-agents?color=6e9b46&amp;label=npm&amp;logo=npm&amp;logoColor=white"></a><span>install once, then run <code>aoa</code> · needs Node 22+</span></div>
       <div class="cta rv" data-d="3">
         <a class="btn gold" href="https://github.com/agentsmill/age-of-agents" target="_blank" rel="noopener">⬇ Get it on GitHub</a>
         <a class="btn" href="#worlds">Tour the realm</a>
@@ -282,6 +283,31 @@
     </div>
   </section>
 
+  <section id="launch-agent">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <span class="eyebrow">Launch agents — BETA</span>
+        <h2>Start a Claude Code agent from the panel</h2>
+        <p>With the optional Claude Agent SDK installed, a <b>🚀 Launch agent</b> button lets you start a real Claude Code session from inside the realm — pick a folder, type a prompt, and answer its permission prompts, plan approvals and multiple-choice questions right in the panel. Real runs use your account and tokens.</p>
+      </div>
+      <div class="term rv" data-d="1">
+        <div class="top"><i style="background:#8fc065"></i><i style="background:#e0b64a"></i><i style="background:#7fb6c4"></i><span class="t">zsh — launch setup</span></div>
+<pre><span class="c"># 1. install the optional SDK</span>
+<span class="p">❯</span> <span class="cmd">npm i <span class="g">@anthropic-ai/claude-agent-sdk</span></span>
+
+<span class="c"># 2. authenticate with your subscription (one time, opens a browser)</span>
+<span class="p">❯</span> <span class="cmd">claude <span class="g">setup-token</span></span>          <span class="c"># prints a token</span>
+<span class="p">❯</span> <span class="cmd">export CLAUDE_CODE_OAUTH_TOKEN=<span class="g">&lt;token&gt;</span></span>
+<span class="p">❯</span> <span class="cmd">unset ANTHROPIC_API_KEY</span>          <span class="c"># or it takes precedence</span>
+
+<span class="c"># 3. start the app from THAT shell, then click 🚀 Launch agent</span>
+<span class="p">❯</span> <span class="cmd">aoa</span>
+</pre>
+      </div>
+      <p class="rv" data-d="2" style="text-align:center; opacity:.75; font-size:14px; margin-top:14px">The SDK is optional — without it the button stays hidden. Without the token, launches fail with <code>401 Invalid authentication credentials</code>. Usage bills against your Claude subscription (the OAuth token), not the metered API.</p>
+    </div>
+  </section>
+
   <section id="start">
     <div class="wrap">
       <div class="sec-head rv">
@@ -291,10 +317,12 @@
       </div>
       <div class="term rv" data-d="1">
         <div class="top"><i style="background:#8fc065"></i><i style="background:#e0b64a"></i><i style="background:#7fb6c4"></i><span class="t">zsh — age-of-agents</span></div>
-<pre><span class="c"># run it instantly — watches ~/.claude, ~/.codex, ~/.opencode &amp; ~/.koda sessions</span>
-<span class="p">❯</span> <span class="cmd">npx <span class="g">age-of-agents</span></span>            <span class="c"># prints the URL</span>
-<span class="p">❯</span> <span class="cmd">npx age-of-agents <span class="g">--demo</span></span>     <span class="c"># calm demo, fake sessions</span>
-<span class="p">❯</span> <span class="cmd">npx age-of-agents <span class="g">--open</span></span>     <span class="c"># open the browser too</span>
+<pre><span class="c"># install globally, then run with the short `aoa` command</span>
+<span class="p">❯</span> <span class="cmd">npm i -g <span class="g">age-of-agents</span></span>
+<span class="p">❯</span> <span class="cmd">aoa</span>                      <span class="c"># prints the URL</span>
+<span class="p">❯</span> <span class="cmd">aoa <span class="g">--demo</span></span>               <span class="c"># calm demo, fake sessions</span>
+<span class="p">❯</span> <span class="cmd">aoa <span class="g">--open</span></span>               <span class="c"># open the browser too</span>
+<span class="p">❯</span> <span class="cmd">npm update -g <span class="g">age-of-agents</span></span>   <span class="c"># update later</span>
 
 <span class="c"># or from source</span>
 <span class="p">❯</span> <span class="cmd">git clone https://github.com/agentsmill/age-of-agents</span>
@@ -335,7 +363,7 @@
   }
   bFan.onclick=()=>set('fantasy'); bSci.onclick=()=>set('scifi');
 
-  // Kopiowanie komendy instalacji do schowka (kopiuje dokładnie to, co pokazane).
+  // Copy the install command to the clipboard (copies exactly what is shown).
   const copyBtn=document.getElementById('copyBtn'), npxCmd=document.getElementById('npxCmd');
   copyBtn?.addEventListener('click', async ()=>{
     try{
@@ -343,7 +371,7 @@
       copyBtn.textContent='✓ copied';
       copyBtn.classList.add('copied');
       setTimeout(()=>{ copyBtn.textContent='copy'; copyBtn.classList.remove('copied'); }, 1600);
-    }catch(_){ /* schowek niedostępny (np. nie-https) — pomiń */ }
+    }catch(_){ /* clipboard unavailable (for example non-https) - skip */ }
   });
 </script>
 </body>

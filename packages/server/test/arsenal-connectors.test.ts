@@ -16,7 +16,7 @@ describe('readConnectors', () => {
     await fs.rm(wd, { recursive: true, force: true });
   });
 
-  it('łączy .mcp.json (projekt), global i per-projekt z ~/.claude.json', async () => {
+  it('combines .mcp.json (project), global, and per-project entries from ~/.claude.json', async () => {
     await fs.writeFile(path.join(wd, '.mcp.json'), JSON.stringify({
       mcpServers: { localmcp: { command: 'node', args: ['s.js'] } },
     }));
@@ -32,7 +32,7 @@ describe('readConnectors', () => {
     expect(byName['projmcp']).toEqual({ name: 'projmcp', origin: 'project', transport: 'stdio' });
   });
 
-  it('zwraca pustą listę gdy brak configów', async () => {
+  it('returns an empty list when configs are missing', async () => {
     expect(await readConnectors({ workingDir: wd, homeDir: home })).toEqual([]);
   });
 });

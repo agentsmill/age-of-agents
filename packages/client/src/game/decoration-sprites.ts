@@ -3,7 +3,7 @@ import type { DecoKind } from './decorations';
 
 const tex = new Map<string, Texture>();
 
-/** Ładuje tekstury dekoracji wprost z PNG (unikalny URL per motyw → brak kolizji cache). */
+/** Loads decoration textures directly from PNG (unique URL per theme -> no cache collisions). */
 export async function loadDecorationSprites(themeId: string): Promise<void> {
   tex.clear();
   try {
@@ -14,11 +14,11 @@ export async function loadDecorationSprites(themeId: string): Promise<void> {
       try {
         tex.set(id, await Assets.load<Texture>(`/assets/${themeId}/decorations/${id}.png`));
       } catch {
-        /* pojedynczy brak — pomijamy ten rodzaj */
+        /* single missing asset: skip this kind */
       }
     }
   } catch {
-    /* brak indeksu — brak dekoracji */
+    /* missing index: no decorations */
   }
 }
 

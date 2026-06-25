@@ -47,3 +47,29 @@ describe('useSettings — missionsCollapsed', () => {
     expect(ls.getItem('agent-citadel.missions-collapsed')).toBe('1');
   });
 });
+
+describe('useSettings — flipped', () => {
+  it('domyślnie nie odwraca miasta, gdy brak klucza', async () => {
+    (globalThis as { localStorage?: unknown }).localStorage = fakeStorage();
+    vi.resetModules();
+    const { useSettings } = await import('../src/settings');
+    expect(useSettings.getState().flipped).toBe(false);
+  });
+
+  it('czyta odwrócony stan z localStorage ("1")', async () => {
+    (globalThis as { localStorage?: unknown }).localStorage = fakeStorage({ 'agent-citadel.flip': '1' });
+    vi.resetModules();
+    const { useSettings } = await import('../src/settings');
+    expect(useSettings.getState().flipped).toBe(true);
+  });
+
+  it('setFlipped zapisuje i utrwala stan', async () => {
+    const ls = fakeStorage();
+    (globalThis as { localStorage?: unknown }).localStorage = ls;
+    vi.resetModules();
+    const { useSettings } = await import('../src/settings');
+    useSettings.getState().setFlipped(true);
+    expect(useSettings.getState().flipped).toBe(true);
+    expect(ls.getItem('agent-citadel.flip')).toBe('1');
+  });
+});

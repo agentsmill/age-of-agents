@@ -1,17 +1,17 @@
 /**
- * Heurystyka nazwy sesji (bohatera). Bez AI — czysto lokalne reguły, żeby gra
- * działała out-of-the-box u każdego (cel: instalacja przez npm/CLI, zero
- * zależności od maszyny). Tytuł z „Recents" Claude'a NIE jest dostępny lokalnie,
- * więc wyprowadzamy go z pierwszego SENSOWNEGO promptu człowieka.
+ * Session (hero) naming heuristic. No AI: purely local rules so the game works
+ * out of the box for everyone (goal: npm/CLI install, zero machine dependencies).
+ * Claude's "Recents" title is NOT locally available, so derive it from the first
+ * MEANINGFUL human prompt.
  */
 
 /**
- * Frazy-potwierdzenia/rozkazy bez własnej treści — kiepskie jako nazwa sesji.
- * Porównanie po normalizacji (lowercase, bez interpunkcji/białych znaków z brzegu).
+ * Confirmation/command phrases without own content are poor session names.
+ * Compare after normalization (lowercase, no edge punctuation/whitespace).
  *
- * WKŁAD USERA (learning): to punkt strojenia pod TWOJE nawyki konwersacyjne.
- * Dopisz/usuń frazy, których używasz na starcie tury („no to lecimy", „ japiernicze”…).
- * Lista jest celowo zachowawcza — łapie tylko jawne „okejki" i meta-rozkazy.
+ * USER CONTRIBUTION (learning): tuning point for YOUR conversational habits.
+ * Add/remove phrases you use at the start of a turn ("no to lecimy", etc.).
+ * The list is intentionally conservative: catches only explicit "okay" and meta commands.
  */
 const STOPWORDS = new Set<string>([
   'ok', 'oki', 'okej', 'okay', 'k', 'spoko', 'git', 'gites',
@@ -22,37 +22,37 @@ const STOPWORDS = new Set<string>([
   'commit', 'commituj', 'zacommituj', 'push', 'merge', 'deploy',
 ]);
 
-/** Normalizacja do porównania z listą-stop: lowercase, bez interpunkcji brzegowej. */
+/** Normalization for comparing with stop list: lowercase, no edge punctuation. */
 function normalize(text: string): string {
   return text
     .trim()
     .toLowerCase()
-    .replace(/[.!?…,;:]+$/u, '') // końcowa interpunkcja
+    .replace(/[.!?…,;:]+$/u, '') // trailing punctuation
     .replace(/\s+/gu, ' ')
     .trim();
 }
 
 /**
  * Czy prompt to opis ZADANIA, a nie samo „ok"/„dawaj"/„realizuj plan".
- * Reguła: odrzuć dokładne frazy z listy-stop oraz pojedyncze, bardzo krótkie
- * słowa; resztę (np. „Napraw zoom") traktuj jak sensowne zadanie.
+ * Rule: reject exact stop-list phrases and single very short words; treat the
+ * rest (for example "Napraw zoom") as a meaningful task.
  */
 export function isSubstantialPrompt(text: string): boolean {
   const n = normalize(text);
   if (!n) return false;
   if (STOPWORDS.has(n)) return false;
-  // pojedyncze krótkie słowo bez treści (np. literówka, emotka-słowo)
+  // single short word without content (for example typo, emoji-word)
   if (!n.includes(' ') && n.length < 8) return false;
   return true;
 }
 
 /**
- * Czyści tekst do roli nazwy: pierwsza niepusta linia, bez wiodących markerów
- * markdown i etykiety „Zadanie:/Task:", zwinięte białe znaki, ucięte do `max`.
+ * Cleans text for title role: first non-empty line, without leading markdown
+ * markers and "Zadanie:/Task:" labels, collapsed whitespace, clipped to `max`.
  */
 export function cleanTitle(text: string, max = 40): string {
   let s = text.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? '';
-  s = s.replace(/^[#>\-*]+\s*/u, ''); // markery list/cytatów/nagłówków
+  s = s.replace(/^[#>\-*]+\s*/u, ''); // list/quote/header markers
   s = s.replace(/^(zadanie|task)\s*:\s*/iu, ''); // etykieta zadania
   s = s.replace(/\s+/gu, ' ').trim();
   return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s;

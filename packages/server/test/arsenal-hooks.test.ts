@@ -16,7 +16,7 @@ describe('readHooks', () => {
     await fs.rm(wd, { recursive: true, force: true });
   });
 
-  it('spłaszcza hooki projektu (event+command, origin)', async () => {
+  it('flattens project hooks (event+command, origin)', async () => {
     await fs.mkdir(path.join(wd, '.claude'), { recursive: true });
     await fs.writeFile(path.join(wd, '.claude', 'settings.json'), JSON.stringify({
       hooks: { SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: 'bd prime' }] }] },
@@ -25,7 +25,7 @@ describe('readHooks', () => {
     expect(hooks).toEqual([{ event: 'SessionStart', command: 'bd prime', origin: 'project' }]);
   });
 
-  it('zwraca pustą listę gdy brak settings', async () => {
+  it('returns an empty list when settings are missing', async () => {
     expect(await readHooks({ workingDir: wd, homeDir: home })).toEqual([]);
   });
 });

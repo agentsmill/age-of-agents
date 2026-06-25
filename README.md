@@ -83,19 +83,13 @@ A third art set beyond Fantasy and Sci-Fi: an **isometric, neon-glass, synthwave
 
 ## 🚀 Quick start
 
-Run it instantly, no install:
-
-```bash
-npx age-of-agents          # watches ~/.claude, ~/.codex, ~/.opencode & ~/.koda sessions (+ Claude in local Docker containers), prints the URL
-npx age-of-agents --demo   # calm demo mode (fake sessions)
-npx age-of-agents --open   # also open the browser
-```
-
-Or install globally (commands `age-of-agents` and the shorter `aoa`):
+**Install — `npm i -g`.** Install it globally for the short `aoa` command; update with `npm update -g age-of-agents` when new versions ship:
 
 ```bash
 npm i -g age-of-agents
-aoa --open
+aoa            # watches ~/.claude, ~/.codex, ~/.opencode & ~/.koda sessions (+ Claude in local Docker), prints the URL
+aoa --demo     # calm demo mode (fake sessions)
+aoa --open     # also open the browser
 ```
 
 > The server binds to `127.0.0.1` only and never writes your transcripts anywhere — it just reads them locally and broadcasts game state over a local WebSocket. See [Privacy](#-privacy).
@@ -166,6 +160,20 @@ npm run build # production client + bundled CLI (dist/cli.js)
 - Transcripts are read **locally and read-only**; their contents are never written to disk by Age of Agents or sent anywhere.
 - The only file the app writes is the optional **Session log** (`~/.age-of-agents/session-log.json`) — a cost ledger derived from session metadata, never transcript contents.
 - Installing the optional Claude Code hooks modifies `~/.claude/settings.json` (a fast event channel). Demo mode touches nothing of yours.
+- **Optional interactive mode (off by default).** You can let the panel answer Claude Code permission prompts and plan approvals via the local hooks. It stays `127.0.0.1`-only; with the mode off, Age of Agents remains a passive read-only observer. When on, an unanswered prompt (timeout or app closed) always falls back to the terminal — the app never auto-allows. "Always allow" rules live in `~/.age-of-agents/permission-policy.json`; the app never edits the permission rules in `~/.claude/settings.json`.
+- **Optional: launch agents from the app (BETA — [setup guide](docs/launch-agent.md)).** With the Claude Agent SDK installed (`npm i @anthropic-ai/claude-agent-sdk`), a **🚀 Launch agent** button lets you start a Claude Code session from the panel — pick a folder, type a prompt, choose a permission mode. These app-owned sessions are real Claude Code runs (they use your account and tokens) and you answer their permission prompts, plan approvals and multiple-choice questions (a centered "agent question" modal) directly in the panel. The SDK is an optional dependency; without it the button is hidden and nothing changes.
+  - **Auth for launching:** the Agent SDK authenticates from environment variables only — it does **not** read your interactive Claude Code login. To use your subscription, generate a long-lived token once with `claude setup-token`, then start the app from a shell where `CLAUDE_CODE_OAUTH_TOKEN` is set (and `ANTHROPIC_API_KEY` is unset, or it takes precedence). Without it, launches fail with `401 Invalid authentication credentials`; the launch dialog warns when no auth is present.
+
+## 🛡️ Security
+
+The server binds to `127.0.0.1` only and is built for local use. It defends against the realistic threat — a malicious web page in your browser (a "drive-by" that scripts `localhost`) — with two layers:
+
+- **Origin allowlist.** WebSocket and state-changing HTTP requests from a non-local origin are rejected (`403`). A cross-origin page always sends an `Origin` header, so it cannot connect or post.
+- **Session token.** A per-machine token in `~/.age-of-agents/session-token` (`0600`) is required for the WebSocket handshake and for sensitive endpoints (launch/stop/message, hook install/uninstall, config writes, `/fs/list`). The app fetches it from `/session-token`, which is only served to allowlisted origins. Installed hooks and local tools keep working with no setup — the token is auto-created on first run.
+
+`/fs/list` (the folder picker) is confined to your home directory. The server refuses to bind to a non-loopback host unless you explicitly set `AOA_ALLOW_REMOTE=1`.
+
+**Honest boundaries:** loopback is not isolated per user, so this does not fully protect against another user on a shared machine, and a process running as you can read the token file. Those are out of scope for a local-first tool.
 
 ## 🎭 Assets
 

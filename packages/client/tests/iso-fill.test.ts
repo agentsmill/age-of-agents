@@ -6,7 +6,7 @@ const tileH = 32;
 const toScreen = (gx: number, gy: number) => ({ x: ((gx - gy) * tileW) / 2, y: ((gx + gy) * tileH) / 2 });
 
 describe('invIso', () => {
-  it('jest odwrotnością projekcji izometrycznej', () => {
+  it('is the inverse of isometric projection', () => {
     for (const [gx, gy] of [
       [0, 0],
       [5, 3],
@@ -23,12 +23,12 @@ describe('invIso', () => {
 });
 
 describe('isoFillRange', () => {
-  it('zakres komórek pokrywa każdy punkt prostokąta świata', () => {
+  it('cell range covers every point of the world rectangle', () => {
     const rect = { minX: -500, minY: -200, maxX: 900, maxY: 700 };
     const r = isoFillRange(tileW, tileH, rect);
-    // Próbkujemy gęstą siatkę punktów WEWNĄTRZ prostokąta. Komórka pokrywająca
-    // dany punkt (round po odwróconej projekcji) MUSI mieścić się w zakresie —
-    // inaczej w tym miejscu ekranu byłaby dziura/czerń.
+    // Sample a dense grid of points INSIDE the rectangle. The cell covering
+    // a given point (round after inverse projection) MUST fit in range,
+    // otherwise there would be a hole/black area on screen there.
     for (let x = rect.minX; x <= rect.maxX; x += 17) {
       for (let y = rect.minY; y <= rect.maxY; y += 13) {
         const inv = invIso(tileW, tileH, x, y);
@@ -42,7 +42,7 @@ describe('isoFillRange', () => {
     }
   });
 
-  it('działa dla prostokąta z dodatnim originem', () => {
+  it('works for a rectangle with positive origin', () => {
     const rect = { minX: 100, minY: 50, maxX: 1200, maxY: 900 };
     const r = isoFillRange(tileW, tileH, rect);
     expect(r.gxMax).toBeGreaterThan(r.gxMin);

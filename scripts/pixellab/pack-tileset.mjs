@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Packer tilesetu PixelLab (Wang dual-grid) → atlas Pixi z klatkami t_0..t_15
- * ułożonymi wg MOJEJ maski narożników (NW=1,NE=2,SW=4,SE=8, bit=upper).
- * Czyta corners z metadanych → liczy moją maskę → wycina wg bounding_box.
- * Dzięki temu DUAL_GRID_LOOKUP w autotile.ts zostaje tożsamościowy.
+ * PixelLab tileset packer (Wang dual-grid) -> Pixi atlas with t_0..t_15 frames
+ * arranged by this project's corner mask (NW=1,NE=2,SW=4,SE=8, bit=upper).
+ * Reads corners from metadata -> computes the project mask -> crops via bounding_box.
+ * This keeps DUAL_GRID_LOOKUP in autotile.ts as an identity mapping.
  *
- * Wejście:  downloads/tilesets/<pair>.{json,png}
- * Wyjście:  packages/client/public/assets/<theme>/tilemap/<pair>.{png,json} + index.json
- * Użycie:   node scripts/pixellab/pack-tileset.mjs <theme> <pair...>
+ * Input:  downloads/tilesets/<pair>.{json,png}
+ * Output: packages/client/public/assets/<theme>/tilemap/<pair>.{png,json} + index.json
+ * Usage:  node scripts/pixellab/pack-tileset.mjs <theme> <pair...>
  */
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -49,7 +49,7 @@ for (const pair of pairs) {
     blit(src, bb.x, bb.y, T, T, sheet, sheet.width, m * T, 0);
     seen.add(m);
   }
-  if (seen.size !== 16) throw new Error(`${pair}: pokryto ${seen.size}/16 masek — sprawdź corners w metadanych`);
+  if (seen.size !== 16) throw new Error(`${pair}: covered ${seen.size}/16 masks - check corners in metadata`);
   const frames = {};
   for (let m = 0; m < 16; m++)
     frames[`t_${m}`] = { frame: { x: m * T, y: 0, w: T, h: T }, sourceSize: { w: T, h: T }, spriteSourceSize: { x: 0, y: 0, w: T, h: T } };
@@ -58,7 +58,7 @@ for (const pair of pairs) {
     join(outDir, `${pair}.json`),
     JSON.stringify({ frames, meta: { image: `${pair}.png`, format: 'RGBA8888', size: { w: T * 16, h: T }, scale: '1' } }, null, 2),
   );
-  console.log(`${pair}: 16 kafli (maski 0-15) ✓`);
+  console.log(`${pair}: 16 tiles (masks 0-15) ✓`);
 }
 writeFileSync(join(outDir, 'index.json'), JSON.stringify({ pairs, tile: T }, null, 2));
 console.log('index.json →', pairs.join(', '));

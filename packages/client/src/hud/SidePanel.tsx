@@ -13,23 +13,26 @@ import { getGameView } from '../game/view';
 import { clip, formatK, relTime } from '../util';
 import { StatTile } from './StatTile';
 import { ContextBar } from './ContextBar';
+import { PendingQuestionCard } from './PendingQuestionCard';
+import { sendSessionMessage, stopSession } from '../sessions';
 
-// Stała referencja — selektor zwracający świeże [] przy każdym wywołaniu
-// wprawiłby useSyncExternalStore w nieskończoną pętlę renderów.
+// Stable reference: a selector returning fresh [] on every call would put
+// useSyncExternalStore into an infinite render loop.
 const NO_LINES: TranscriptLine[] = [];
 
-/** Kolor + emoji per stan (karta pionka — od razu widać „co robi"). */
+/** Color + emoji per state (pawn card: immediately shows "what it is doing"). */
 const STATE_STYLE: Record<HeroStateKind, { color: string; emoji: string }> = {
   working: { color: '#5dcaa5', emoji: '⚙️' },
   thinking: { color: '#85b7eb', emoji: '💭' },
   'awaiting-input': { color: '#ef9f27', emoji: '✋' },
   error: { color: '#f09595', emoji: '⚠️' },
+  recovering: { color: '#e48aa2', emoji: '⚕️' },
   idle: { color: '#b4b2a9', emoji: '⏸️' },
   sleeping: { color: '#888780', emoji: '💤' },
   returning: { color: '#97c459', emoji: '🚶' },
 };
 
-/** Emoji budynku (dekoracyjne, wspólne dla obu motywów). */
+/** Building emoji (decorative, shared by both themes). */
 const BUILDING_EMOJI: Record<BuildingId, string> = {
   citadel: '🏛️',
   tower: '🔭',
@@ -39,7 +42,7 @@ const BUILDING_EMOJI: Record<BuildingId, string> = {
   barracks: '👥',
   market: '📦',
   guild: '🔌',
-  // Punti di raccolta (vengono mostrati solo nei rispettivi temi)
+  // Gathering points (shown only in their respective themes).
   arena: '⚔️',
   tavern: '🍺',
   garden: '🌿',
@@ -52,10 +55,11 @@ const BUILDING_EMOJI: Record<BuildingId, string> = {
   medbay: '⚕️',
 };
 
-/** Panel wybranej sesji: karta pionka (stan, statystyki, zadanie, ostatnie akcje) + transkrypt. */
+/** Selected session panel: pawn card (state, stats, task, recent actions) + transcript. */
 export function SidePanel() {
   const selected = useWorld((s) => s.selectedSessionId);
   const hero = useWorld((s) => (selected ? s.heroes[selected] : undefined));
+  const isSdk = useWorld((s) => (selected ? !!s.sdkSessionIds[selected] : false));
   const peonsMap = useWorld((s) => s.peons);
   const missionsMap = useWorld((s) => s.missions);
   const lines = useWorld((s) => (selected ? s.transcripts[selected] ?? NO_LINES : NO_LINES));
@@ -64,16 +68,16 @@ export function SidePanel() {
   const setAutofollow = useWorld((s) => s.setAutofollow);
   const themeId = useSettings((s) => s.themeId);
   const lang = useSettings((s) => s.lang);
-  const mapping = useMapping((s) => s.mapping); // re-render gdy user przemapuje narzędzia
+  const mapping = useMapping((s) => s.mapping); // re-render when user remaps tools
   const models = useModels((s) => s.models);
   const t = useUi();
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Lekki tick — odświeża czasy względne ("aktywny 12 min", "5m temu"), gdy nic
-  // innego nie zmienia stanu (sesja bezczynna). Reszta i tak re-renderuje przy zdarzeniach.
+  // Lightweight tick: refreshes relative times ("active 12 min", "5m ago") when
+  // nothing else changes state (idle session). Events re-render everything else anyway.
   const [, setTick] = useState(0);
   useEffect(() => {
-    if (!selected) return; // przy zamkniętym panelu nie tykaj (brak zbędnych re-renderów)
+    if (!selected) return; // with panel closed, do nothing (no unnecessary re-renders)
     const id = setInterval(() => setTick((n) => n + 1), 10_000);
     return () => clearInterval(id);
   }, [selected]);
@@ -82,7 +86,7 @@ export function SidePanel() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [lines.length, selected]);
 
-  // Derywacje z całych map — memo, by tick (co 10s) nie przeliczał ich bez zmiany danych.
+  // Derivations from whole maps: memoized so the 10s tick does not recompute them without data changes.
   const helpers = useMemo(
     () => Object.values(peonsMap).filter((p) => p.parentSessionId === selected).length,
     [peonsMap, selected],
@@ -97,7 +101,7 @@ export function SidePanel() {
   const now = Date.now();
   const st = STATE_STYLE[hero.state];
   const job = hero.state === 'working' ? hero.toolDetail ?? hero.currentTool : undefined;
-  // Destynacja: dokąd jednostka zmierza na mapie (praca → budynek narzędzia; powrót → Twierdza).
+  // Destination: where the unit is heading on the map (work -> tool building; return -> Citadel).
   const destId: BuildingId | undefined =
     hero.state === 'working'
       ? resolveBuilding(hero.currentTool, hero.toolDetail, mapping)
@@ -172,6 +176,8 @@ export function SidePanel() {
         </span>
       </div>
 
+      <PendingQuestionCard sessionId={selected} />
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
         <StatTile label={t.produced} value={formatK(hero.tokens.output)} />
         <StatTile label={t.read} value={formatK(hero.tokens.input)} />
@@ -182,7 +188,7 @@ export function SidePanel() {
       {typeof hero.contextTokens === 'number' && (
         <ContextBar
           tokens={hero.contextTokens}
-          windowSize={resolveContextWindow(hero.model, models)}
+          windowSize={hero.contextWindowTokens ?? resolveContextWindow(hero.model, models)}
           label={t.context}
         />
       )}
@@ -223,6 +229,7 @@ export function SidePanel() {
           </div>
         ))}
       </div>
+      {isSdk && selected && <SdkSessionFooter sessionId={selected} />}
     </div>
   );
 }
@@ -235,7 +242,19 @@ function Label({ text }: { text: string }) {
   );
 }
 
-/** Czas trwania od startu sesji, np. "12 min" / "1h 5m". */
+function SdkSessionFooter({ sessionId }: { sessionId: string }) {
+  const t = useUi();
+  const [text, setText] = useState('');
+  return (
+    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+      <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t.pqSendPlaceholder} style={{ flex: 1 }} />
+      <button className="ghost" disabled={!text.trim()} onClick={() => { void sendSessionMessage(sessionId, text); setText(''); }}>{t.pqSend}</button>
+      <button className="ghost" onClick={() => void stopSession(sessionId)}>{t.pqStop}</button>
+    </div>
+  );
+}
+
+/** Duration since session start, for example "12 min" / "1h 5m". */
 function fmtDuration(startedAt: string, now: number): string {
   const m = (now - Date.parse(startedAt)) / 60_000;
   if (!isFinite(m) || m < 1) return '<1 min';
@@ -243,4 +262,3 @@ function fmtDuration(startedAt: string, now: number): string {
   const h = Math.floor(m / 60);
   return `${h}h ${Math.round(m % 60)}m`;
 }
-

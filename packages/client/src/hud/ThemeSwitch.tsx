@@ -2,10 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import { useSettings, type Lang } from '../settings';
 import { useUi } from '../i18n';
 import { HooksPanel } from './HooksPanel';
+import { PanelControlToggle } from './PanelControlToggle';
 import { SettingsPanel } from './SettingsPanel';
+import { LaunchAgentButton } from './LaunchAgentButton';
+import { ProjectSwitcher } from './ProjectSwitcher';
 import { useMenuKeyboard } from './useMenuKeyboard';
 
-/** Lista języków do dropdownu: endonimy (nazwa w danym języku) + flaga + krótki kod. */
+/** Language dropdown list: endonyms (name in that language) + flag + short code. */
 const LANGS: { id: Lang; label: string; flag: string }[] = [
   { id: 'en', label: 'English', flag: '🇬🇧' },
   { id: 'pl', label: 'Polski', flag: '🇵🇱' },
@@ -20,6 +23,8 @@ export function ThemeSwitch() {
   const setLang = useSettings((s) => s.setLang);
   const flipped = useSettings((s) => s.flipped);
   const setFlipped = useSettings((s) => s.setFlipped);
+  const barCollapsed = useSettings((s) => s.barCollapsed);
+  const setBarCollapsed = useSettings((s) => s.setBarCollapsed);
   const t = useUi();
 
   const [langOpen, setLangOpen] = useState(false);
@@ -29,7 +34,7 @@ export function ThemeSwitch() {
   const langTriggerRef = useRef<HTMLButtonElement>(null);
   const langMenuRef = useRef<HTMLDivElement>(null);
 
-  // Zamknij menu języka po kliknięciu poza nim lub naciśnięciu Esc (jak w ProjectSwitcher).
+  // Close the language menu after outside click or Esc (as in ProjectSwitcher).
   useEffect(() => {
     if (!langOpen) return;
     const onDown = (e: MouseEvent) => {
@@ -55,11 +60,28 @@ export function ThemeSwitch() {
     if (langRef.current?.contains(document.activeElement)) langTriggerRef.current?.focus();
   };
 
-  // Nawigacja klawiaturą w rozwiniętym menu języka (strzałki/Home/End + focus po otwarciu).
+  // Keyboard navigation in the expanded language menu (arrows/Home/End + focus after opening).
   useMenuKeyboard(langOpen, langMenuRef);
 
   return (
     <div className="hud-panel" style={{ top: 12, left: 12, padding: 6, display: 'flex', gap: 6 }}>
+      {/* Collapse the WHOLE toolbar to a compact handle so it never stretches the
+          top edge; state is remembered across reloads (default collapsed). */}
+      <button
+        className="ghost"
+        onClick={() => setBarCollapsed(!barCollapsed)}
+        title={t.agentControls}
+        aria-label={t.agentControls}
+        aria-expanded={!barCollapsed}
+        style={{ display: 'inline-flex', alignItems: 'center' }}
+      >
+        {barCollapsed ? '☰' : '◂'}
+      </button>
+      {/* Kingdom switcher stays visible even when the bar is collapsed (it carries
+          the live session summary); merged here so it never overlaps the toolbar. */}
+      <ProjectSwitcher inline />
+      {!barCollapsed && (
+        <>
       <button
         className="ghost"
         style={themeId === 'fantasy' ? { background: '#3b3b35' } : undefined}
@@ -82,8 +104,10 @@ export function ThemeSwitch() {
         🌃 {t.cyberpunk}
       </button>
       <HooksPanel />
+      <PanelControlToggle />
+      <LaunchAgentButton />
 
-      {/* ── Język jako dropdown (zamiast cyklicznego przycisku) ── */}
+      {/* Language as dropdown instead of a cycling button. */}
       <div ref={langRef} style={{ position: 'relative' }}>
         <button
           ref={langTriggerRef}
@@ -139,7 +163,7 @@ export function ThemeSwitch() {
         ⇄
       </button>
 
-      {/* ── Trybik: ustawienia (reakcje budynków) ── */}
+      {/* Gear: settings (building reactions). */}
       <button
         ref={gearRef}
         className="ghost"
@@ -152,11 +176,13 @@ export function ThemeSwitch() {
       >
         ⚙
       </button>
+        </>
+      )}
       {settingsOpen && (
         <SettingsPanel
           onClose={() => {
             setSettingsOpen(false);
-            gearRef.current?.focus(); // przywróć fokus na trybik (a11y)
+            gearRef.current?.focus(); // restore focus to the gear (a11y)
           }}
         />
       )}

@@ -7,11 +7,11 @@ const tiles = new Map<string, Texture>(); // TerrainId -> tekstura diamentu
 let loaded = false;
 let currentTheme = '';
 
-// Zmiękczanie styków biomów (look — łatwy do strojenia). 0 wyłącza efekt.
-const FEATHER_ALPHA = 0.45; // krycie nakładki tekstury sąsiada
-const FEATHER_SCALE = 0.7; // rozmiar nakładki względem kafla
-const FEATHER_OFFSET = 0.28; // przesunięcie nakładki ku sąsiadowi (ułamek kafla)
-const BOUNDARY_SHADE = 0.94; // delikatny kontur — komórka graniczna nieco ciemniejsza
+// Biome seam softening (look, easy to tune). 0 disables the effect.
+const FEATHER_ALPHA = 0.45; // neighbor texture overlay opacity
+const FEATHER_SCALE = 0.7; // overlay size relative to tile
+const FEATHER_OFFSET = 0.28; // overlay shift toward neighbor (fraction of tile)
+const BOUNDARY_SHADE = 0.94; // subtle outline: boundary cell slightly darker
 
 /** Deterministyczny tint jitter (±5%) jak dotychczas — rozbija jednolite pola. */
 function jitter01(gx: number, gy: number): number {
@@ -23,10 +23,10 @@ function grayTint(factor: number): number {
   return (v << 16) | (v << 8) | v;
 }
 
-/** Ładuje kafle izometryczne terenu (jeden diament per TerrainId). Brak → drawTerrain fallback. */
+/** Loads isometric terrain tiles (one diamond per TerrainId). Missing -> drawTerrain fallback. */
 export async function loadIsoTiles(themeId: string): Promise<void> {
-  // Wyrzuć z cache Pixi stare kafle poprzedniego tematu — inaczej Pixi może
-  // odpowiedzieć starą teksturą po zmianie motywu i nigdy nie wczytać nowej.
+  // Evict old previous-theme tiles from the Pixi cache; otherwise Pixi may
+  // return the old texture after a theme change and never load the new one.
   if (currentTheme && currentTheme !== themeId) {
     for (const id of tiles.keys()) {
       try { await Assets.unload(`/assets/${currentTheme}/tilemap-iso/${id}.png`); } catch { /* ignore */ }
@@ -69,28 +69,29 @@ export function hasIsoTiles(): boolean {
 
 /**
  * Teren izometryczny: per-cel diament (Sprite), anchor (0.5,0.5) w toScreen(gx,gy).
- * Rysowane w kolejności głębokości (gx+gy), by cienki bok kafla z tyłu nie nachodził
- * na przód. Płaska warstwa tła (niesortowana) — dodawana pod unitLayer w view.ts.
+ * Drawn in depth order (gx+gy), so a tile's thin back side does not overlap the
+ * front. Flat background layer (unsorted), added below unitLayer in view.ts.
  *
- * Współpraca tekstur (Zadanie 2): na styku dwóch biomów komórka dostaje (a) lekki
- * kontur (przyciemnienie) i (b) "feather" — nakładkę tekstury sąsiada przesuniętą
- * ku wspólnej krawędzi. To proceduralna namiastka kafli przejściowych (np. brzeg
- * wody) bez generowania nowych assetów. Tint jitter (±5%) jak dotąd.
+ * Texture cooperation (Task 2): where two biomes meet, the cell gets (a) a light
+ * outline (darkening) and (b) "feather", a neighbor texture overlay shifted
+ * toward the shared edge. This is a procedural stand-in for transition tiles
+ * (for example water edge) without generating new assets. Tint jitter (+/-5%)
+ * stays as before.
  */
 export function buildIsoTilemap(theme: ThemeDef, worldRect?: WorldRect): Container {
   const root = new Container();
-  const map = buildTerrainMap(theme); // siatka rozgrywki (feather + kontur tylko tutaj)
-  const sample = terrainSampler(theme); // biom „dzikiej ziemi" poza siatką
+  const map = buildTerrainMap(theme); // gameplay grid (feather + outline only here)
+  const sample = terrainSampler(theme); // "wild land" biome outside the grid
   const { w, h } = theme.grid;
 
-  // Wymiary kafla z projekcji (toScreen(1,0) względem toScreen(0,0) = (tileW/2, tileH/2)).
+  // Tile dimensions from projection (toScreen(1,0) relative to toScreen(0,0) = (tileW/2, tileH/2)).
   const p00 = theme.projection.toScreen(0, 0);
   const p10 = theme.projection.toScreen(1, 0);
   const tileW = (p10.x - p00.x) * 2;
   const tileH = (p10.y - p00.y) * 2;
 
-  // Zakres komórek: cały prostokąt świata (diamentowy zakres indeksów) lub —
-  // bez prostokąta — sama siatka rozgrywki (zachowanie jak dawniej).
+  // Cell range: the whole world rectangle (diamond-shaped index range) or,
+  // without a rectangle, the gameplay grid itself (old behavior).
   const cells: { gx: number; gy: number }[] = [];
   if (worldRect) {
     const r = isoFillRange(tileW, tileH, worldRect);
@@ -98,12 +99,12 @@ export function buildIsoTilemap(theme: ThemeDef, worldRect?: WorldRect): Contain
   } else {
     for (let gy = 0; gy < h; gy++) for (let gx = 0; gx < w; gx++) cells.push({ gx, gy });
   }
-  cells.sort((a, b) => a.gx + a.gy - (b.gx + b.gy)); // tył → przód
+  cells.sort((a, b) => a.gx + a.gy - (b.gx + b.gy)); // back -> front
 
   for (const { gx, gy } of cells) {
     const p = theme.projection.toScreen(gx, gy);
-    // Culling: pomiń komórki, których diament nie dotyka prostokąta świata
-    // (isoFillRange daje diament opisany na prostokącie → ~2× nadmiar bez tego).
+    // Culling: skip cells whose diamond does not touch the world rectangle
+    // (isoFillRange gives a diamond circumscribed around the rectangle -> about 2x excess without this).
     if (worldRect) {
       if (p.x + tileW / 2 < worldRect.minX || p.x - tileW / 2 > worldRect.maxX) continue;
       if (p.y + tileH / 2 < worldRect.minY || p.y - tileH / 2 > worldRect.maxY) continue;
@@ -116,12 +117,12 @@ export function buildIsoTilemap(theme: ThemeDef, worldRect?: WorldRect): Contain
 
     const s = new Sprite(tex);
     s.anchor.set(0.5, 0.5);
-    s.scale.set(theme.tile / tex.width); // diament 32px → szerokość kafla (tileW=64)
+    s.scale.set(theme.tile / tex.width); // 32px diamond -> tile width (tileW=64)
     s.position.set(p.x, p.y);
     s.tint = grayTint(j * (edges.length ? BOUNDARY_SHADE : 1));
     root.addChild(s);
 
-    // feather: nakładka tekstury każdego różniącego się sąsiada, biased ku jego krawędzi
+    // feather: overlay each different neighbor's texture, biased toward its edge
     if (FEATHER_ALPHA > 0) {
       for (const e of edges) {
         const ntex = tiles.get(e.biome);

@@ -16,14 +16,14 @@ describe('readAgents', () => {
     await fs.rm(wd, { recursive: true, force: true });
   });
 
-  it('czyta agentów z .claude/agents (projekt) i frontmatter', async () => {
+  it('reads agents from .claude/agents (project) and frontmatter', async () => {
     await fs.mkdir(path.join(wd, '.claude', 'agents'), { recursive: true });
     await fs.writeFile(path.join(wd, '.claude', 'agents', 'reviewer.md'), `---\nname: code-reviewer\ndescription: Recenzuje\n---\n# x`);
     const agents = await readAgents({ workingDir: wd, homeDir: home });
     expect(agents).toEqual([{ name: 'code-reviewer', description: 'Recenzuje', origin: 'project' }]);
   });
 
-  it('fallback nazwy = plik bez .md gdy brak frontmattera', async () => {
+  it('name fallback = file without .md when frontmatter is missing', async () => {
     await fs.mkdir(path.join(home, '.claude', 'agents'), { recursive: true });
     await fs.writeFile(path.join(home, '.claude', 'agents', 'planner.md'), `# bez frontmattera`);
     const agents = await readAgents({ workingDir: wd, homeDir: home });

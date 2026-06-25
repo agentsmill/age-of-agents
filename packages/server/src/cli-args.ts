@@ -1,9 +1,9 @@
 import { SERVER_PORT } from '@agent-citadel/shared';
 
 /**
- * Tryb otwierania przeglądarki:
- *  - 'auto'   — domyślnie: otwórz, jeśli uruchomienie jest interaktywne (nie CI, jest TTY)
- *  - 'always' — wymuś otwarcie (flaga --open), nawet w CI / bez TTY
+ * Browser opening mode:
+ *  - 'auto'   default: open if launch is interactive (not CI, has TTY)
+ *  - 'always' force opening (--open flag), even in CI / without TTY
  *  - 'never'  — nie otwieraj (flaga --no-open)
  */
 export type OpenMode = 'auto' | 'always' | 'never';
@@ -42,15 +42,29 @@ export function parseArgs(argv: string[]): CliOptions {
 }
 
 /**
- * Czy faktycznie otworzyć przeglądarkę. Czysta decyzja (bez efektów ubocznych) —
- * środowisko (CI / TTY) wstrzykiwane, by była łatwo testowalna.
+ * Whether to actually open the browser. Pure decision (no side effects):
+ * environment (CI / TTY) is injected so this is easy to test.
  *
- * 'auto' otwiera tylko interaktywnie: pomija CI i wyjście nie-terminalowe
- * (skrypt/pipe/headless), żeby nie zaskakiwać automatów. --open wymusza,
+ * 'auto' opens only interactively: skips CI and non-terminal output
+ * (script/pipe/headless), so automation is not surprised. --open forces it.
  * --no-open blokuje.
  */
 export function shouldOpenBrowser(mode: OpenMode, env: { ci: boolean; isTTY: boolean }): boolean {
   if (mode === 'never') return false;
   if (mode === 'always') return true;
   return !env.ci && env.isTTY;
+}
+
+export type Subcommand = 'serve' | 'local' | 'local-proxy';
+
+/**
+ * Splits a leading subcommand off argv. A token is a subcommand only if it is
+ * the first arg and not a flag, so existing flag-only invocations keep working.
+ */
+export function parseSubcommand(argv: string[]): { command: Subcommand; rest: string[] } {
+  const first = argv[0];
+  if (first === 'local' || first === 'local-proxy') {
+    return { command: first, rest: argv.slice(1) };
+  }
+  return { command: 'serve', rest: argv };
 }

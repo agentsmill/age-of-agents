@@ -8,7 +8,7 @@ import { useSettings } from '../settings';
 const W = 180;
 const H = 120;
 
-/** Minimapa: budynki + jednostki, klik przesuwa kamerę. */
+/** Minimap: buildings + units; click moves the camera. */
 export function Minimap() {
   const themeId = useSettings((s) => s.themeId);
   const canvasRef = useRef<HTMLCanvasElement>(null);

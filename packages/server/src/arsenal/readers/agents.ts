@@ -19,7 +19,7 @@ async function readDir(agentsDir: string, origin: ArsenalOrigin): Promise<Arsena
       const fm = parseFrontmatter(await fs.readFile(path.join(agentsDir, e.name), 'utf8'));
       out.push({ name: fm.name ?? e.name.replace(/\.md$/, ''), description: fm.description, origin });
     } catch {
-      // pomiń
+      // skip
     }
   }
   return out;

@@ -4,7 +4,7 @@ export type Lang = 'en' | 'pl' | 'it';
 
 interface SettingsStore {
   themeId: string;
-  /** Język UI. Domyślnie angielski; polski, włoski jako alternatywy. */
+  /** UI language. Defaults to English; Polish and Italian are alternatives. */
   lang: Lang;
   flipped: boolean;
   /** Czy panel misji (MissionLog) jest zwinięty do paska tytułu. */
@@ -32,7 +32,7 @@ function isValidLang(value: string | null): value is Lang {
 
 export const useSettings = create<SettingsStore>((set) => ({
   themeId: localStorage.getItem(STORAGE_KEY) ?? 'fantasy',
-  lang: isValidLang(localStorage.getItem(LANG_KEY)) ? (localStorage.getItem(LANG_KEY) as Lang) : 'en', // domyślnie EN
+  lang: isValidLang(localStorage.getItem(LANG_KEY)) ? (localStorage.getItem(LANG_KEY) as Lang) : 'en', // default EN
   flipped: localStorage.getItem(FLIP_KEY) === '1',
   missionsCollapsed: localStorage.getItem(MISSIONS_COLLAPSED_KEY) === '1',
   soundEnabled: localStorage.getItem(SOUND_KEY) === '1',

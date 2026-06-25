@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Packer map-objectów PixelLab (budynki/dekoracje) → sprite'y Pixi (1 klatka "main").
- * Przycina każdy PNG do widocznego bounding-boxa (usuwa przezroczysty padding),
- * dzięki czemu kotwica w stopie (0.5,1) trafia w podstawę obiektu.
+ * PixelLab map-object packer (buildings/decorations) -> Pixi sprites (one "main" frame).
+ * Trims each PNG to the visible bounding box (removes transparent padding),
+ * so the foot anchor (0.5,1) lands on the object's base.
  *
- * Wejście:  downloads/objects/<subdir>/<id>.png
- * Wyjście:  packages/client/public/assets/<theme>/<subdir>/<id>.{png,json} + index.json
- * Użycie:   node scripts/pixellab/pack-objects.mjs <theme> <subdir>   (subdir: buildings|decorations)
+ * Input:  downloads/objects/<subdir>/<id>.png
+ * Output: packages/client/public/assets/<theme>/<subdir>/<id>.{png,json} + index.json
+ * Usage:  node scripts/pixellab/pack-objects.mjs <theme> <subdir>   (subdir: buildings|decorations)
  */
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
@@ -16,14 +16,15 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const theme = process.argv[2] ?? 'fantasy';
 const subdir = process.argv[3] ?? 'buildings';
-const raw = process.argv[4] === 'raw'; // raw = bez bg-removal/trim (kafle terenu izo: zachowaj pełny diament)
+const raw = process.argv[4] === 'raw'; // raw = no bg-removal/trim (iso terrain tiles: keep the full diamond)
 const inDir = join(root, `downloads/objects/${theme}/${subdir}`);
 const outDir = join(root, `packages/client/public/assets/${theme}/${subdir}`);
 
 /**
- * Usuwa jednolite tło połączone z brzegiem (flood-fill). PixelLab zwraca obiekty
- * z nieprzezroczystym tłem-kluczem — wycinamy je od krawędzi, zostawiając ten sam
- * kolor WEWNĄTRZ obiektu (np. kamień), bo outline obiektu zatrzymuje wypełnienie.
+ * Removes a uniform background connected to the image edge (flood-fill). PixelLab
+ * returns objects with an opaque key background; trim it from the edges while
+ * preserving the same color INSIDE the object (for example stone), because the
+ * object's outline stops the fill.
  */
 function removeBackground(png, tol = 36) {
   const { width: W, height: H, data } = png;
@@ -92,4 +93,4 @@ for (const f of readdirSync(inDir).filter((f) => f.endsWith('.png'))) {
   ids.push(id);
 }
 writeFileSync(join(outDir, 'index.json'), JSON.stringify({ ids }, null, 2));
-console.log(`${subdir}: ${ids.length} obiektów →`, ids.join(', '));
+console.log(`${subdir}: ${ids.length} objects ->`, ids.join(', '));

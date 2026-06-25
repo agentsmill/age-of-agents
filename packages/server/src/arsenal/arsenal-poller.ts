@@ -10,7 +10,7 @@ const POLL_INTERVAL_MS = 4000;
 
 interface CacheEntry { fingerprint: string; lastSeenMs: number; }
 
-/** Fingerprint BEZ refreshedAt — emitujemy tylko gdy realnie się zmieni. */
+/** Fingerprint WITHOUT refreshedAt: emit only when it really changes. */
 function fingerprint(a: ProjectArsenal): string {
   return [
     a.activeSessions,
@@ -22,7 +22,7 @@ function fingerprint(a: ProjectArsenal): string {
 }
 
 /**
- * Czyta statyczny „Arsenał" (skille/MCP/hooki/subagenci) z każdego aktywnego projektu
+ * Reads static "Arsenal" (skills/MCP/hooks/subagents) from each active project.
  * i emituje `arsenal-updated`.
  */
 export class ArsenalPoller {
@@ -45,7 +45,7 @@ export class ArsenalPoller {
     this.timer = undefined;
   }
 
-  /** Jeden obieg po wszystkich aktywnych projektach (publiczne dla testów). */
+  /** One pass over all active projects (public for tests). */
   async refreshOnce(): Promise<void> {
     const projectDirs = this.world.activeProjectDirs();
     for (const dir of projectDirs) {
@@ -55,7 +55,7 @@ export class ArsenalPoller {
         console.error('[arsenal] refresh failed for', dir, err);
       }
     }
-    // GC: usuń cache katalogów bez aktywnych sesji po 60s.
+    // GC: remove cache for directories without active sessions after 60s.
     const active = new Set(projectDirs);
     for (const dir of [...this.cache.keys()]) {
       if (!active.has(dir) && Date.now() - (this.cache.get(dir)?.lastSeenMs ?? 0) > 60_000) {
@@ -66,7 +66,7 @@ export class ArsenalPoller {
 
   private async refreshProject(projectDir: string): Promise<void> {
     const heroes = this.world.heroesByProject(projectDir);
-    // Pliki czytamy z REALNEGO cwd bohatera (workingDir), fallback na projectDir.
+    // Read files from the hero's REAL cwd (workingDir), fallback to projectDir.
     const workingDir = heroes.find((h) => h.workingDir)?.workingDir ?? projectDir;
     const opts = { workingDir, homeDir: this.homeDir };
     const [skills, connectors, hooks, agents] = await Promise.all([

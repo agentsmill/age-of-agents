@@ -2,11 +2,11 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { DEFAULT_MAPPING } from '../src/theme/mapping';
 
 /**
- * Inicjalizacja store z cache localStorage (readCache) — kluczowa obietnica spec
- * 4.3: „świat renderuje poprawnie zanim wróci fetch". Testowalne tylko przez
- * ustawienie localStorage PRZED importem modułu (readCache biegnie przy create()),
- * stąd vi.resetModules + dynamiczny import. Izolowane w osobnym pliku, by nie
- * zaśmiecić singletona useMapping w pozostałych testach.
+ * Store initialization from localStorage cache (readCache) - a key promise of spec
+ * 4.3: "the world renders correctly before fetch returns". Testable only by
+ * setting localStorage BEFORE module import (readCache runs during create()),
+ * hence vi.resetModules + dynamic import. Isolated in a separate file to avoid
+ * polluting the useMapping singleton in other tests.
  */
 
 afterEach(() => {
@@ -27,8 +27,8 @@ function fakeStorage(initial: Record<string, string>) {
   };
 }
 
-describe('useMapping init z cache localStorage', () => {
-  it('inicjalizuje mapping z poprawnego cache', async () => {
+describe('useMapping init with localStorage cache', () => {
+  it('initializes mapping from valid cache', async () => {
     const custom = { rules: [{ kind: 'exact', tool: 'Edit', building: 'library' }], fallback: 'citadel' };
     (globalThis as { localStorage?: unknown }).localStorage = fakeStorage({
       'age-of-agents.mapping': JSON.stringify(custom),
@@ -38,14 +38,14 @@ describe('useMapping init z cache localStorage', () => {
     expect(useMapping.getState().mapping).toEqual(custom);
   });
 
-  it('uszkodzony cache → DEFAULT_MAPPING', async () => {
-    (globalThis as { localStorage?: unknown }).localStorage = fakeStorage({ 'age-of-agents.mapping': '{ zepsuty' });
+  it('broken cache -> DEFAULT_MAPPING', async () => {
+    (globalThis as { localStorage?: unknown }).localStorage = fakeStorage({ 'age-of-agents.mapping': '{ broken' });
     vi.resetModules();
     const { useMapping } = await import('../src/mapping-store');
     expect(useMapping.getState().mapping).toEqual(DEFAULT_MAPPING);
   });
 
-  it('niepoprawny config w cache → DEFAULT_MAPPING', async () => {
+  it('invalid config in cache -> DEFAULT_MAPPING', async () => {
     (globalThis as { localStorage?: unknown }).localStorage = fakeStorage({
       'age-of-agents.mapping': JSON.stringify({ rules: [], fallback: 'nope' }),
     });
@@ -54,7 +54,7 @@ describe('useMapping init z cache localStorage', () => {
     expect(useMapping.getState().mapping).toEqual(DEFAULT_MAPPING);
   });
 
-  it('brak cache → DEFAULT_MAPPING', async () => {
+  it('missing cache -> DEFAULT_MAPPING', async () => {
     (globalThis as { localStorage?: unknown }).localStorage = fakeStorage({});
     vi.resetModules();
     const { useMapping } = await import('../src/mapping-store');

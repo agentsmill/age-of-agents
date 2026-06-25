@@ -12,7 +12,7 @@ import { Unit } from './unit';
 import { getHeroSheet, getPeonSheet, loadThemeSprites } from './sprites';
 import { loadEmblems } from './emblems';
 import { sessionToArchetypeKey } from './archetype';
-import { resolveModelLive } from '../model-store';
+import { resolveModelLive, pickSpriteLive } from '../model-store';
 import { loadTilemaps, hasTilemaps, buildTilemap } from './tilemap';
 import { loadBuildingSprites, getBuildingSprite } from './building-sprites';
 import { loadDecorationSprites, getDecorationTexture } from './decoration-sprites';
@@ -22,32 +22,35 @@ import { peonSpawnScatter, heroSpawnScatter } from './scatter';
 import { buildTerrainMap } from './terrain-map';
 import { BUILDING_FX, collectActiveBuildings, type WorkerSample } from './building-fx';
 import { buildingText } from '../i18n';
-import { homeBuilding, awaitingBuilding } from './home-building';
+import { homeBuilding, awaitingBuilding, completedBuilding, recoveryBuilding } from './home-building';
 import { worldLayerTransform, worldToViewport, flipTextNodes } from './flip';
 import { getRealmAudio } from './audio';
 import { deriveCrestSpec, buildCrest } from './heraldry';
 import type { Lang } from '../settings';
+import { contextPct } from '../context-progress';
 
-/** Docelowa szerokość dekoracji w kaflach (do skalowania sprite'a). */
+/** Target decoration width in tiles (for sprite scaling). */
 const DECO_W: Record<DecoKind, number> = { tree: 1.1, rock: 0.8, bush: 0.75, flower: 0.7 };
 
 /**
- * Margines „dzikiej ziemi" (kafle poza siatką rozgrywki) dookoła planszy. Większy
- * margines przy „cover" kurczy treść ku środkowi, więc skrajne budynki (np. Kuźnia
- * w prawym-górnym rogu) wychodzą spod nachodzących paneli HUD — całą planszę widać
- * mimo otwartych paneli, dalej bez czarnych ramek (teren wypełnia rogi).
+ * "Wild land" margin (tiles outside the gameplay grid) around the board. A larger
+ * margin at "cover" shrinks content toward the center, so edge buildings (for
+ * example Forge in the top-right corner) move out from under overlapping HUD
+ * panels. The whole board remains visible with panels open, still without black
+ * borders because terrain fills the corners.
  */
 const WORLD_MARGIN_TILES = 12;
 /**
- * Dodatkowy zapas nad terenem (w kaflach) na wysokie bryły. Sprite budynku jest
- * kotwiczony u stopy (0.5, 1) i rośnie w GÓRĘ, więc szczyt np. wieży maga sięga
- * ponad górny brzeg świata liczony z kafli terenu — i przy „cover" bywa ucinany.
- * Zapas wypełnia isoFillRange trawą (nie ciemnością), opuszcza i centruje planszę.
+ * Extra headroom above the terrain (in tiles) for tall solids. A building sprite
+ * is anchored at its foot (0.5, 1) and grows UP, so the top of e.g. the mage tower
+ * extends beyond the world's top edge computed from terrain tiles and can be cut
+ * off at "cover". The headroom is filled by isoFillRange with grass (not
+ * darkness), lowering and centering the board.
  */
 const TOP_SPRITE_HEADROOM_TILES = 2;
-/** Górny limit przybliżenia (kontrolki/kółko). Dolny = „cover" liczony dynamicznie. */
+/** Upper zoom limit (controls/wheel). Lower limit = dynamically computed "cover". */
 const MAX_ZOOM = 5;
-/** Krotność skali „cover" przy focusie na jednostce (podwójny klik / autofollow). */
+/** Multiple of "cover" scale when focusing a unit (double-click / autofollow). */
 const FOCUS_ZOOM_FACTOR = 2.5;
 
 interface Particle {
@@ -59,16 +62,16 @@ interface Particle {
   gravity: number;
 }
 
-/** Emiter aktywności jednego budynku: poświata + akumulator drobinek. */
+/** Activity emitter for one building: glow + particle accumulator. */
 interface FxEmitter {
   glow: Graphics;
-  intensity: number; // 0..1, łagodne włączanie/wygaszanie
-  accum: number; // ułamek drobinki do wyemitowania
+  intensity: number; // 0..1, smooth fade in/out
+  accum: number; // fractional particle waiting to emit
   x: number;
   y: number;
 }
 
-/** Rejestr aktywnego widoku — HUD (minimapa, portrety) sięga przez niego do sceny. */
+/** Active view registry; HUD (minimap, portraits) reaches the scene through it. */
 let activeView: GameView | undefined;
 export function getGameView(): GameView | undefined {
   return activeView;
@@ -83,8 +86,8 @@ export interface UnitDot {
 }
 
 /**
- * Główny widok gry: scena Pixi + viewport, rekoncyliacja stanu świata
- * (zustand) na jednostki oraz wybór celów wg stanu/narzędzia.
+ * Main game view: Pixi scene + viewport, reconciling world state (zustand) into
+ * units and choosing targets by state/tool.
  */
 export class GameView {
   private app = new Application();
@@ -94,14 +97,16 @@ export class GameView {
   private units = new Map<string, Unit>();
   private retiring = new Map<string, { unit: Unit; deadline: number }>();
   private targets = new Map<string, string>();
-  private lastBuilding = new Map<string, BuildingId>(); // ostatni warsztat — tu jednostka „mieszka", nie w Twierdzy
-  private wanderAt = new Map<string, number>(); // elapsed następnego drobnego spaceru bezczynnego bohatera
+  private lastBuilding = new Map<string, BuildingId>(); // last workshop: the unit "lives" here, not in Citadel
+  private homeByUnit = new Map<string, BuildingId>(); // stable social/off-duty home per hero
+  private wanderAt = new Map<string, number>(); // elapsed time of next small idle-hero walk
   private worldLayer!: Container;
   private worldWidth = 0;
   private worldHeight = 0;
-  private userZoomed = false; // wheel/pinch/kontrolki — wstrzymuje auto-dopasowanie przy resize
+  private userZoomed = false; // wheel/pinch/controls: pauses auto-fit on resize
   private particles: Particle[] = [];
   private emitters = new Map<BuildingId, FxEmitter>();
+  private lastClearedAt = new Map<string, number>();
   private elapsed = 0;
   // Realm Heartbeat: scena przyciemnia/rozjaśnia się wg TEMPA tokenów wyjściowych
   // (nie zegara) — realm „oddycha". Filtr na app.stage = jeden pełnoekranowy pass
@@ -128,8 +133,8 @@ export class GameView {
   private graph: WaypointGraph;
   private unsubscribe?: () => void;
   private unsubscribeMapping?: () => void;
-  private ready = false; // app.init() rozwiązane — wolno wołać app.destroy()
-  private destroyed = false; // strażnik wyścigu init()↔destroy() (zmiana motywu w trakcie ładowania)
+  private ready = false; // app.init() resolved, app.destroy() may be called
+  private destroyed = false; // init()/destroy() race guard (theme change during load)
 
   constructor(
     private readonly theme: ThemeDef,
@@ -150,7 +155,7 @@ export class GameView {
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
     });
-    // Widok mógł zostać zniszczony (zmiana motywu) w trakcie await app.init().
+    // The view may have been destroyed (theme change) while awaiting app.init().
     this.ready = true;
     if (this.destroyed) {
       this.app.destroy(true, { children: true });
@@ -158,8 +163,8 @@ export class GameView {
     }
     host.appendChild(this.app.canvas);
 
-    // Granice świata = bbox obszaru gry + margines „dzikiej ziemi" (kafle poza
-    // siatką rozgrywki). Teren wypełni dokładnie ten prostokąt → brak czarnych rogów.
+    // World bounds = gameplay area bbox + "wild land" margin (tiles outside the
+    // gameplay grid). Terrain fills exactly this rectangle -> no black corners.
     const projection = this.theme.projection;
     const M = WORLD_MARGIN_TILES;
     const { w: gw, h: gh } = this.theme.grid;
@@ -171,9 +176,10 @@ export class GameView {
     ];
     const minX = Math.min(...corners.map((c) => c.x));
     const maxX = Math.max(...corners.map((c) => c.x));
-    // Zapas u góry na wysokie bryły (kotwica u stopy → sprite rośnie w górę).
-    // Bez tego szczyt wieży maga wystaje ponad prostokąt świata i jest ucinany przy
-    // „cover". isoFillRange wypełni ten pas trawą, więc plansza opada i centruje się.
+    // Top headroom for tall solids (foot anchor -> sprite grows upward). Without
+    // this, the mage tower top extends beyond the world rectangle and is cut off
+    // at "cover". isoFillRange fills this band with grass, so the board lowers
+    // and centers itself.
     const minY = Math.min(...corners.map((c) => c.y)) - TOP_SPRITE_HEADROOM_TILES * this.theme.tile;
     const maxY = Math.max(...corners.map((c) => c.y));
     const worldWidth = maxX - minX;
@@ -204,9 +210,9 @@ export class GameView {
     // ale deszcz Matriksa (sąsiad na stage) zostaje nietknięty czystą zielenią.
     this.viewport.filters = [this.dayNight];
 
-    // Ręczne sterowanie kamerą (zoom kółkiem, pinch, przeciągnięcie) przejmuje
-    // kontrolę → zrywa autofollow. Inaczej followSelected co klatkę cofałby
-    // pan-do-kursora przy zoomie i kleił mapę przy dragu.
+    // Manual camera control (wheel zoom, pinch, drag) takes over and breaks
+    // autofollow. Otherwise followSelected would undo pan-to-cursor on every
+    // zoom frame and stick the map during drag.
     this.viewport.on('wheel-scroll', () => {
       this.userZoomed = true;
       useWorld.getState().setAutofollow(false);
@@ -223,8 +229,8 @@ export class GameView {
       if (screenW < 50 || screenH < 50) return;
       this.matrix?.resize(screenW, screenH);
       this.viewport.resize(screenW, screenH, worldWidth, worldHeight);
-      // cover (Math.max): teren ZAWSZE wypełnia ekran — koniec letterboxa/czarnych rogów.
-      // Przybliżać można do MAX_ZOOM; oddalać nie da się poza „cover" (brak pustki).
+      // cover (Math.max): terrain ALWAYS fills the screen, ending letterbox/black corners.
+      // Zoom in up to MAX_ZOOM; cannot zoom out beyond "cover" (no empty space).
       const cover = Math.max(screenW / worldWidth, screenH / worldHeight);
       this.viewport.clampZoom({ minScale: cover, maxScale: Math.max(MAX_ZOOM, cover * 1.2) });
       if (!this.userZoomed) {
@@ -235,16 +241,16 @@ export class GameView {
     this.app.renderer.on('resize', refit);
     refit();
 
-    // Warstwa świata przesunięta tak, by współrzędne ujemne (izo) mieściły się w viewporcie.
+    // World layer shifted so negative coordinates (iso) fit in the viewport.
     const worldLayer = (this.worldLayer = new Container());
     const layout = worldLayerTransform(minX, maxX, minY, this.flipped);
     worldLayer.scale.set(layout.scaleX, layout.scaleY);
     worldLayer.position.set(layout.x, layout.y);
     this.viewport.addChild(worldLayer);
 
-    // Assety/tilesety PixelLab MUSZĄ być załadowane PRZED budową terenu/budynków/dekoracji.
-    // Inaczej hasTilemaps()/getBuildingSprite() zwracają puste → placeholdery na starcie,
-    // a przy zmianie motywu scena buduje się ze starym (jeszcze niewyczyszczonym) cache.
+    // PixelLab assets/tilesets MUST be loaded BEFORE building terrain/buildings/decorations.
+    // Otherwise hasTilemaps()/getBuildingSprite() return empty -> placeholders at startup,
+    // and on theme change the scene builds from the old cache before it is cleared.
     await Promise.all([
       loadThemeSprites(this.theme.id),
       loadEmblems(), // herby providerów — theme-agnostic, idempotentne
@@ -252,10 +258,10 @@ export class GameView {
       loadDecorationSprites(this.theme.id),
       this.theme.style === 'topdown' ? loadTilemaps(this.theme.id) : loadIsoTiles(this.theme.id),
     ]);
-    if (this.destroyed) return; // zniszczony w trakcie ładowania assetów — nie buduj sceny
+    if (this.destroyed) return; // destroyed while loading assets: do not build the scene
 
     if (this.theme.style === 'topdown' && hasTilemaps()) {
-      worldLayer.addChild(buildTilemap(this.theme)); // niesortowana warstwa tła pod unitLayer
+      worldLayer.addChild(buildTilemap(this.theme)); // unsorted background layer below unitLayer
     } else if (this.theme.style === 'iso' && hasIsoTiles()) {
       worldLayer.addChild(buildIsoTilemap(this.theme, worldRect));
     } else {
@@ -285,8 +291,8 @@ export class GameView {
       this.unitLayer.addChild(node);
     }
 
-    // Dekoracje: kwiaty/krzaki płasko pod jednostkami (worldLayer, przed unitLayer),
-    // drzewa/skały zasłaniające w unitLayer z głębokością (jak budynki/jednostki).
+    // Decorations: flowers/bushes are flat under units (worldLayer before unitLayer);
+    // trees/rocks occlude in unitLayer with depth (like buildings/units).
     if (this.theme.style === 'topdown' || this.theme.style === 'iso') {
       const terrain = buildTerrainMap(this.theme);
       for (const p of scatterDecorations(this.theme, terrain)) {
@@ -358,7 +364,7 @@ export class GameView {
     if (this.ready) this.app.destroy(true, { children: true }); // app.init() musiało się rozwiązać
   }
 
-  /** Wycentruj kamerę na pozycji siatki (klik w minimapę / portret). */
+  /** Center the camera on a grid position (minimap / portrait click). */
   centerOn(gx: number, gy: number): void {
     const { x, y } = this.theme.projection.toScreen(gx, gy);
     this.viewport.animate({
@@ -373,16 +379,16 @@ export class GameView {
     if (unit) this.centerOn(unit.gx, unit.gy);
   }
 
-  /** Wycentruj i przybliż kamerę na jednostce (podwójny klik portretu / włączenie autofollow). */
+  /** Center and zoom the camera on a unit (portrait double-click / autofollow enable). */
   focusOnUnit(id: string): void {
     const unit = this.units.get(id);
     if (!unit) return;
     const cover = this.coverScale();
     const max = Math.max(MAX_ZOOM, cover * 1.2);
     const target = Math.min(max, Math.max(cover, cover * FOCUS_ZOOM_FACTOR));
-    this.userZoomed = true; // jak zoomBy — refit() przy resize nie cofnie zoomu focusa
-    // Gdy autofollow trzyma TĘ jednostkę, followSelected co klatkę owns pozycję —
-    // animujemy więc tylko skalę, by nie rywalizować o pozycję (dwa tickery → jitter).
+    this.userZoomed = true; // like zoomBy: refit() on resize will not undo focus zoom
+    // When autofollow owns THIS unit, followSelected owns position every frame;
+    // animate only scale to avoid competing over position (two tickers -> jitter).
     const st = useWorld.getState();
     if (st.autofollow && st.selectedSessionId === id) {
       this.viewport.animate({ scale: target, time: 350, ease: 'easeInOutSine' });
@@ -397,7 +403,7 @@ export class GameView {
     });
   }
 
-  /** Gdy autofollow włączony: trzymaj kamerę na wybranej jednostce (zoom bez zmian). */
+  /** When autofollow is enabled: keep camera on the selected unit (zoom unchanged). */
   private followSelected(id: string): void {
     const unit = this.units.get(id);
     if (!unit) return;
@@ -419,7 +425,7 @@ export class GameView {
     );
   }
 
-  /** Mnożnik zoomu (kontrolki HUD +/−). Trzymany w granicach clampZoom (cover … MAX_ZOOM). */
+  /** Zoom multiplier (HUD +/- controls). Kept within clampZoom (cover ... MAX_ZOOM). */
   zoomBy(factor: number): void {
     const cover = this.coverScale();
     const max = Math.max(MAX_ZOOM, cover * 1.2);
@@ -428,7 +434,7 @@ export class GameView {
     this.viewport.animate({ scale: target, time: 160, ease: 'easeInOutSine' });
   }
 
-  /** Reset kamery: maksymalne oddalenie (cover) + wycentrowanie na świecie. */
+  /** Camera reset: maximum zoom-out (cover) + centered on the world. */
   resetView(): void {
     this.userZoomed = false;
     this.viewport.animate({
@@ -439,14 +445,14 @@ export class GameView {
     });
   }
 
-  /** Skala „cover" — teren wypełnia ekran (dolna granica zoomu). */
+  /** "Cover" scale: terrain fills the screen (lower zoom bound). */
   private coverScale(): number {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
     return Math.max(sw / this.worldWidth, sh / this.worldHeight);
   }
 
-  /** Pozycje jednostek do minimapy. */
+  /** Unit positions for the minimap. */
   unitDots(): UnitDot[] {
     return [...this.units.values()].map((u) => ({
       id: u.id,
@@ -519,8 +525,8 @@ export class GameView {
     missions: Record<string, MissionSnapshot> = {},
     projectFilter?: string,
   ): void {
-    // Filtruj bohaterów i peonów po wybranym projekcie (miasto).
-    // Peony mają parentSessionId — kierujemy się projektem rodzica.
+    // Filter heroes and peons by selected project (city).
+    // Peons have parentSessionId; use the parent's project.
     const heroList = projectFilter
       ? Object.values(heroes).filter((h) => h.projectDir === projectFilter)
       : Object.values(heroes);
@@ -528,11 +534,11 @@ export class GameView {
     const peonList = projectFilter
       ? Object.values(peons).filter((p) => projectHeroIds.has(p.parentSessionId))
       : Object.values(peons);
-    // Dalej rysujemy WSZYSTKIE budynki, dekoracje itd. — filtr dotyczy
-    // tylko jednostek (kto jest w tej chwili widoczny).
+    // Still draw ALL buildings, decorations, etc.; the filter applies only to
+    // units (who is currently visible).
     const seen = new Set<string>();
 
-    // Fajerwerki przy przejściu misji active -> completed.
+    // Fireworks on mission transition active -> completed.
     for (const mission of Object.values(missions)) {
       const prev = this.missionStatus.get(mission.id);
       if (mission.status === 'completed' && prev === 'active') {
@@ -550,12 +556,11 @@ export class GameView {
       seen.add(hero.sessionId);
       let unit = this.units.get(hero.sessionId);
       if (!unit) {
-        // La piazza della cittadella si intasa se ogni nuova sessione spawna
-        // sulla sua porta. Le nuove sessioni di uno stesso progetto vanno invece
-        // a un "punto di raccolta" coerente con il tema (arena/tavern/garden
-        // per fantasy; holodeck/mess/hydroponics per sci-fi), scelto da un hash
-        // stabile del nome del progetto. La citadella resta la destinazione
-        // per le sessioni senza progetto riconoscibile.
+        // The citadel plaza clogs up if every new session spawns at its door.
+        // New sessions from the same project instead go to a theme-appropriate
+        // gathering point (arena/tavern/garden for fantasy; holodeck/mess/
+        // hydroponics for sci-fi), chosen by a stable hash of the project name.
+        // Citadel remains the destination for sessions without a recognizable project.
         const homeId = homeBuilding(this.theme, hero);
         const home = this.building(homeId);
         const o = heroSpawnScatter(hero.sessionId);
@@ -568,11 +573,11 @@ export class GameView {
         unit.container.on('pointertap', () => useWorld.getState().select(sessionId));
         this.units.set(hero.sessionId, unit);
         this.unitLayer.addChild(unit.container);
+        // Remember the social home separately from the last work building.
         if (this.flipped) flipTextNodes(unit.container);
-        // Zapamiętaj budynek „domowy" — w przeciwnym razie idle/thinking
-        // bohaterowie wracają do Twierdzy (fallback w steer/wanderIdle) i stoi
-        // ich w piazza. Z domem pamiętanym wracają pod właściwy punkt zbiórki.
+        this.homeByUnit.set(hero.sessionId, homeId);
         this.lastBuilding.set(hero.sessionId, homeId);
+        this.lastClearedAt.set(hero.sessionId, hero.clearedAt ?? 0);
       }
       unit.setName(clipName(hero.title));
       unit.setState(hero.state, hero.state === 'working' ? hero.toolDetail ?? hero.currentTool : undefined);
@@ -585,15 +590,20 @@ export class GameView {
       const ctxWin = resolveModelLive(hero.model).contextWindow;
       unit.setContextPressure(!!hero.contextTokens && hero.contextTokens / ctxWin >= 0.8);
       this.steer(unit, hero.state, hero.currentTool, hero.toolDetail, hero.teamColor);
+      const cleared = hero.clearedAt ?? 0;
+      if (cleared !== (this.lastClearedAt.get(hero.sessionId) ?? 0)) {
+        this.lastClearedAt.set(hero.sessionId, cleared);
+        this.smiteOnClear(unit);
+      }
     }
 
     for (const peon of peonList) {
       seen.add(peon.agentId);
       let unit = this.units.get(peon.agentId);
       if (!unit) {
-        // Minioni rekrutowani z Hangaru (Koszar): wychodzą ROZSIANI wokół drzwi
-        // (per-peon jitter), nie z jednego punktu — inaczej 8 sprite'ów stoi na sobie
-        // i widać „2 zamiast 8" (krótkożyciowi peoni nie zdążą się rozejść).
+        // Minions recruited from Hangar (Barracks): they exit SCATTERED around
+        // the door (per-peon jitter), not from one point; otherwise 8 sprites
+        // overlap and look like "2 instead of 8" (short-lived peons do not spread out).
         const door = this.building('barracks').door;
         const o = peonSpawnScatter(peon.agentId);
         const start = { gx: door.gx + o.dx, gy: door.gy + o.dy };
@@ -626,7 +636,7 @@ export class GameView {
     }
   }
 
-  /** Peon kończy służbę: wraca do rodzica (lub twierdzy) ze skrzynką i znika. */
+  /** Peon finishes service: returns to parent (or citadel) with a crate and disappears. */
   private retirePeon(unit: Unit): void {
     unit.setCrate(true);
     unit.setState('returning');
@@ -651,7 +661,7 @@ export class GameView {
     }
   }
 
-  /** Prosty wybuch cząsteczek (ukończona misja / dostarczony łup). */
+  /** Simple particle burst (completed mission / delivered loot). */
   private spawnFireworks(gx: number, gy: number, colorIndex: number, count = 26): void {
     const { x, y } = this.theme.projection.toScreen(gx, gy);
     const color = TEAM_COLORS[colorIndex % TEAM_COLORS.length];
@@ -674,10 +684,69 @@ export class GameView {
     }
   }
 
+  private smiteOnClear(unit: Unit): void {
+    window.setTimeout(() => {
+      if (this.units.get(unit.id) !== unit) return;
+      this.spawnLightning(unit.gx, unit.gy);
+    }, 120);
+  }
+
+  private spawnLightning(gx: number, gy: number): void {
+    const { x, y } = this.theme.projection.toScreen(gx, gy);
+    const pts: number[] = [0, -220];
+    let py = -220;
+    while (py < -14) {
+      py = Math.min(-14, py + 22 + Math.random() * 16);
+      pts.push((Math.random() - 0.5) * 18, py);
+    }
+
+    const bolt = new Graphics();
+    bolt.poly(pts, false).stroke({ color: 0x85c8ff, width: 7, alpha: 0.38 });
+    bolt.poly(pts, false).stroke({ color: 0xfff4bd, width: 2.5, alpha: 0.96 });
+    bolt.blendMode = 'add';
+    bolt.position.set(x, y);
+    this.fxLayer.addChild(bolt);
+    this.particles.push({ g: bolt, vx: 0, vy: 0, life: 0.24, maxLife: 0.24, gravity: 0 });
+
+    const flash = new Graphics();
+    flash.circle(0, -12, 22).fill({ color: 0xd8efff, alpha: 0.42 });
+    flash.circle(0, -12, 9).fill({ color: 0xfff4bd, alpha: 0.78 });
+    flash.blendMode = 'add';
+    flash.position.set(x, y);
+    this.fxLayer.addChild(flash);
+    this.particles.push({ g: flash, vx: 0, vy: 0, life: 0.32, maxLife: 0.32, gravity: 0 });
+
+    const ring = new Graphics();
+    ring.ellipse(0, 2, 18, 7).stroke({ color: 0xfff4bd, width: 2.5, alpha: 0.9 });
+    ring.blendMode = 'add';
+    ring.position.set(x, y);
+    this.fxLayer.addChild(ring);
+    this.particles.push({ g: ring, vx: 0, vy: 0, life: 0.45, maxLife: 0.45, gravity: 0 });
+
+    for (let i = 0; i < 14; i++) {
+      const spark = new Graphics();
+      spark.rect(-2, -2, 4, 4).fill(i % 3 === 0 ? 0xfff4bd : 0x85c8ff);
+      spark.blendMode = 'add';
+      spark.position.set(x, y - 14);
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 60 + Math.random() * 130;
+      const life = 0.55 + Math.random() * 0.4;
+      this.fxLayer.addChild(spark);
+      this.particles.push({
+        g: spark,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 70,
+        life,
+        maxLife: life,
+        gravity: 220,
+      });
+    }
+  }
+
   /**
-   * FX aktywności budynków: dla każdego budynku z pracującą jednostką w pobliżu
-   * utrzymuje poświatę (łagodnie włączaną/wygaszaną) i sączy drobinki w stylu
-   * z BUILDING_FX. Próg/wygląd → building-fx.ts (punkt strojenia usera).
+   * Building activity FX: for every building with a working unit nearby, keep a
+   * glow (smooth fade in/out) and drip particles using BUILDING_FX style.
+   * Threshold/look -> building-fx.ts (user tuning point).
    */
   private updateBuildingFx(dt: number): void {
     const active = this.collectActiveBuildings();
@@ -721,7 +790,7 @@ export class GameView {
     }
   }
 
-  /** Pojedyncza unosząca się drobinka aktywności (dym/iskra/poświata). */
+  /** Single floating activity particle (smoke/spark/glow). */
   private spawnBuildingMote(em: FxEmitter, style: (typeof BUILDING_FX)[BuildingId]): void {
     const g = new Graphics();
     g.rect(-1.5, -1.5, 3, 3).fill(Math.random() < 0.3 ? style.spark : style.color);
@@ -735,19 +804,19 @@ export class GameView {
       vy: -style.rise * (0.6 + Math.random() * 0.6),
       life,
       maxLife: life,
-      gravity: 36, // lekka grawitacja — drobinka wznosi się i zwalnia
+      gravity: 36, // light gravity: particle rises and slows down
     });
   }
 
-  /** Punkt zaczepienia FX przy wierzchołku sprite'a budynku (z wymiarów tekstury). */
+  /** FX anchor point near the building sprite top (from texture dimensions). */
   private fxAnchor(b: BuildingDef): { x: number; y: number } {
     const foot = this.theme.projection.toScreen(b.gx + b.w / 2, b.gy + b.h); // kotwica sprite'a (0.5,1)
     const tex = getBuildingSprite(b.id);
     const hgt = tex ? tex.height * ((b.w * this.theme.tile) / tex.width) : this.theme.tile * (b.h + 1);
-    return { x: foot.x, y: foot.y - hgt * 0.78 }; // ~górne 22% bryły
+    return { x: foot.x, y: foot.y - hgt * 0.78 }; // ~upper 22% of the solid
   }
 
-  /** Budynki z pracującą jednostką dostatecznie blisko drzwi (czysta reguła w building-fx.ts). */
+  /** Buildings with a working unit close enough to the door (pure rule in building-fx.ts). */
   private collectActiveBuildings(): Set<BuildingId> {
     const samples: WorkerSample[] = [];
     for (const [id, unit] of this.units) {
@@ -916,20 +985,20 @@ export class GameView {
   }
 
   /**
-   * Drobny spacer bezczynnych bohaterów wokół ich warsztatu — żeby kolonia ŻYŁA,
-   * a nie zamierała w jednym punkcie. Co 5–10 s bezczynny (nie śpiący/pracujący)
-   * bohater dostaje nową ścieżkę do losowego punktu blisko swojego ostatniego budynku.
-   * Re-steer z reconcile nie przeszkadza: dla 'idle' klucz celu jest stały → no-op.
+   * Small idle hero walk around their workshop, so the colony feels ALIVE rather
+   * than frozen at one point. Every 5-10s, an idle (not sleeping/working) hero
+   * gets a new path to a random point near their last building. Re-steer from
+   * reconcile does not interfere: for 'idle', the target key is stable -> no-op.
    */
   private wanderIdle(): void {
     for (const [id, unit] of this.units) {
       if (unit.isPeon || unit.moving || unit.stateKind !== 'idle') continue;
       if (this.elapsed < (this.wanderAt.get(id) ?? 0)) continue;
-      this.wanderAt.set(id, this.elapsed + 5 + (hashId(id) % 5)); // 5–10 s, rozsynchronizowane per jednostka
-      const door = this.building(this.lastBuilding.get(id) ?? 'citadel').door;
+      this.wanderAt.set(id, this.elapsed + 5 + (hashId(id) % 5)); // 5-10s, desynchronized per unit
+      const door = this.building(this.homeByUnit.get(id) ?? this.lastBuilding.get(id) ?? 'citadel').door;
       const k = (Math.floor(this.elapsed * 7) + hashId(id)) >>> 0;
       const angle = (k % 360) * (Math.PI / 180);
-      const radius = 1.2 + (k % 5) * 0.5; // 1.2–3.2 kafla wokół warsztatu
+      const radius = 1.2 + (k % 5) * 0.5; // 1.2-3.2 tiles around the workshop
       const spot = { gx: door.gx + Math.cos(angle) * radius, gy: door.gy + Math.sin(angle) * radius };
       const route = this.graph.route(this.graph.nearest(unit.gx, unit.gy).id, this.graph.nearest(spot.gx, spot.gy).id);
       route.push({ id: 'wander', gx: spot.gx, gy: spot.gy });
@@ -941,22 +1010,25 @@ export class GameView {
     let buildingId: BuildingId;
     if (state === 'working') {
       buildingId = resolveBuildingLive(tool, detail);
-      // Nieznane narzędzie daje fallback 'citadel'. Dla peona to zła stopa: cel=Twierdza
-      // ⇒ pusta ścieżka ⇒ stoi. Kieruj go do Koszar, żeby faktycznie biegł.
+      // Unknown tool gives fallback 'citadel'. For a peon this is the wrong foot:
+      // target=Citadel -> empty path -> standing still. Send it to Barracks so it actually runs.
       if (buildingId === 'citadel' && unit.isPeon) buildingId = 'barracks';
-      this.lastBuilding.set(unit.id, buildingId); // zapamiętaj warsztat — tu jednostka zostaje między zadaniami
+      this.lastBuilding.set(unit.id, buildingId); // remember workshop; unit stays here between tasks
     } else if (!unit.isPeon && state === 'awaiting-input') {
       // Czeka na usera → idzie do kaplicy/poczekalni. NIE nadpisujemy lastBuilding,
-      // by po odpowiedzi wrócił do swojego warsztatu (idle → ostatni warsztat).
+      // so after an answer it returns to its workshop (idle -> last workshop).
       buildingId = awaitingBuilding(this.theme.id);
-    } else if (!unit.isPeon && (state === 'thinking' || state === 'error')) {
-      this.targets.delete(unit.id); // bohater: zostań gdzie jesteś (myśli przy warsztacie)
+    } else if (!unit.isPeon && state === 'returning') {
+      buildingId = completedBuilding(this.theme.id);
+    } else if (!unit.isPeon && (state === 'recovering' || state === 'error')) {
+      buildingId = recoveryBuilding(this.theme.id);
+    } else if (!unit.isPeon && state === 'thinking') {
+      this.targets.delete(unit.id); // hero: stay where you are (thinking at workshop)
       return;
     } else {
-      // idle/sleeping/returning: NIE wracaj do Twierdzy — zostań przy OSTATNIM warsztacie.
-      // Kolonia rozłożona po budynkach żyje; dopiero bez historii pracy → dom domyślny.
+      // idle/sleeping: off-duty heroes return to their stable social home.
       const fallback: BuildingId = unit.isPeon ? 'barracks' : 'citadel';
-      buildingId = this.lastBuilding.get(unit.id) ?? fallback;
+      buildingId = (!unit.isPeon ? this.homeByUnit.get(unit.id) : undefined) ?? this.lastBuilding.get(unit.id) ?? fallback;
     }
 
     const key = `${state === 'working' ? 'w' : 'home'}:${buildingId}`;
@@ -966,31 +1038,31 @@ export class GameView {
     const door = this.building(buildingId).door;
     const startNode = this.graph.nearest(unit.gx, unit.gy);
     const route = this.graph.route(startNode.id, `door:${buildingId}`);
-    // Bohater przy pracy: ciasny rozrzut przy drzwiach. Peony i bezczynni bohaterowie:
-    // szeroki krąg wokół budynku, żeby się nie nakładali (declutter sprite'ów i etykiet).
+    // Working hero: tight scatter by the door. Peons and idle heroes:
+    // wide circle around the building so units do not overlap (declutter sprites and labels).
     const spot = !unit.isPeon && state === 'working' ? spotJitter(unit.id, slot) : idleScatter(unit.id);
     route.push({ id: 'spot', gx: door.gx + spot.dx, gy: door.gy + spot.dy });
     unit.setPath(route);
   }
 }
 
-/** Prosty hash stringa → liczba (seed do rozsynchronizowania spacerów/jittera). */
+/** Simple string hash -> number (seed for desynchronizing walks/jitter). */
 function hashId(id: string): number {
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return h;
 }
 
-/** Deterministyczny krąg pozycji bezczynnych wokół twierdzy (luźny tłum, nie stos). */
+/** Deterministic circle of idle positions around the citadel (loose crowd, not a stack). */
 function idleScatter(id: string): { dx: number; dy: number } {
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   const angle = (h % 360) * (Math.PI / 180);
-  const radius = 1.5 + (h % 6) * 0.4; // 1.5–3.5 kafle
+  const radius = 1.5 + (h % 6) * 0.4; // 1.5-3.5 tiles
   return { dx: Math.cos(angle) * radius, dy: Math.sin(angle) * radius };
 }
 
-/** Deterministyczny rozrzut miejsc pracy, żeby jednostki się nie nakładały. */
+/** Deterministic scatter of work spots so units do not overlap. */
 function spotJitter(id: string, slot: number): { dx: number; dy: number } {
   let hash = slot * 7;
   for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) % 9973;

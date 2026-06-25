@@ -21,6 +21,8 @@ export interface UiStrings {
   hooksTitle: string;
   hooksInstall: string;
   hooksUninstall: string;
+  hooksRepair: string;
+  hooksRepairShort: string;
   tokensOut: string;
   tokensIn: string;
   connecting: string;
@@ -97,6 +99,8 @@ export interface UiStrings {
   // Zakładka Modele
   tabBuildingReactions: string;
   tabModels: string;
+  allRandomLabel: string;
+  allRandomHint: string;
   models: string;
   modelsHint: string;
   spriteAndName: string;
@@ -113,6 +117,40 @@ export interface UiStrings {
   addRow: string;
   defaultMark: string;
   setDefault: string;
+  // Pending-question card & panel-control toggle
+  pqPermissionTitle: string;
+  pqPlanTitle: string;
+  pqQuestionTitle: string;
+  pqAllow: string;
+  pqAllowAlways: string;
+  pqDeny: string;
+  pqApprovePlan: string;
+  pqRejectPlan: string;
+  pqAnswerInTerminal: string;
+  pqPanelControl: string;
+  pqPanelControlOn: string;
+  pqPanelControlOff: string;
+  // Launch dialog
+  launchAgent: string;
+  launchTitle: string;
+  launchFolder: string;
+  launchPrompt: string;
+  launchModel: string;
+  launchPermissionMode: string;
+  launchStart: string;
+  launchCancel: string;
+  launchCostWarning: string;
+  launchUnavailable: string;
+  launchAuthWarning: string;
+  launchSetupGuide: string;
+  agentControls: string;
+  // Question modal & SDK card actions
+  pqSend: string;
+  pqSendPlaceholder: string;
+  pqStop: string;
+  pqRejectReason: string;
+  pqOpenQuestion: string;
+  pqClose: string;
 }
 
 const EN: UiStrings = {
@@ -125,6 +163,9 @@ const EN: UiStrings = {
   hooksInstall:
     'Turn on live updates?\n\nThe world will react the moment your Claude Code sessions do something, instead of with a ~1 second delay. This adds a small entry to your Claude Code settings file (a backup is saved first). Your existing settings are left untouched.',
   hooksUninstall: 'Turn off live updates? (your other settings stay untouched)',
+  hooksRepair:
+    'Repair live updates?\n\nThis replaces the old direct HTTP hook with a silent local shim. Live updates still work when Age of Agents is running, but Claude Code will stop showing hook errors when it is closed.',
+  hooksRepairShort: '⚡ live: repair',
   tokensOut: 'Total work the agents have produced',
   tokensIn: 'Total amount the agents have read',
   connecting: '○ connecting…',
@@ -136,12 +177,13 @@ const EN: UiStrings = {
     idle: 'waiting',
     sleeping: 'asleep',
     error: 'hit a snag',
+    recovering: 'recovering',
     returning: 'heading back',
   },
   modelUnknown: 'unknown model',
   transcriptHint: 'The conversation will show up here as the session does new work.',
   tok: 'k produced',
-  workingNow: 'Busy here right now',
+  workingNow: 'Here right now',
   sessions: 'sessions',
   peons: 'helpers',
   tokenUsage: 'Work done here',
@@ -171,7 +213,7 @@ const EN: UiStrings = {
   notifJump: 'click to jump',
   autofollow: 'Follow',
   autofollowHint: 'Camera follows this hero',
-  cities: 'CITIES',
+  cities: 'Kingdom',
   agents: 'agents',
   allCities: 'All',
   language: 'Language',
@@ -189,7 +231,7 @@ const EN: UiStrings = {
   context: 'Context',
   settings: 'Settings',
   buildingReactions: 'Building reactions',
-  buildingReactionsHint: 'Pick which live-log tools each building reacts to. Edit visually or as JSON below — both stay in sync.',
+  buildingReactionsHint: 'Pick which live-log tools each working building reacts to. Social buildings use session state: homes, awaiting input, completed turns, and recovery.',
   addTrigger: 'add (, or ;)',
   kindName: 'name',
   kindPattern: 'pattern',
@@ -213,6 +255,8 @@ const EN: UiStrings = {
   addTriggerConfirm: 'Add trigger',
   tabBuildingReactions: 'Building reactions',
   tabModels: 'Models',
+  allRandomLabel: 'All random sprites',
+  allRandomHint: 'Every agent gets a random look from the whole pool. Refresh reshuffles the city.',
   models: 'Models',
   modelsHint: 'Tell the world how to recognize each model: which character it appears as, and how big its context window is. The 1M tag matters for the window. Edit visually or as JSON — both stay in sync.',
   spriteAndName: 'Character & name',
@@ -229,6 +273,40 @@ const EN: UiStrings = {
   addRow: '+ add',
   defaultMark: 'default',
   setDefault: 'set default',
+  // Pending-question card & panel-control toggle
+  pqPermissionTitle: 'Permission request',
+  pqPlanTitle: 'Plan ready for approval',
+  pqQuestionTitle: 'Agent question',
+  pqAllow: 'Allow',
+  pqAllowAlways: 'Always allow',
+  pqDeny: 'Deny',
+  pqApprovePlan: 'Approve',
+  pqRejectPlan: 'Reject',
+  pqAnswerInTerminal: 'Answer in the terminal',
+  pqPanelControl: 'Answer prompts in panel',
+  pqPanelControlOn: 'Panel answering: ON',
+  pqPanelControlOff: 'Panel answering: OFF',
+  // Launch dialog
+  launchAgent: 'Launch agent',
+  launchTitle: 'Launch a Claude Code agent',
+  launchFolder: 'Working folder',
+  launchPrompt: 'Prompt',
+  launchModel: 'Model (blank = account default)',
+  launchPermissionMode: 'Permission mode',
+  launchStart: 'Launch',
+  launchCancel: 'Cancel',
+  launchCostWarning: 'This runs a real Claude Code session — it uses your account and consumes tokens.',
+  launchUnavailable: 'Claude Agent SDK not installed — run npm i @anthropic-ai/claude-agent-sdk',
+  launchAuthWarning: 'No SDK auth on the server — launches will fail (401). Generate a token and restart the app from that shell:',
+  launchSetupGuide: 'Setup guide',
+  agentControls: 'Agent controls',
+  // Question modal & SDK card actions
+  pqSend: 'Send',
+  pqSendPlaceholder: 'Reply to the agent…',
+  pqStop: 'Stop agent',
+  pqRejectReason: 'Reason (optional)',
+  pqOpenQuestion: 'agent has a question — open',
+  pqClose: 'Close',
 };
 
 const PL: UiStrings = {
@@ -241,6 +319,9 @@ const PL: UiStrings = {
   hooksInstall:
     'Włączyć aktualizacje na żywo?\n\nŚwiat będzie reagował w chwili, gdy Twoje sesje Claude Code coś zrobią, zamiast z ~1-sekundowym opóźnieniem. Dopisze to mały wpis do pliku ustawień Claude Code (najpierw powstaje kopia zapasowa). Twoje istniejące ustawienia pozostają nietknięte.',
   hooksUninstall: 'Wyłączyć aktualizacje na żywo? (Twoje pozostałe ustawienia zostają nietknięte)',
+  hooksRepair:
+    'Naprawić aktualizacje na żywo?\n\nTo zastąpi stary bezpośredni hook HTTP cichym lokalnym shimem. Aktualizacje nadal działają, gdy Age of Agents jest uruchomione, ale Claude Code przestanie pokazywać błędy hooków, gdy aplikacja jest zamknięta.',
+  hooksRepairShort: '⚡ live: napraw',
   tokensOut: 'Łączna praca wytworzona przez agentów',
   tokensIn: 'Łączna ilość, którą agenci przeczytali',
   connecting: '○ łączenie…',
@@ -252,12 +333,13 @@ const PL: UiStrings = {
     idle: 'czeka',
     sleeping: 'śpi',
     error: 'potknięcie',
+    recovering: 'dochodzi do siebie',
     returning: 'wraca',
   },
   modelUnknown: 'nieznany model',
   transcriptHint: 'Rozmowa pojawi się tutaj, gdy sesja zacznie coś robić.',
   tok: 'k wytworzono',
-  workingNow: 'Pracuje tu teraz',
+  workingNow: 'Tutaj teraz',
   sessions: 'sesji',
   peons: 'pomocników',
   tokenUsage: 'Wykonana tu praca',
@@ -287,7 +369,7 @@ const PL: UiStrings = {
   notifJump: 'kliknij, by skoczyć',
   autofollow: 'Podążaj',
   autofollowHint: 'Kamera podąża za bohaterem',
-  cities: 'MIASTA',
+  cities: 'Królestwo',
   agents: 'agentów',
   allCities: 'Wszystkie',
   language: 'Język',
@@ -305,7 +387,7 @@ const PL: UiStrings = {
   context: 'Kontekst',
   settings: 'Ustawienia',
   buildingReactions: 'Reakcje budynków',
-  buildingReactionsHint: 'Wybierz, na jakie narzędzia z żywych logów reaguje każdy budynek. Edytuj wizualnie albo jako JSON poniżej — oba są zsynchronizowane.',
+  buildingReactionsHint: 'Wybierz, na jakie narzędzia z żywych logów reaguje każdy budynek. Budynki socjalne wynikają ze stanu sesji: dom, oczekiwanie, zakończenie i odzyskiwanie.',
   addTrigger: 'dodaj (, lub ;)',
   kindName: 'nazwa',
   kindPattern: 'wzorzec',
@@ -329,6 +411,8 @@ const PL: UiStrings = {
   addTriggerConfirm: 'Dodaj wyzwalacz',
   tabBuildingReactions: 'Reakcje budynków',
   tabModels: 'Modele',
+  allRandomLabel: 'Losowe sprite\'y',
+  allRandomHint: 'Każdy agent dostaje losowy wygląd z całej puli. Odświeżenie przelosowuje miasto.',
   models: 'Modele',
   modelsHint: 'Powiedz światu, jak rozpoznać każdy model: jako który bohater się pokazuje i jak duże ma okno kontekstu. Tag 1M ma znaczenie dla okna. Edytuj wizualnie albo jako JSON — oba są zsynchronizowane.',
   spriteAndName: 'Bohater i nazwa',
@@ -345,6 +429,40 @@ const PL: UiStrings = {
   addRow: '+ dodaj',
   defaultMark: 'domyślny',
   setDefault: 'ustaw domyślny',
+  // Pending-question card & panel-control toggle
+  pqPermissionTitle: 'Prośba o uprawnienie',
+  pqPlanTitle: 'Plan do akceptacji',
+  pqQuestionTitle: 'Pytanie agenta',
+  pqAllow: 'Pozwól',
+  pqAllowAlways: 'Pozwól zawsze',
+  pqDeny: 'Odmów',
+  pqApprovePlan: 'Akceptuj',
+  pqRejectPlan: 'Odrzuć',
+  pqAnswerInTerminal: 'Odpowiedz w terminalu',
+  pqPanelControl: 'Odpowiadaj na prompty w panelu',
+  pqPanelControlOn: 'Odpowiadanie w panelu: WŁ.',
+  pqPanelControlOff: 'Odpowiadanie w panelu: WYŁ.',
+  // Launch dialog
+  launchAgent: 'Uruchom agenta',
+  launchTitle: 'Uruchom agenta Claude Code',
+  launchFolder: 'Folder roboczy',
+  launchPrompt: 'Prompt',
+  launchModel: 'Model (puste = domyślny konta)',
+  launchPermissionMode: 'Tryb uprawnień',
+  launchStart: 'Uruchom',
+  launchCancel: 'Anuluj',
+  launchCostWarning: 'To uruchamia prawdziwą sesję Claude Code — używa Twojego konta i zużywa tokeny.',
+  launchUnavailable: 'Brak Claude Agent SDK — uruchom npm i @anthropic-ai/claude-agent-sdk',
+  launchAuthWarning: 'Brak auth SDK na serwerze — launch padnie (401). Wygeneruj token i zrestartuj appkę z tego shella:',
+  launchSetupGuide: 'Instrukcja konfiguracji',
+  agentControls: 'Sterowanie agentami',
+  // Question modal & SDK card actions
+  pqSend: 'Wyślij',
+  pqSendPlaceholder: 'Odpowiedz agentowi…',
+  pqStop: 'Zatrzymaj agenta',
+  pqRejectReason: 'Powód (opcjonalnie)',
+  pqOpenQuestion: 'agent ma pytanie — otwórz',
+  pqClose: 'Zamknij',
 };
 
 const IT: UiStrings = {
@@ -357,6 +475,9 @@ const IT: UiStrings = {
   hooksInstall:
     "Attivare gli aggiornamenti in tempo reale?\n\nIl mondo reagirà nell'istante in cui le tue sessioni Claude Code faranno qualcosa, invece di avere un ritardo di ~1 secondo. Verrà aggiunta una piccola voce al file delle impostazioni di Claude Code (prima viene salvato un backup). Le tue impostazioni esistenti restano intatte.",
   hooksUninstall: 'Disattivare gli aggiornamenti in tempo reale? (le altre impostazioni restano intatte)',
+  hooksRepair:
+    "Riparare gli aggiornamenti in tempo reale?\n\nSostituisce il vecchio hook HTTP diretto con uno shim locale silenzioso. Gli aggiornamenti funzionano ancora quando Age of Agents è aperto, ma Claude Code smette di mostrare errori degli hook quando l'app è chiusa.",
+  hooksRepairShort: '⚡ live: ripara',
   tokensOut: 'Lavoro totale prodotto dagli agenti',
   tokensIn: "Quantità totale che gli agenti hanno letto",
   connecting: '○ connessione…',
@@ -368,12 +489,13 @@ const IT: UiStrings = {
     idle: 'in attesa',
     sleeping: 'addormentato',
     error: 'ha incontrato un problema',
+    recovering: 'si riprende',
     returning: 'sta tornando',
   },
   modelUnknown: 'modello sconosciuto',
   transcriptHint: 'La conversazione apparirà qui quando la sessione inizierà a lavorare.',
   tok: 'k prodotti',
-  workingNow: 'Qui si lavora',
+  workingNow: 'Qui adesso',
   sessions: 'sessioni',
   peons: 'aiutanti',
   tokenUsage: 'Lavoro svolto qui',
@@ -403,7 +525,7 @@ const IT: UiStrings = {
   notifJump: 'clicca per saltare',
   autofollow: 'Segui',
   autofollowHint: 'La telecamera segue questo eroe',
-  cities: 'CITTÀ',
+  cities: 'Regno',
   agents: 'agenti',
   allCities: 'Tutte',
   language: 'Lingua',
@@ -421,7 +543,7 @@ const IT: UiStrings = {
   context: 'Contesto',
   settings: 'Impostazioni',
   buildingReactions: 'Reazioni degli edifici',
-  buildingReactionsHint: 'Scegli a quali strumenti dei log dal vivo reagisce ogni edificio. Modifica visivamente o come JSON qui sotto — restano sincronizzati.',
+  buildingReactionsHint: 'Scegli a quali strumenti dei log dal vivo reagisce ogni edificio. Gli edifici sociali seguono lo stato: casa, attesa, completamento e recupero.',
   addTrigger: 'aggiungi (, o ;)',
   kindName: 'nome',
   kindPattern: 'pattern',
@@ -445,6 +567,8 @@ const IT: UiStrings = {
   addTriggerConfirm: 'Aggiungi trigger',
   tabBuildingReactions: 'Reazioni degli edifici',
   tabModels: 'Modelli',
+  allRandomLabel: 'Sprite casuali',
+  allRandomHint: 'Ogni agente riceve un aspetto casuale dall\'intero set. L\'aggiornamento rimescola la città.',
   models: 'Modelli',
   modelsHint: 'Indica al mondo come riconoscere ogni modello: con quale personaggio appare e quanto è grande la sua finestra di contesto. Il tag 1M conta per la finestra. Modifica visivamente o come JSON — restano sincronizzati.',
   spriteAndName: 'Personaggio e nome',
@@ -461,6 +585,40 @@ const IT: UiStrings = {
   addRow: '+ aggiungi',
   defaultMark: 'predefinito',
   setDefault: 'imposta predefinito',
+  // Pending-question card & panel-control toggle
+  pqPermissionTitle: 'Richiesta di permesso',
+  pqPlanTitle: 'Piano da approvare',
+  pqQuestionTitle: 'Domanda dell’agente',
+  pqAllow: 'Consenti',
+  pqAllowAlways: 'Consenti sempre',
+  pqDeny: 'Nega',
+  pqApprovePlan: 'Approva',
+  pqRejectPlan: 'Rifiuta',
+  pqAnswerInTerminal: 'Rispondi nel terminale',
+  pqPanelControl: 'Rispondi ai prompt nel pannello',
+  pqPanelControlOn: 'Risposta nel pannello: ON',
+  pqPanelControlOff: 'Risposta nel pannello: OFF',
+  // Launch dialog
+  launchAgent: 'Avvia agente',
+  launchTitle: 'Avvia un agente Claude Code',
+  launchFolder: 'Cartella di lavoro',
+  launchPrompt: 'Prompt',
+  launchModel: 'Modello (vuoto = predefinito account)',
+  launchPermissionMode: 'Modalità permessi',
+  launchStart: 'Avvia',
+  launchCancel: 'Annulla',
+  launchCostWarning: 'Avvia una vera sessione Claude Code — usa il tuo account e consuma token.',
+  launchUnavailable: 'Claude Agent SDK non installato — esegui npm i @anthropic-ai/claude-agent-sdk',
+  launchAuthWarning: 'Nessuna auth SDK sul server — i lanci falliranno (401). Genera un token e riavvia l’app da quella shell:',
+  launchSetupGuide: 'Guida alla configurazione',
+  agentControls: 'Controlli agente',
+  // Question modal & SDK card actions
+  pqSend: 'Invia',
+  pqSendPlaceholder: "Rispondi all'agente…",
+  pqStop: 'Ferma agente',
+  pqRejectReason: 'Motivo (facoltativo)',
+  pqOpenQuestion: "l'agente ha una domanda — apri",
+  pqClose: 'Chiudi',
 };
 
 const UI: Record<Lang, UiStrings> = { en: EN, pl: PL, it: IT };

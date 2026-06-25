@@ -2,16 +2,15 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 
 /**
- * Przyrostowy tail plików NDJSON: pamięta offset per plik i dostarcza
- * wyłącznie KOMPLETNE linie (zakończone \n). Niedokończona końcówka
- * zostaje w buforze do następnego odczytu — transkrypty są dopisywane
- * na żywo, więc ostatnia linia bywa w połowie zapisu.
+ * Incremental tail for NDJSON files: remembers offset per file and delivers only
+ * COMPLETE lines (ending with \n). An incomplete tail stays buffered until the
+ * next read; transcripts are appended live, so the last line can be mid-write.
  */
 export class TailRegistry {
   private offsets = new Map<string, number>();
   private remainders = new Map<string, string>();
 
-  /** Rejestruje plik bez czytania historii — tail zacznie od bieżącego końca. */
+  /** Registers a file without reading history; tail starts from current end. */
   async registerAtEnd(path: string): Promise<void> {
     const { size } = await stat(path);
     this.offsets.set(path, size);
@@ -27,7 +26,7 @@ export class TailRegistry {
     this.remainders.delete(path);
   }
 
-  /** Czyta nowe pełne linie od zapamiętanego offsetu (domyślnie od początku pliku). */
+  /** Reads new complete lines from remembered offset (default from file start). */
   async readNewLines(path: string): Promise<string[]> {
     let offset = this.offsets.get(path) ?? 0;
     let size: number;
@@ -38,7 +37,7 @@ export class TailRegistry {
       return [];
     }
     if (size < offset) {
-      // Plik skrócony/nadpisany — zacznij od zera.
+      // File truncated/overwritten: start from zero.
       offset = 0;
       this.remainders.set(path, '');
     }

@@ -1,13 +1,13 @@
 import { useEffect, type RefObject } from 'react';
 
 /**
- * Klawiatura wzorca ARIA „menu" dla prostego dropdownu z przyciskami role="menuitem*".
+ * ARIA "menu" keyboard pattern for a simple dropdown with role="menuitem*" buttons.
  *
- *  - Po otwarciu przenosi focus na aktywną (aria-checked="true") lub pierwszą opcję.
- *  - ArrowDown/ArrowUp przesuwają focus cyklicznie, Home/End skaczą na skraje.
+ *  - On open, moves focus to the active (aria-checked="true") or first option.
+ *  - ArrowDown/ArrowUp move focus cyclically, Home/End jump to edges.
  *
- * Działa na żywym DOM (querySelectorAll w kontenerze), więc nie wymaga refów per-opcja
- * ani roving tabindex. Esc i click-outside obsługują komponenty osobno.
+ * Works on live DOM (querySelectorAll in the container), so it does not require
+ * per-option refs or roving tabindex. Components handle Esc and click-outside separately.
  */
 export function useMenuKeyboard(open: boolean, menuRef: RefObject<HTMLElement | null>): void {
   useEffect(() => {

@@ -2,7 +2,16 @@ import { claudeSource } from './claude.js';
 import { codexSource } from './codex.js';
 import { opencodeSource } from './opencode.js';
 import { kodaSource } from './koda.js';
+import { localLlmSource } from './local-llm.js';
+import { filterSources } from './config.js';
 import type { AgentSource } from './types.js';
 
-/** Wszystkie aktywne źródła agentów. */
-export const SOURCES: AgentSource[] = [claudeSource, codexSource, opencodeSource, kodaSource];
+/** All known agent sources. */
+export const ALL_SOURCES: AgentSource[] = [claudeSource, codexSource, opencodeSource, kodaSource, localLlmSource];
+
+export function activeSources(raw = process.env.AOA_SOURCES): AgentSource[] {
+  return filterSources(ALL_SOURCES, raw);
+}
+
+/** All active agent sources for the default environment. */
+export const SOURCES: AgentSource[] = activeSources();
