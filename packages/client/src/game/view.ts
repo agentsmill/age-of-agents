@@ -1,4 +1,4 @@
-import { Application, ColorMatrixFilter, Container, Graphics, Sprite, TextureStyle } from 'pixi.js';
+import { Application, ColorMatrixFilter, Container, type FederatedPointerEvent, Graphics, Sprite, TextureStyle } from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
 import type { HeroSnapshot, MissionSnapshot, PeonSnapshot } from '@agent-citadel/shared';
 import { useWorld } from '../store';
@@ -204,6 +204,12 @@ export class GameView {
       const palette = this.theme.buildings.map((b) => `#${b.placeholderColor.toString(16).padStart(6, '0')}`);
       this.matrix = new MatrixRain(palette);
       this.app.stage.addChild(this.matrix.view);
+      // Kursor ugina deszcz („Neo" warp). globalpointermove na stage łapie ruch
+      // nad CAŁYM płótnem niezależnie od hit-testu — viewport (drag/zoom) go nie
+      // połyka. e.global jest w px CSS (przestrzeń ekranu = logiczna sprite'a).
+      this.app.stage.eventMode = 'static';
+      this.app.stage.on('globalpointermove', (e: FederatedPointerEvent) => this.matrix?.setPointer(e.global.x, e.global.y));
+      this.app.stage.on('pointerleave', () => this.matrix?.clearPointer());
     }
     this.app.stage.addChild(this.viewport);
     // Realm Heartbeat: filtr dnia/nocy NA VIEWPORCIE (nie na stage) — świat „oddycha",

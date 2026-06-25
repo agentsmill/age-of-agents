@@ -29,6 +29,26 @@ export class MatrixRain {
   private acc = 0;
   private readonly step = 1 / 20; // ~20 kroków/s — tempo opadania (niezależne od FPS)
 
+  // „Neo" warp — glify uginają się promieniście wokół kursora (jak w agentSpam).
+  // Pozycja w px CSS (przestrzeń logiczna sprite'a); aktywna dopiero po ruchu myszy.
+  private pointerX = -9999;
+  private pointerY = -9999;
+  private pointerActive = false;
+  private static readonly WARP_RADIUS = 90; // promień pola w px CSS
+  private static readonly WARP_STRENGTH = 0.85; // siła odepchnięcia (0..1)
+
+  /** Pozycja kursora w px CSS (z e.global Pixi — przestrzeń ekranu = logiczna sprite'a). */
+  setPointer(cssX: number, cssY: number): void {
+    this.pointerX = cssX;
+    this.pointerY = cssY;
+    this.pointerActive = true;
+  }
+
+  /** Kursor opuścił scenę → wyłącz warp (deszcz wraca do pionu). */
+  clearPointer(): void {
+    this.pointerActive = false;
+  }
+
   /** @param colors barwy budynków (CSS #rrggbb) — deszcz pada w kolorach realm. */
   constructor(colors: string[] = ['#5bffb0']) {
     this.colors = colors.length ? colors : ['#5bffb0'];
@@ -86,13 +106,33 @@ export class MatrixRain {
     ctx.fillRect(0, 0, this.w, this.h);
     ctx.font = `${this.font}px monospace`;
     ctx.textBaseline = 'top';
+    // Kursor w px URZĄDZENIA (glify liczone w px backing canvasu) + promień ×dpr.
+    const warp = this.pointerActive;
+    const mx = this.pointerX * this.dpr;
+    const my = this.pointerY * this.dpr;
+    const radius = MatrixRain.WARP_RADIUS * this.dpr;
     for (let i = 0; i < this.drops.length; i++) {
       const x = i * this.font;
       const y = this.drops[i] * this.font;
       const ch = GLYPHS[(Math.random() * GLYPHS.length) | 0];
+      // „Neo" warp: odepchnij głowę promieniście od kursora, gdy blisko. Ogon
+      // jest „wypalony" na canvasie z poprzednich klatek → gnie się wraz z głową.
+      let dx = x;
+      let dy = y;
+      if (warp) {
+        const ox = x - mx;
+        const oy = y - my;
+        const dist = Math.hypot(ox, oy);
+        if (dist < radius && dist > 0.1) {
+          const t = 1 - dist / radius;
+          const force = t * t * radius * MatrixRain.WARP_STRENGTH;
+          dx += (ox / dist) * force;
+          dy += (oy / dist) * force;
+        }
+      }
       // Głowa kolumny w barwie budynku (rzadziej biały błysk); ogon gaśnie do czerni przez fade.
       ctx.fillStyle = Math.random() < 0.05 ? '#ffffff' : this.colors[this.dropCol[i]];
-      ctx.fillText(ch, x, y);
+      ctx.fillText(ch, dx, dy);
       if (y > this.h && Math.random() > 0.972) {
         this.drops[i] = 0; // reset głowy nad ekran
         this.dropCol[i] = (Math.random() * this.colors.length) | 0; // nowa barwa po cyklu
