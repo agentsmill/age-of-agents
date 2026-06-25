@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUi } from '../i18n';
 import { useSettings } from '../settings';
+import { getRealmAudio } from '../game/audio';
 import { BuildingReactionsEditor } from './BuildingReactionsEditor';
 import { ModelRegistryEditor } from './ModelRegistryEditor';
 
@@ -11,6 +12,15 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const setAllRandom = useSettings((s) => s.setAllRandom);
   const dialogRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<'buildings' | 'models'>('buildings');
+  const soundEnabled = useSettings((s) => s.soundEnabled);
+  const setSoundEnabled = useSettings((s) => s.setSoundEnabled);
+  // Toggle = gest usera → wolno wznowić AudioContext (polityka autoplay).
+  const toggleSound = async () => {
+    const next = !soundEnabled;
+    if (next) await getRealmAudio().resume();
+    getRealmAudio().setEnabled(next);
+    setSoundEnabled(next);
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -85,27 +95,14 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             {t.tabModels}
           </button>
         </div>
-        {tab === 'buildings' ? (
-          <BuildingReactionsEditor />
-        ) : (
-          <>
-            <label
-              className="px"
-              style={{ display: 'flex', alignItems: 'flex-start', gap: 8, margin: '4px 0 10px' }}
-            >
-              <input
-                type="checkbox"
-                checked={allRandom}
-                onChange={(e) => setAllRandom(e.target.checked)}
-              />
-              <span>
-                🎲 {t.allRandomLabel}
-                <span style={{ display: 'block', opacity: 0.7, fontSize: 11 }}>{t.allRandomHint}</span>
-              </span>
-            </label>
-            <ModelRegistryEditor />
-          </>
-        )}
+        <label
+          className="px"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 2px 4px', fontSize: 13, cursor: 'pointer' }}
+        >
+          <input type="checkbox" checked={soundEnabled} onChange={toggleSound} />
+          {soundEnabled ? '🔊' : '🔇'} Ambient soundscape
+        </label>
+        {tab === 'buildings' ? <BuildingReactionsEditor /> : <ModelRegistryEditor />}
       </div>
     </div>
   );

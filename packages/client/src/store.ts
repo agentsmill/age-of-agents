@@ -8,7 +8,8 @@ import type {
   ProjectArsenal,
   TranscriptLine,
 } from '@agent-citadel/shared';
-import { deriveNotification, DEDUP_WINDOW, MAX_VISIBLE, type Notification } from './notifications';
+import { deriveNotification, contextPressureNotification, DEDUP_WINDOW, MAX_VISIBLE, type Notification } from './notifications';
+import { resolveModelLive } from './model-store';
 
 interface WorldStore {
   connected: boolean;
@@ -33,18 +34,21 @@ interface WorldStore {
    * and the map filters agents by projectDir.
    */
   selectedProjectDir?: string;
-  /** Id of the AskUserQuestion shown as a centered modal (undefined = closed). */
-  openQuestionId?: string;
-  /** Session ids the app launched via the SDK (drive the reply/stop footer). */
-  sdkSessionIds: Record<string, true>;
+  /** Tryb Chronicle (#7): replay nadpisuje świat, żywe eventy WS są ignorowane. */
+  replayMode: boolean;
   setConnected(connected: boolean): void;
   select(sessionId?: string): void;
   selectBuilding(buildingId?: string): void;
   setAutofollow(on: boolean): void;
   dismissNotification(id: string): void;
   selectProject(projectDir?: string): void;
-  openQuestion(id?: string): void;
-  markSdkSession(sessionId: string): void;
+  enterReplay(): void;
+  exitReplay(): void;
+  setReplayWorld(
+    heroes: Record<string, HeroSnapshot>,
+    peons: Record<string, PeonSnapshot>,
+    missions: Record<string, MissionSnapshot>,
+  ): void;
   apply(event: GameEvent): void;
 }
 
@@ -69,8 +73,7 @@ export const useWorld = create<WorldStore>((set) => ({
   notifications: [],
   autofollow: false,
   arsenal: {},
-  pending: {},
-  sdkSessionIds: {},
+  replayMode: false,
   setConnected: (connected) => set({ connected }),
   // Unit and building selection are mutually exclusive (one right-side panel).
   // Reset autofollow only when the target CHANGES (opt-in per agent): clicking
@@ -86,8 +89,10 @@ export const useWorld = create<WorldStore>((set) => ({
   dismissNotification: (id) =>
     set((state) => ({ notifications: state.notifications.filter((n) => n.id !== id) })),
   selectProject: (selectedProjectDir) => set({ selectedProjectDir }),
-  openQuestion: (openQuestionId) => set({ openQuestionId }),
-  markSdkSession: (sessionId) => set((s) => ({ sdkSessionIds: { ...s.sdkSessionIds, [sessionId]: true } })),
+  // Chronicle (#7): wejście czyści selekcję; replay potem nadpisuje świat przez setReplayWorld.
+  enterReplay: () => set({ replayMode: true, selectedSessionId: undefined, selectedBuildingId: undefined }),
+  exitReplay: () => set({ replayMode: false }),
+  setReplayWorld: (heroes, peons, missions) => set({ heroes, peons, missions }),
   apply: (event) =>
     set((state) => {
       switch (event.type) {
@@ -112,9 +117,13 @@ export const useWorld = create<WorldStore>((set) => ({
         case 'hero-updated': {
           const prev = state.heroes[event.hero.sessionId];
           const now = Date.now();
+          let notifs = addNotif(state.notifications, deriveNotification(prev, event, now), now);
+          // Ciśnienie kontekstu: okno modelu z rejestru (klient zna contextTokens + model).
+          const win = resolveModelLive(event.hero.model).contextWindow;
+          notifs = addNotif(notifs, contextPressureNotification(prev, event.hero, win, now), now);
           return {
             heroes: { ...state.heroes, [event.hero.sessionId]: event.hero },
-            notifications: addNotif(state.notifications, deriveNotification(prev, event, now), now),
+            notifications: notifs,
           };
         }
         case 'hero-removed': {

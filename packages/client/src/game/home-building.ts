@@ -10,8 +10,26 @@ import {
 } from '@agent-citadel/shared';
 import type { ThemeDef } from '../theme/types';
 
-/** "Waiting room" building where a hero awaiting user input goes (awaiting-input).
- *  fantasy: chapel (shrine); sci-fi: waiting room (lounge); fallback: citadel. */
+/**
+ * Punti di raccolta (3 per tema) in cui una nuova sessione spawna
+ * prima di essere mandata a lavorare. Scelti da un hash STABILE del
+ * nome del progetto, così le sessioni dello stesso progetto si
+ * raggruppano nello stesso punto, e progetti diversi si distribuiscono
+ * sulla mappa invece di ammucchiarsi davanti alla citadella.
+ *
+ * I 3 building per tema sono ordinati così che ognuno "ospiti" un
+ * sottoinsieme diverso di progetti (hash % 3) — la suddivisione è
+ * deterministica e non dipende dall'ordine di arrivo.
+ */
+const HOME_BUILDINGS: Record<string, BuildingId[]> = {
+  fantasy: ['arena', 'tavern', 'garden', 'bar', 'shrine'],
+  scifi: ['holodeck', 'mess', 'hydroponics', 'lounge', 'medbay'],
+  cyberpunk: ['holodeck', 'mess', 'hydroponics', 'lounge', 'medbay'],
+};
+
+/** Budynek „poczekalni", do którego idzie bohater czekający na usera (awaiting-input).
+ *  fantasy: kaplica (shrine); sci-fi: poczekalnia (lounge); fallback: citadel. */
+const AWAITING_BY_THEME: Record<string, BuildingId> = { fantasy: 'shrine', scifi: 'lounge', cyberpunk: 'lounge' };
 export function awaitingBuilding(themeId: string): BuildingId {
   return awaitingBuildingForTheme(themeId);
 }

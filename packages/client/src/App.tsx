@@ -10,6 +10,10 @@ import { BuildingPanel } from './hud/BuildingPanel';
 import { ThemeSwitch } from './hud/ThemeSwitch';
 import { ZoomControls } from './hud/ZoomControls';
 import { ArchitectHall } from './hud/ArchitectHall';
+import { HeatmapPanel } from './hud/HeatmapPanel';
+import { SessionHistoryPanel } from './hud/SessionHistoryPanel';
+import { Chronicle } from './hud/Chronicle';
+import { RealmCardButton } from './hud/RealmCardButton';
 import './hud/hud.css';
 
 export function App() {
@@ -26,6 +30,10 @@ export function App() {
       <ArchitectHall />
       <Portraits />
       <ZoomControls />
+      <HeatmapPanel />
+      <SessionHistoryPanel />
+      <Chronicle />
+      <RealmCardButton />
       <Minimap />
     </div>
   );

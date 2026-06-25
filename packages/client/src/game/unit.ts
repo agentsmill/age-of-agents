@@ -2,6 +2,7 @@ import { AnimatedSprite, Container, Graphics, Sprite, Text, type Spritesheet } f
 import { resolveProvider, type AgentKind, type HeroStateKind } from '@agent-citadel/shared';
 import { getEmblemTexture } from './emblems';
 import type { Projection } from './projection';
+import type { NeonStyle } from '../theme/types';
 import type { PathNode } from './pathfind';
 import { buildUnitBody, labelStyle, teamColor } from './placeholders';
 import { stateToAnimation } from './archetype';
@@ -34,10 +35,7 @@ export class Unit {
   private crate = new Graphics();
   private teamRing = new Graphics();
   private selectionRing = new Graphics();
-  private contextBar = new Container();
-  private contextTrack = new Graphics();
-  private contextFill = new Graphics();
-  private contextProgress?: number;
+  private pressureRing = new Graphics();
   private selected = false;
   private overlay = new Text({ text: '', style: labelStyle });
   private bubble = new Text({ text: '', style: { ...labelStyle, fontSize: 10 } });
@@ -58,6 +56,8 @@ export class Unit {
     agent: AgentKind = 'claude',
     spriteScale: number = SPRITE_SCALE,
     spriteFootAnchor: number = SPRITE_FOOT_ANCHOR,
+    /** Gdy motyw neonowy (#cyberpunk) i brak sprite'a → abstrakcyjny świecący awatar. */
+    neon?: NeonStyle,
   ) {
     this.gx = start.gx;
     this.gy = start.gy;
@@ -75,7 +75,7 @@ export class Unit {
       this.body = new Container();
       this.body.addChild(sprite);
     } else {
-      this.body = buildUnitBody(teamColor(colorIndex), isPeon);
+      this.body = buildUnitBody(teamColor(colorIndex), isPeon, neon);
     }
 
     // Team-color ring at the feet: ALWAYS visible (also under PixelLab sprite),
@@ -87,6 +87,10 @@ export class Unit {
     // Selection ring: white, pulsing, larger; distinguishes "selected" without losing team color.
     this.selectionRing.ellipse(0, 2, ringRx + 3.5, ringRy + 2).stroke({ color: 0xffffff, width: 2, alpha: 0.9 });
     this.selectionRing.visible = false;
+    // Context Pressure: bursztynowy pierścień pulsujący u stóp — glanceable ostrzeżenie
+    // „blisko ściany kontekstu" (sterowane setContextPressure z reconcile).
+    this.pressureRing.ellipse(0, 2, ringRx + 5, ringRy + 3).stroke({ color: 0xfac775, width: 2.5, alpha: 0.95 });
+    this.pressureRing.visible = false;
 
     this.aura.circle(0, -12, 18).fill({ color: 0x7f77dd, alpha: 0.25 });
     this.aura.visible = false;
@@ -109,13 +113,7 @@ export class Unit {
     this.nameTag.position.set(0, 6);
     this.nameTag.alpha = 0.9;
 
-    this.contextTrack.rect(-CONTEXT_BAR_W / 2 - 1, -1, CONTEXT_BAR_W + 2, CONTEXT_BAR_H + 2).fill(0x0b0b0a);
-    this.contextTrack.rect(-CONTEXT_BAR_W / 2, 0, CONTEXT_BAR_W, CONTEXT_BAR_H).fill({ color: 0x2a2926, alpha: 0.95 });
-    this.contextBar.position.set(0, isPeon ? -30 : -39);
-    this.contextBar.visible = false;
-    this.contextBar.addChild(this.contextTrack, this.contextFill);
-
-    this.container.addChild(this.aura, this.selectionRing, this.teamRing, this.body, this.crate, this.contextBar, this.overlay, this.bubble, this.nameTag);
+    this.container.addChild(this.aura, this.selectionRing, this.pressureRing, this.teamRing, this.body, this.crate, this.overlay, this.bubble, this.nameTag);
 
     const badge = buildAgentBadge(agent);
     if (badge) this.container.addChild(badge);
@@ -177,6 +175,13 @@ export class Unit {
     this.selected = on;
     this.selectionRing.visible = on;
     if (!on) this.selectionRing.scale.set(1);
+  }
+
+  /** Bursztynowy pierścień ostrzegawczy, gdy sesja blisko granicy okna kontekstu. */
+  setContextPressure(on: boolean): void {
+    if (this.pressureRing.visible === on) return;
+    this.pressureRing.visible = on;
+    if (!on) this.pressureRing.scale.set(1);
   }
 
   setState(state: HeroStateKind, bubbleText?: string): void {
@@ -253,6 +258,7 @@ export class Unit {
     }
 
     if (this.selected) this.selectionRing.scale.set(1 + Math.sin(this.elapsed * 4) * 0.08);
+    if (this.pressureRing.visible) this.pressureRing.scale.set(1 + Math.sin(this.elapsed * 6) * 0.12);
 
     // Bubble: fresh (after change) or when unit is selected; hidden the rest of the time.
     this.bubble.visible = this.bubble.text !== '' && (this.bubbleForced || this.elapsed < this.bubbleUntil);
