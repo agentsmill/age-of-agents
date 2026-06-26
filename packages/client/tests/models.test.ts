@@ -53,15 +53,24 @@ describe('resolveModel - two axes at once', () => {
       displayName: 'GPT-5.5',
       contextWindow: 258_400,
     });
-    expect(resolveModel('gpt-5.4-codex', DEFAULT_MODEL_CONFIG)).toMatchObject({
+    expect(resolveModel('gpt-5.4', DEFAULT_MODEL_CONFIG)).toMatchObject({
       sprite: 'fable',
-      displayName: 'GPT-5.4 Codex',
+      displayName: 'GPT-5.4',
+      contextWindow: 258_400,
+    });
+    expect(resolveModel('gpt-5-codex', DEFAULT_MODEL_CONFIG)).toMatchObject({
+      sprite: 'fable',
+      displayName: 'GPT-5 Codex',
       contextWindow: 258_400,
     });
     expect(resolveModel('gpt-5.4-mini', DEFAULT_MODEL_CONFIG)).toMatchObject({
       sprite: 'haiku',
       displayName: 'GPT-5.4 Mini',
       contextWindow: 258_400,
+    });
+    expect(resolveModel('gpt-5.3-codex-spark', DEFAULT_MODEL_CONFIG)).toMatchObject({
+      sprite: 'fable',
+      displayName: 'GPT-5.3 Codex Spark',
     });
   });
 });
@@ -98,8 +107,44 @@ describe('upgradeModelConfig', () => {
       displayName: 'GPT-5.5',
       contextWindow: 258_400,
     });
+    expect(resolveModel('gpt-5.3-codex-spark', upgraded)).toMatchObject({
+      sprite: 'fable',
+      displayName: 'GPT-5.3 Codex Spark',
+    });
     expect(upgraded.sprites[0]).toEqual(oldConfig.sprites[0]);
     expect(upgraded.windows[0]).toEqual(oldConfig.windows[0]);
+  });
+
+  it('does not rewrite existing GPT rules while appending missing defaults', () => {
+    const oldConfig: ModelConfig = {
+      sprites: [
+        { match: { kind: 'pattern', pattern: 'gpt-5.4-codex' }, sprite: 'fable', displayName: 'GPT-5.4 Codex' },
+        { match: { kind: 'pattern', pattern: 'gpt-' }, sprite: 'fable', displayName: 'GPT' },
+      ],
+      windows: [
+        { match: { kind: 'exact', id: 'gpt-5.5' }, contextWindow: 258_400 },
+        { match: { kind: 'pattern', pattern: 'gpt-5.4' }, contextWindow: 1_050_000 },
+        { match: { kind: 'pattern', pattern: 'gpt-5.4-mini' }, contextWindow: 400_000 },
+        { match: { kind: 'exact', id: 'my-gpt' }, contextWindow: 123_456 },
+      ],
+      fallback: { sprite: 'sonnet', contextWindow: 200_000 },
+    };
+
+    const upgraded = upgradeModelConfig(oldConfig);
+    expect(upgraded.sprites[0]).toEqual(oldConfig.sprites[0]);
+    expect(upgraded.sprites[1]).toEqual(oldConfig.sprites[1]);
+    expect(upgraded.windows[0]).toEqual(oldConfig.windows[0]);
+    expect(upgraded.windows[1]).toEqual(oldConfig.windows[1]);
+    expect(upgraded.windows[2]).toEqual(oldConfig.windows[2]);
+    expect(resolveModel('gpt-5.4', upgraded).contextWindow).toBe(1_050_000);
+    expect(resolveModel('gpt-5.4-mini', upgraded).contextWindow).toBe(1_050_000);
+    expect(resolveContextWindow('my-gpt', upgraded)).toBe(123_456);
+    expect(upgraded.sprites).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        match: { kind: 'pattern', pattern: 'gpt-5.3-codex-spark' },
+        displayName: 'GPT-5.3 Codex Spark',
+      }),
+    ]));
   });
 
   it('does not duplicate existing user rules', () => {

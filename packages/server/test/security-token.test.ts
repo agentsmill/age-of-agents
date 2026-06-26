@@ -17,6 +17,16 @@ describe('loadOrCreateToken', () => {
     const second = await loadOrCreateToken(p);
     expect(second).toBe(first);
   });
+
+  it('handles concurrent first-run creators', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'aoa-tok-'));
+    const p = join(dir, 'session-token');
+    const tokens = await Promise.all(Array.from({ length: 20 }, () => loadOrCreateToken(p)));
+
+    expect(new Set(tokens).size).toBe(1);
+    expect(tokens[0]).toMatch(/^[0-9a-f]{64}$/);
+    expect(statSync(p).mode & 0o777).toBe(0o600);
+  });
 });
 
 describe('timingSafeEqualStr', () => {

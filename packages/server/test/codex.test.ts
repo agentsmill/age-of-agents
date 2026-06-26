@@ -339,6 +339,11 @@ describe('interpretCodexLine', () => {
     const userMsg = (text: string) =>
       interpretCodexLine(line({ type: 'response_item', timestamp: '2026-06-14T10:00:00.000Z', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }));
     expect(userMsg('Dodaj endpoint /health')).toContainEqual({ kind: 'prompt', text: 'Dodaj endpoint /health', ts: '2026-06-14T10:00:00.000Z' });
+    expect(userMsg('<codex_delegation>\n  <source_thread_id>parent</source_thread_id>\n  <input>Run read-only telemetry check</input>\n</codex_delegation>'))
+      .toContainEqual({ kind: 'prompt', text: 'Run read-only telemetry check', ts: '2026-06-14T10:00:00.000Z' });
+    expect(userMsg('<codex_delegation>\n  <input>Missing source id</input>\n</codex_delegation>')).toEqual([]);
+    expect(userMsg('<codex_delegation>\n  <source_thread_id>parent</source_thread_id>\n  <input>One</input>\n  <input>Two</input>\n</codex_delegation>')).toEqual([]);
+    expect(userMsg('<codex_delegation>\n  <source_thread_id>parent</source_thread_id>\n  <input><environment_context></environment_context></input>\n</codex_delegation>')).toEqual([]);
     expect(userMsg('<environment_context>\n  <cwd>/x</cwd>\n</environment_context>')).toEqual([]);
     expect(userMsg('# AGENTS.md instructions for /x')).toEqual([]);
     // Developer role (permission instructions) -> not a prompt.

@@ -34,6 +34,21 @@ export function isCodexHumanPrompt(text: string, role: string | undefined): bool
   return true;
 }
 
+function extractCodexDelegationInput(text: string): string | undefined {
+  const match = text.match(/^\s*<codex_delegation>\s*<source_thread_id>[\s\S]*?<\/source_thread_id>\s*<input>([\s\S]*?)<\/input>\s*<\/codex_delegation>\s*$/);
+  if (!match) return undefined;
+  if ((text.match(/<input>/g)?.length ?? 0) !== 1 || (text.match(/<\/input>/g)?.length ?? 0) !== 1) return undefined;
+  return match?.[1]?.trim() || undefined;
+}
+
+function codexPromptText(text: string, role: string | undefined): string | undefined {
+  if (isCodexHumanPrompt(text, role)) return text;
+  if (role !== 'user') return undefined;
+  const delegated = extractCodexDelegationInput(text);
+  if (!delegated) return undefined;
+  return isCodexHumanPrompt(delegated, role) ? delegated : undefined;
+}
+
 /* ─────────────────────────────────────────────────────────────────
  * TUNING POINT 2: Codex tool -> canonical game name.
  * The canonical name flows into toolToBuilding (shared), so it controls which
@@ -233,8 +248,9 @@ function handleMessage(payload: any, ts: string, facts: Fact[]): void {
   for (const b of blocks) {
     const text = typeof b?.text === 'string' ? b.text : '';
     if (!text) continue;
-    if (b.type === 'input_text' && isCodexHumanPrompt(text, role)) {
-      facts.push({ kind: 'prompt', text: clip(text), ts });
+    if (b.type === 'input_text') {
+      const promptText = codexPromptText(text, role);
+      if (promptText) facts.push({ kind: 'prompt', text: clip(promptText), ts });
     } else if (b.type === 'output_text' && role === 'assistant' && text.trim()) {
       facts.push({ kind: 'assistant-text', text: clip(text), ts });
     }

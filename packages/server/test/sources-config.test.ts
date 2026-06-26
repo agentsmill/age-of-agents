@@ -28,6 +28,10 @@ describe('sources config', () => {
     expect(parseSourceFilter('codex, claude')).toEqual(new Set(['codex', 'claude']));
   });
 
+  it('parseSourceFilter accepts local-llm', () => {
+    expect(parseSourceFilter('local-llm')).toEqual(new Set(['local-llm']));
+  });
+
   it('parseSourceFilter rejects unknown source ids', () => {
     expect(() => parseSourceFilter('codex,nope')).toThrow('Unknown AOA_SOURCES value: nope');
   });
@@ -80,5 +84,6 @@ describe('activeSources', () => {
   it('uses AOA_SOURCES-style filtering over registered sources', () => {
     expect(activeSources('codex').map((s) => s.id)).toEqual(['codex']);
     expect(activeSources('claude,codex').map((s) => s.id)).toEqual(['claude', 'codex']);
+    expect(activeSources('local-llm').map((s) => s.id)).toEqual(['local-llm']);
   });
 });

@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { accumulateMessage, computeBuildingStats, getBuildingStats, invalidateBuildingStatsCache } from '../src/building-stats.js';
+import {
+  accumulateMessage,
+  computeBuildingStats,
+  computeBuildingStatsForSources,
+  getBuildingStats,
+  invalidateBuildingStatsCache,
+} from '../src/building-stats.js';
 import type { BuildingId, MappingConfig } from '@agent-citadel/shared';
 
 const DAY = 86_400_000;
@@ -73,11 +79,11 @@ describe('accumulateMessage', () => {
 });
 
 /** Corpus with one assistant message using `tool` (fresh timestamp -> in the 30-day window). */
-function rootWithTool(tool: string): string {
+function rootWithTool(tool: string, timestamp = new Date().toISOString()): string {
   const dir = mkdtempSync(join(tmpdir(), 'aoa-stats-'));
   const rec = {
     type: 'assistant',
-    timestamp: new Date().toISOString(),
+    timestamp,
     message: { usage: { output_tokens: 100 }, content: [{ type: 'tool_use', name: tool }] },
   };
   writeFileSync(join(dir, 'session.jsonl'), JSON.stringify(rec) + '\n');
@@ -282,6 +288,38 @@ describe('computeBuildingStats - Codex rollout records', () => {
     expect(res.buildings.hydroponics?.today).toBe(40);
   });
 
+  it('credits a final Codex token_count before task completion even when completion timestamp is missing', async () => {
+    invalidateBuildingStatsCache();
+    const root = rootWithCodexRecords([
+      {
+        type: 'response_item',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({ cmd: 'npm test' }),
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+      {
+        type: 'event_msg',
+        payload: { type: 'task_complete' },
+      },
+    ]);
+
+    const res = await computeBuildingStats(root, NOW + 2000);
+    expect(res.buildings.mine).toBeUndefined();
+    expect(res.buildings.garden?.today).toBe(40);
+    expect(res.buildings.hydroponics?.today).toBe(40);
+  });
+
   it('credits Codex aborted turns to theme recovery buildings', async () => {
     invalidateBuildingStatsCache();
     const root = rootWithCodexRecords([
@@ -355,9 +393,78 @@ describe('computeBuildingStats - Codex rollout records', () => {
     expect(res.buildings.shrine?.today).toBe(40);
     expect(res.buildings.medbay?.today).toBe(40);
   });
+
+  it('credits a final Codex token_count before turn abort even when abort timestamp is missing', async () => {
+    invalidateBuildingStatsCache();
+    const root = rootWithCodexRecords([
+      {
+        type: 'response_item',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({ cmd: 'npm test' }),
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+      {
+        type: 'event_msg',
+        payload: { type: 'turn_aborted' },
+      },
+    ]);
+
+    const res = await computeBuildingStats(root, NOW + 2000);
+    expect(res.buildings.mine).toBeUndefined();
+    expect(res.buildings.shrine?.today).toBe(40);
+    expect(res.buildings.medbay?.today).toBe(40);
+  });
 });
 
 describe('getBuildingStats - cache + invalidation during scan', () => {
+  it('computes mixed stats through source adapters without importing Codex parser helpers', async () => {
+    invalidateBuildingStatsCache();
+    const claudeRoot = rootWithTool('Read', new Date(NOW).toISOString());
+    const codexRoot = rootWithCodexRecords([
+      {
+        type: 'response_item',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({ cmd: 'npm test' }),
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+    ]);
+
+    const res = await computeBuildingStatsForSources(
+      [
+        { id: 'claude', roots: () => [claudeRoot] },
+        { id: 'codex', roots: () => [codexRoot] },
+      ],
+      NOW + 2000,
+    );
+
+    expect(res.buildings.library?.today).toBe(100);
+    expect(res.buildings.mine?.today).toBe(40);
+    const source = readFileSync(new URL('../src/building-stats.ts', import.meta.url), 'utf8');
+    expect(source).not.toMatch(/from ['"]\.\/sources\/codex\.js['"]/);
+  });
+
   it('merges stats from explicit Claude and Codex roots', async () => {
     invalidateBuildingStatsCache();
     const claudeRoot = rootWithTool('Read'); // -> library
