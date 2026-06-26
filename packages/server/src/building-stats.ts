@@ -18,6 +18,7 @@ import {
 } from './building-stats-sources/index.js';
 
 type BuildingStatsSourceInput = BuildingStatsSource | Pick<BuildingStatsSource, 'id' | 'roots'>;
+type StatsThemeId = 'fantasy' | 'scifi';
 
 /**
  * Token usage per building for day/week/30-day windows.
@@ -36,6 +37,10 @@ type BuildingStatsSourceInput = BuildingStatsSource | Pick<BuildingStatsSource, 
 const DAY = 86_400_000;
 const MONTH = 30 * DAY;
 const CACHE_TTL = 60_000;
+
+export function normalizeStatsTheme(themeId: string | undefined): StatsThemeId {
+  return themeId === 'scifi' ? 'scifi' : 'fantasy';
+}
 
 interface Bucket {
   today: number;
@@ -86,12 +91,12 @@ function resolveStatsSource(input: BuildingStatsSourceInput): BuildingStatsSourc
   return { ...source, roots: input.roots };
 }
 
-function completedBuildingsForAllThemes(): BuildingId[] {
-  return [...new Set([completedBuildingForTheme('fantasy'), completedBuildingForTheme('scifi')])];
+function completedBuildingsForTheme(themeId: string): BuildingId[] {
+  return [completedBuildingForTheme(themeId)];
 }
 
-function recoveryBuildingsForAllThemes(): BuildingId[] {
-  return [...new Set([recoveryBuildingForTheme('fantasy'), recoveryBuildingForTheme('scifi')])];
+function recoveryBuildingsForTheme(themeId: string): BuildingId[] {
+  return [recoveryBuildingForTheme(themeId)];
 }
 
 async function scanFile(
@@ -101,6 +106,7 @@ async function scanFile(
   now: number,
   dayStart: number,
   config: MappingConfig,
+  themeId: string,
 ): Promise<void> {
   const content = await readFile(path, 'utf8');
   const extract = source.createExtractor();
@@ -149,12 +155,12 @@ async function scanFile(
           recordOutput(event.ts, event.output, event.tools);
           break;
         case 'turn-end':
-          current = completedBuildingsForAllThemes();
-          flushPendingOutput(current);
+          flushPendingOutput();
+          current = completedBuildingsForTheme(themeId);
           break;
         case 'turn-aborted':
-          current = recoveryBuildingsForAllThemes();
-          flushPendingOutput(current);
+          flushPendingOutput();
+          current = recoveryBuildingsForTheme(themeId);
           break;
       }
     }
@@ -169,6 +175,7 @@ async function scanRoot(
   now: number,
   dayStart: number,
   config: MappingConfig,
+  themeId: string,
 ): Promise<void> {
   let entries: string[] = [];
   try {
@@ -183,7 +190,7 @@ async function scanRoot(
     try {
       const s = await stat(path);
       if (now - s.mtimeMs > MONTH) continue; // file has no events in the 30-day window
-      await scanFile(source, path, acc, now, dayStart, config);
+      await scanFile(source, path, acc, now, dayStart, config, themeId);
     } catch {
       /* skip unreadable file */
     }
@@ -194,7 +201,9 @@ export async function computeBuildingStatsForSources(
   sources: BuildingStatsSourceInput[],
   now: number,
   config: MappingConfig = DEFAULT_MAPPING,
+  themeId = 'fantasy',
 ): Promise<BuildingStatsResponse> {
+  const normalizedTheme = normalizeStatsTheme(themeId);
   const ds = new Date(now);
   ds.setHours(0, 0, 0, 0);
   const dayStart = ds.getTime();
@@ -203,7 +212,7 @@ export async function computeBuildingStatsForSources(
   for (const input of sources) {
     const source = resolveStatsSource(input);
     for (const root of source.roots()) {
-      await scanRoot(source, root, acc, now, dayStart, config);
+      await scanRoot(source, root, acc, now, dayStart, config, normalizedTheme);
     }
   }
 
@@ -222,12 +231,14 @@ export async function computeBuildingStatsForRoots(
   roots: string[],
   now: number,
   config: MappingConfig = DEFAULT_MAPPING,
+  themeId = 'fantasy',
 ): Promise<BuildingStatsResponse> {
   const sourceRoots = [...roots];
   return computeBuildingStatsForSources(
     DEFAULT_BUILDING_STATS_SOURCES.map((source) => ({ ...source, roots: () => sourceRoots })),
     now,
     config,
+    themeId,
   );
 }
 
@@ -235,13 +246,14 @@ export async function computeBuildingStats(
   root: string,
   now: number,
   config: MappingConfig = DEFAULT_MAPPING,
+  themeId = 'fantasy',
 ): Promise<BuildingStatsResponse> {
-  return computeBuildingStatsForRoots([root], now, config);
+  return computeBuildingStatsForRoots([root], now, config, themeId);
 }
 
 // Cache: scan is expensive (many sessions x 30 days), so compute at most once/min.
-let cache: { at: number; data: BuildingStatsResponse } | undefined;
-let inflight: Promise<BuildingStatsResponse> | undefined;
+let cache = new Map<string, { at: number; data: BuildingStatsResponse }>();
+let inflight = new Map<string, Promise<BuildingStatsResponse>>();
 // Epoch counter: invalidation bumps it; a pass writes cache ONLY when the epoch
 // has not changed since it started. Otherwise PUT during a scan would cache a
 // result computed with the OLD config for the entire TTL.
@@ -249,17 +261,23 @@ let epoch = 0;
 
 /** After map edit (PUT /tool-mapping), drop cache so numbers catch up with the new config. */
 export function invalidateBuildingStatsCache(): void {
-  cache = undefined;
-  inflight = undefined; // abandon in-flight pass; its result is already stale
+  cache.clear();
+  inflight.clear(); // abandon in-flight passes; their results are already stale
   epoch++;
 }
 
 export async function getBuildingStats(
   root?: string | string[],
+  themeId = 'fantasy',
 ): Promise<BuildingStatsResponse> {
   const now = Date.now();
-  if (cache && now - cache.at < CACHE_TTL) return cache.data;
-  if (inflight) return inflight;
+  const normalizedTheme = normalizeStatsTheme(themeId);
+  const rootKey = root === undefined ? '<default>' : Array.isArray(root) ? root.join('\0') : root;
+  const key = `${normalizedTheme}\0${rootKey}`;
+  const cached = cache.get(key);
+  if (cached && now - cached.at < CACHE_TTL) return cached.data;
+  const currentInflight = inflight.get(key);
+  if (currentInflight) return currentInflight;
   const startEpoch = epoch;
   const sources = root === undefined
     ? DEFAULT_BUILDING_STATS_SOURCES
@@ -267,19 +285,20 @@ export async function getBuildingStats(
         ...source,
         roots: () => (Array.isArray(root) ? root : [root]),
       }));
-  inflight = loadMappingConfig()
-    .then((config) => computeBuildingStatsForSources(sources, now, config))
+  const promise = loadMappingConfig()
+    .then((config) => computeBuildingStatsForSources(sources, now, config, normalizedTheme))
     .then((data) => {
       // Save cache only if the map was not invalidated in the meantime.
       if (epoch === startEpoch) {
-        cache = { at: Date.now(), data };
-        inflight = undefined;
+        cache.set(key, { at: Date.now(), data });
+        if (inflight.get(key) === promise) inflight.delete(key);
       }
       return data;
     })
     .catch((err) => {
-      if (epoch === startEpoch) inflight = undefined;
+      if (epoch === startEpoch && inflight.get(key) === promise) inflight.delete(key);
       throw err;
     });
-  return inflight;
+  inflight.set(key, promise);
+  return promise;
 }

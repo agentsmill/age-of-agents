@@ -31,7 +31,7 @@ export function BuildingPanel() {
     let alive = true;
     const load = () => {
       setLoading(true);
-      fetch('/building-stats')
+      fetch(`/building-stats?theme=${encodeURIComponent(themeId)}`)
         .then((r) => r.json())
         .then((d: BuildingStatsResponse) => alive && setStats(d))
         .catch(() => {})
@@ -43,7 +43,7 @@ export function BuildingPanel() {
       alive = false;
       clearInterval(timer);
     };
-  }, [buildingId]);
+  }, [buildingId, themeId]);
 
   if (!buildingId) return null;
 

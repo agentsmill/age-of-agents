@@ -157,6 +157,10 @@ export class Unit {
     this.path = path.filter((node) => Math.hypot(node.gx - this.gx, node.gy - this.gy) > 0.05);
   }
 
+  clearPath(): void {
+    this.path = [];
+  }
+
   get moving(): boolean {
     return this.path.length > 0;
   }

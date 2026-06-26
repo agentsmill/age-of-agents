@@ -85,7 +85,10 @@ export class WaypointGraph {
       }
     }
 
-    if (!prev.has(toId)) return [this.nodes.get(toId)!].filter(Boolean);
+    if (!prev.has(toId)) {
+      console.warn(`[pathfind] No route from ${fromId} to ${toId}`);
+      return [this.nodes.get(toId)!].filter(Boolean);
+    }
     const path: PathNode[] = [];
     let cursor: string | undefined = toId;
     while (cursor) {
