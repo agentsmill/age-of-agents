@@ -7,7 +7,7 @@ import { emblemSrc } from '../theme/emblems';
  * buildAgentBadge (synchroniczne, w konstruktorze Unit) używa getEmblemTexture od ręki;
  * brak tekstury → fallback proceduralny (kółko + litera).
  */
-const KINDS: AgentKind[] = ['claude', 'codex', 'opencode', 'koda', 'local-llm'];
+const KINDS: AgentKind[] = ['claude', 'codex', 'opencode', 'koda', 'local-llm', 'mimocode', 'auggie'];
 const textures = new Map<AgentKind, Texture>();
 let loaded = false;
 
