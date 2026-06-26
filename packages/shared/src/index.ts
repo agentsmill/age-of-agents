@@ -7,7 +7,7 @@ export * from './pending.js';
 /** Agent Citadel WebSocket protocol: shared server/client types. */
 
 /** Which CLI generated the session; controls the hero badge and tool mapping. */
-export type AgentKind = 'claude' | 'codex' | 'opencode' | 'koda' | 'local-llm';
+export type AgentKind = 'claude' | 'codex' | 'opencode' | 'koda' | 'local-llm' | 'mimocode' | 'auggie';
 
 export type HeroStateKind =
   | 'thinking'

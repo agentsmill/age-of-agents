@@ -24,6 +24,8 @@ export const AGENT_PROVIDERS: Record<AgentKind, ProviderInfo> = {
   opencode: { kind: 'opencode', label: 'OpenCode', labelShort: 'O', color: '#f59e0b' }, // amber-500
   koda: { kind: 'koda', label: 'Koda', labelShort: 'K', color: '#8b5cf6' }, // violet-500
   'local-llm': { kind: 'local-llm', label: 'Local LLM', labelShort: 'L', color: '#22d3ee' }, // cyan-400
+  mimocode: { kind: 'mimocode', label: 'MiMo Code', labelShort: 'M', color: '#ff6900' }, // Xiaomi orange
+  auggie: { kind: 'auggie', label: 'Auggie', labelShort: 'A', color: '#6366f1' }, // indigo-500
 };
 
 /**
