@@ -7,6 +7,7 @@ const SOURCE_IDS: Record<SourceId, true> = {
   codex: true,
   opencode: true,
   koda: true,
+  kimi: true,
 };
 const SOURCE_ID_SET: ReadonlySet<string> = new Set(Object.keys(SOURCE_IDS));
 
