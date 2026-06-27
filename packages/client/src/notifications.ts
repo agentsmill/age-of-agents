@@ -4,7 +4,7 @@ import type { GameEvent, HeroSnapshot } from '@agent-citadel/shared';
 export type NotifKind = 'alert' | 'error' | 'success';
 
 /** Notification reason; maps to the i18n label and NotifKind. */
-export type NotifReason = 'needs-you' | 'error' | 'mission-done' | 'new-session';
+export type NotifReason = 'needs-you' | 'error' | 'mission-done' | 'new-session' | 'session-done';
 
 export interface Notification {
   id: string;
@@ -41,6 +41,7 @@ export const REASON_KIND: Record<NotifReason, NotifKind> = {
   error: 'error',
   'mission-done': 'success',
   'new-session': 'success',
+  'session-done': 'success',
 };
 
 /** Notification factory: derives kind/ttl from reason and builds a stable id. */
@@ -93,6 +94,8 @@ export function deriveNotification(
         return make('needs-you', hero.sessionId, hero.title, hero.gitBranch, now);
       if (entered && hero.state === 'error')
         return make('error', hero.sessionId, hero.title, hero.gitBranch, now);
+      if (entered && hero.state === 'returning')
+        return make('session-done', hero.sessionId, hero.title, hero.gitBranch, now);
       if (event.type === 'hero-spawned')
         return make('new-session', hero.sessionId, hero.title, hero.gitBranch, now);
       return null;

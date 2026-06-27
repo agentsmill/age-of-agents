@@ -3,7 +3,7 @@ import { useUi } from '../i18n';
 import { formatK } from '../util';
 
 /** Resource bar: total tokens of all heroes = citadel "gold". */
-export function ResourceBar() {
+export function ResourceBar({ onCostClick }: { onCostClick?: () => void }) {
   const heroes = useWorld((s) => s.heroes);
   const connected = useWorld((s) => s.connected);
   const t = useUi();
@@ -19,6 +19,16 @@ export function ResourceBar() {
       <span className="px" title={t.tokensIn} style={{ opacity: 0.7 }}>
         📜 {formatK(totals.input)}
       </span>
+      {onCostClick && (
+        <button
+          className="ghost"
+          onClick={onCostClick}
+          title="Cost Dashboard"
+          style={{ fontSize: 12, cursor: 'pointer', padding: '0 4px' }}
+        >
+          💰
+        </button>
+      )}
       <span style={{ opacity: 0.7 }}>{connected ? '●' : t.connecting}</span>
     </div>
   );

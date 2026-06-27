@@ -15,6 +15,7 @@ import { StatTile } from './StatTile';
 import { ContextBar } from './ContextBar';
 import { PendingQuestionCard } from './PendingQuestionCard';
 import { sendSessionMessage, stopSession } from '../sessions';
+import { ReplayPanel } from './ReplayPanel';
 
 // Stable reference: a selector returning fresh [] on every call would put
 // useSyncExternalStore into an infinite render loop.
@@ -72,6 +73,7 @@ export function SidePanel() {
   const models = useModels((s) => s.models);
   const t = useUi();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [showReplay, setShowReplay] = useState(false);
 
   // Lightweight tick: refreshes relative times ("active 12 min", "5m ago") when
   // nothing else changes state (idle session). Events re-render everything else anyway.
@@ -229,6 +231,16 @@ export function SidePanel() {
           </div>
         ))}
       </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+        <button
+          className="ghost"
+          onClick={() => setShowReplay(!showReplay)}
+          style={{ fontSize: 11, cursor: 'pointer' }}
+        >
+          {showReplay ? '📡 Live' : '⏮ Replay'}
+        </button>
+      </div>
+      {showReplay && <ReplayPanel sessionId={selected} />}
       {isSdk && selected && <SdkSessionFooter sessionId={selected} />}
     </div>
   );

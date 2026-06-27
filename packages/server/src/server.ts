@@ -18,6 +18,7 @@ import { registerSessionRoutes } from './session-routes.js';
 import { registerFsRoutes } from './fs-routes.js';
 import { loadOrCreateToken } from './security/token.js';
 import { registerSecurityGuard, verifyWsClient } from './security/guard.js';
+import { TranscriptStore } from './transcript/store.js';
 
 export interface StartServerOptions {
   /** HTTP port. Pass 0 so the system picks a free one (useful in tests). */
@@ -56,6 +57,9 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   registerSecurityGuard(app, { getPort: () => resolvedPort, token });
   const world = new World();
   const pendingRegistry = new PendingRegistry(world);
+  // Transcript persistence (optional — requires better-sqlite3).
+  const transcriptStore = new TranscriptStore();
+  world.transcriptStore = transcriptStore;
   world.onEvent((event) => {
     if (event.type === 'hero-removed') pendingRegistry.cancelForSession(event.sessionId);
   });
@@ -68,6 +72,13 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   let liveSessions: LiveSessionRegistry | undefined;
 
   app.get('/health', async () => ({ ok: true, demo: opts.demo }));
+
+  // Transcript replay API — returns persisted transcript lines for a session.
+  app.get('/sessions/:id/transcript', async (request) => {
+    const { id } = request.params as { id: string };
+    const limit = Number((request.query as Record<string, string>).limit) || 500;
+    return transcriptStore.query(id, limit);
+  });
 
   if (opts.demo) {
     // No-op routes so installed hooks do not emit 404s in demo mode.
@@ -153,6 +164,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     });
 
     app.addHook('onReady', async () => {
+      await transcriptStore.open();
       for (const w of watchers) w.start();
       await opencodePoller?.start();
       await mimocodePoller?.start();
@@ -237,6 +249,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     close: async () => {
       offEvent();
       await liveSessions?.stopAll();
+      transcriptStore.close();
       await opencodePoller?.stop();
       await mimocodePoller?.stop();
       await auggiePoller?.stop();

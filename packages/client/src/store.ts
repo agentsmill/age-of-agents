@@ -9,6 +9,7 @@ import type {
   TranscriptLine,
 } from '@agent-citadel/shared';
 import { deriveNotification, DEDUP_WINDOW, MAX_VISIBLE, type Notification } from './notifications';
+import { desktopNotify } from './desktop-notify';
 
 interface WorldStore {
   connected: boolean;
@@ -112,9 +113,14 @@ export const useWorld = create<WorldStore>((set) => ({
         case 'hero-updated': {
           const prev = state.heroes[event.hero.sessionId];
           const now = Date.now();
+          const notif = deriveNotification(prev, event, now);
+          const notifications = addNotif(state.notifications, notif, now);
+          if (notif && notifications.length > state.notifications.length) {
+            desktopNotify(notif.subject, notif.reason);
+          }
           return {
             heroes: { ...state.heroes, [event.hero.sessionId]: event.hero },
-            notifications: addNotif(state.notifications, deriveNotification(prev, event, now), now),
+            notifications,
           };
         }
         case 'hero-removed': {
