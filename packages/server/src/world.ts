@@ -24,6 +24,8 @@ export class World {
   private arsenals = new Map<string, ProjectArsenal>();
   private listeners = new Set<Listener>();
   private nextTeamColor = 0;
+  /** Optional transcript persistence (set by server when better-sqlite3 is available). */
+  transcriptStore?: { append(line: TranscriptLine): void };
 
   onEvent(listener: Listener): () => void {
     this.listeners.add(listener);
@@ -121,6 +123,7 @@ export class World {
   emitTranscriptLine(line: GameEvent & { type: 'transcript-line' }): void {
     const lines = this.transcripts.get(line.line.sessionId) ?? [];
     this.transcripts.set(line.line.sessionId, [...lines, line.line].slice(-TRANSCRIPT_BUFFER));
+    this.transcriptStore?.append(line.line);
     this.emit(line);
   }
 

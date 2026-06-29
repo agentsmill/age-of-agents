@@ -5,6 +5,8 @@ import { World } from './world.js';
 import { registerMappingRoutes } from './mapping-routes.js';
 import { registerModelRoutes } from './model-routes.js';
 import { OpenCodePoller } from './sources/opencode-poller.js';
+import { MimoCodePoller } from './sources/mimocode-poller.js';
+import { AuggiePoller } from './sources/auggie-poller.js';
 import { DockerPoller } from './sources/docker-poller.js';
 import { CliDockerClient } from './sources/docker-client.js';
 import { ArsenalPoller } from './arsenal/arsenal-poller.js';
@@ -16,6 +18,7 @@ import { registerSessionRoutes } from './session-routes.js';
 import { registerFsRoutes } from './fs-routes.js';
 import { loadOrCreateToken } from './security/token.js';
 import { registerSecurityGuard, verifyWsClient } from './security/guard.js';
+import { TranscriptStore } from './transcript/store.js';
 
 export interface StartServerOptions {
   /** HTTP port. Pass 0 so the system picks a free one (useful in tests). */
@@ -54,16 +57,28 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   registerSecurityGuard(app, { getPort: () => resolvedPort, token });
   const world = new World();
   const pendingRegistry = new PendingRegistry(world);
+  // Transcript persistence (optional — requires better-sqlite3).
+  const transcriptStore = new TranscriptStore();
+  world.transcriptStore = transcriptStore;
   world.onEvent((event) => {
     if (event.type === 'hero-removed') pendingRegistry.cancelForSession(event.sessionId);
   });
   let watchers: SourceWatcher[] = [];
   let opencodePoller: OpenCodePoller | undefined;
+  let mimocodePoller: MimoCodePoller | undefined;
+  let auggiePoller: AuggiePoller | undefined;
   let dockerPoller: DockerPoller | undefined;
   let arsenalPoller: ArsenalPoller | undefined;
   let liveSessions: LiveSessionRegistry | undefined;
 
   app.get('/health', async () => ({ ok: true, demo: opts.demo }));
+
+  // Transcript replay API — returns persisted transcript lines for a session.
+  app.get('/sessions/:id/transcript', async (request) => {
+    const { id } = request.params as { id: string };
+    const limit = Number((request.query as Record<string, string>).limit) || 500;
+    return transcriptStore.query(id, limit);
+  });
 
   if (opts.demo) {
     // No-op routes so installed hooks do not emit 404s in demo mode.
@@ -92,6 +107,12 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     // OpenCode uses SQLite instead of JSONL: start poller.
     const opencodeEnabled = sources.some((source) => source.id === 'opencode');
     opencodePoller = opencodeEnabled ? new OpenCodePoller(world) : undefined;
+    // MiMo Code (OpenCode fork) also uses SQLite: start poller.
+    const mimocodeEnabled = sources.some((source) => source.id === 'mimocode');
+    mimocodePoller = mimocodeEnabled ? new MimoCodePoller(world) : undefined;
+    // Auggie uses JSON files: start file watcher poller.
+    const auggieEnabled = sources.some((source) => source.id === 'auggie');
+    auggiePoller = auggieEnabled ? new AuggiePoller(world) : undefined;
     // Containerized Claude sessions are controlled by the Claude source filter.
     const dockerEnabled = sources.some((source) => source.id === 'claude');
     dockerPoller = dockerEnabled ? new DockerPoller(world, new CliDockerClient()) : undefined;
@@ -143,8 +164,11 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     });
 
     app.addHook('onReady', async () => {
+      await transcriptStore.open();
       for (const w of watchers) w.start();
       await opencodePoller?.start();
+      await mimocodePoller?.start();
+      void auggiePoller?.start();
       // Fire-and-forget: Docker unavailability must not delay server readiness.
       void dockerPoller?.start();
       // `arsenal-updated` event to client (Arsenal panel).
@@ -225,7 +249,10 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     close: async () => {
       offEvent();
       await liveSessions?.stopAll();
+      transcriptStore.close();
       await opencodePoller?.stop();
+      await mimocodePoller?.stop();
+      await auggiePoller?.stop();
       dockerPoller?.stop();
       await Promise.all(watchers.map((w) => w.stop()));
       arsenalPoller?.stop();
