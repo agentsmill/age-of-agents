@@ -212,9 +212,15 @@ export function extractOpencodeMeta(sessionRow: Record<string, unknown>): { mode
   };
 }
 
-/** Path to OpenCode database. */
-export function getOpencodeDbPath(): string {
-  return join(homedir(), '.local', 'share', 'opencode', 'opencode.db');
+/**
+ * Path to OpenCode database. Mirrors OpenCode's own resolution (xdg-basedir):
+ * $XDG_DATA_HOME when set, otherwise ~/.local/share — on every platform,
+ * including Windows (xdg-basedir has no win32 branch).
+ */
+export function getOpencodeDbPath(env: NodeJS.ProcessEnv = process.env): string {
+  const xdgData = env.XDG_DATA_HOME?.trim();
+  const dataHome = xdgData ? xdgData : join(homedir(), '.local', 'share');
+  return join(dataHome, 'opencode', 'opencode.db');
 }
 
 /**

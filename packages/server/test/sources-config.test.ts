@@ -32,6 +32,11 @@ describe('sources config', () => {
     expect(() => parseSourceFilter('codex,nope')).toThrow('Unknown AOA_SOURCES value: nope');
   });
 
+  it('parseSourceFilter accepts every registered source id, including local-llm', () => {
+    expect(parseSourceFilter('local-llm')).toEqual(new Set(['local-llm']));
+    expect(activeSources('claude,local-llm').map((s) => s.id)).toEqual(['claude', 'local-llm']);
+  });
+
   it('filterSources keeps only selected sources when a filter is provided', () => {
     const all = [source('claude'), source('codex'), source('opencode'), source('koda')];
     expect(filterSources(all, 'codex,koda').map((s) => s.id)).toEqual(['codex', 'koda']);
