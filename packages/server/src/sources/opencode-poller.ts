@@ -27,6 +27,19 @@ const STALE_SESSION_MS = 5 * 60_000;
  * memory does not grow forever. = HISTORICAL_WINDOW_MS. */
 const SESSION_RETENTION_MS = HISTORICAL_WINDOW_MS;
 
+/** How long to wait before re-checking for a database that does not exist yet
+ * (OpenCode not installed, or installed but never run). Doubles up to the cap:
+ * the file can appear at any time, so this is recoverable — unlike schema drift. */
+const DB_RETRY_INITIAL_MS = 5_000;
+const DB_RETRY_MAX_MS = 5 * 60_000;
+
+/** better-sqlite3 cannot open the file — it (or its directory) does not exist.
+ * SQLITE_CANTOPEN is what a readonly open of a missing file throws. */
+function isDbMissingError(err: unknown): boolean {
+  const code = (err as { code?: string } | null)?.code;
+  return code === 'SQLITE_CANTOPEN' || code === 'ENOENT';
+}
+
 function isSchemaMismatchError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err);
   // Trwały dryf schematu OpenCode: usunięta kolumna („no such column") albo
@@ -49,6 +62,9 @@ interface SessionState {
 export class OpenCodePoller {
   private sessions = new Map<string, SessionState>();
   private timer?: NodeJS.Timeout;
+  private retryTimer?: NodeJS.Timeout;
+  private retryDelayMs = DB_RETRY_INITIAL_MS;
+  private waitingLogged = false;
   private db: any; // better-sqlite3 Database
   private isRunning = false;
   /** Historical sessions (time_updated > STALE_SESSION_MS) already handled:
@@ -58,30 +74,55 @@ export class OpenCodePoller {
   constructor(private readonly world: World) {}
 
   async start(): Promise<void> {
-    if (this.isRunning) return;
-    
+    if (this.isRunning || this.retryTimer) return;
+
+    let Database: unknown;
     try {
       // Dynamic import better-sqlite3 (optional dependency).
       const mod = await import('better-sqlite3');
-      const Database = mod.default; // better-sqlite3 (CJS) exports constructor as default
+      Database = mod.default; // better-sqlite3 (CJS) exports constructor as default
       if (!Database || typeof Database !== 'function') {
         throw new Error('better-sqlite3 did not export a Database constructor');
       }
-      const dbPath = getOpencodeDbPath();
-      this.db = new (Database as any)(dbPath, { readonly: true });
-      
-      // Przygotuj zapytania
-      this.isRunning = true;
-      this.timer = setInterval(() => this.poll(), POLL_INTERVAL_MS);
-      
-      // Pierwsze odpytanie natychmiast
-      await this.poll();
-      
-      if (this.isRunning) console.log('[OpenCode] Poller started');
     } catch (err) {
-      console.warn('[OpenCode] Could not start poller:', err instanceof Error ? err.message : String(err));
-      console.log('[OpenCode] Make sure better-sqlite3 is installed: npm install better-sqlite3');
+      // Missing native module: not recoverable at runtime — one accurate message.
+      console.warn('[OpenCode] better-sqlite3 unavailable — OpenCode source disabled:', err instanceof Error ? err.message : String(err));
+      console.log('[OpenCode] Install it to enable OpenCode sessions: npm install better-sqlite3');
+      return;
     }
+    await this.open(Database);
+  }
+
+  /** Opens the database and starts polling. A missing file is recoverable
+   * (OpenCode may be installed or run later) — re-check with backoff instead
+   * of disabling the source or blaming better-sqlite3. */
+  private async open(Database: unknown): Promise<void> {
+    this.retryTimer = undefined;
+    const dbPath = getOpencodeDbPath();
+    try {
+      this.db = new (Database as any)(dbPath, { readonly: true });
+    } catch (err) {
+      if (isDbMissingError(err)) {
+        if (!this.waitingLogged) {
+          console.log(`[OpenCode] Database not found at ${dbPath} — will keep checking in the background`);
+          this.waitingLogged = true;
+        }
+        this.retryTimer = setTimeout(() => void this.open(Database), this.retryDelayMs);
+        this.retryTimer.unref?.();
+        this.retryDelayMs = Math.min(this.retryDelayMs * 2, DB_RETRY_MAX_MS);
+        return;
+      }
+      console.warn('[OpenCode] Could not open database:', err instanceof Error ? err.message : String(err));
+      return;
+    }
+
+    this.isRunning = true;
+    this.timer = setInterval(() => this.poll(), POLL_INTERVAL_MS);
+
+    // Pierwsze odpytanie natychmiast
+    await this.poll();
+
+    if (this.isRunning) console.log('[OpenCode] Poller started');
   }
 
   async stop(): Promise<void> {
@@ -89,6 +130,10 @@ export class OpenCodePoller {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = undefined;
+    }
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = undefined;
     }
     if (this.db) {
       this.db.close();
