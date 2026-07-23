@@ -522,8 +522,10 @@ export function resolveModel(model: string | undefined, cfg: ModelConfig): Resol
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   sprites: [
     { match: { kind: 'exact', id: 'gpt-5.5' }, sprite: 'fable', displayName: 'GPT-5.5' },
-    { match: { kind: 'pattern', pattern: 'gpt-5.4-codex' }, sprite: 'fable', displayName: 'GPT-5.4 Codex' },
+    { match: { kind: 'pattern', pattern: 'gpt-5-codex' }, sprite: 'fable', displayName: 'GPT-5 Codex' },
+    { match: { kind: 'pattern', pattern: 'gpt-5.3-codex-spark' }, sprite: 'fable', displayName: 'GPT-5.3 Codex Spark' },
     { match: { kind: 'pattern', pattern: 'gpt-5.4-mini' }, sprite: 'haiku', displayName: 'GPT-5.4 Mini' },
+    { match: { kind: 'pattern', pattern: 'gpt-5.4' }, sprite: 'fable', displayName: 'GPT-5.4' },
     { match: { kind: 'pattern', pattern: 'gpt-oss' }, sprite: 'fable', displayName: 'GPT-OSS' },
     { match: { kind: 'pattern', pattern: 'gpt-' }, sprite: 'fable', displayName: 'GPT' },
     { match: { kind: 'pattern', pattern: 'opus' }, sprite: 'opus', displayName: 'Opus 4.8' },
@@ -544,6 +546,8 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   windows: [
     { match: { kind: 'pattern', pattern: '[1m]' }, contextWindow: 1_000_000 }, // explicit 1M tag beats base model
     { match: { kind: 'exact', id: 'gpt-5.5' }, contextWindow: 258_400 },
+    { match: { kind: 'pattern', pattern: 'gpt-5-codex' }, contextWindow: 258_400 },
+    { match: { kind: 'pattern', pattern: 'gpt-5.4-mini' }, contextWindow: 258_400 },
     { match: { kind: 'pattern', pattern: 'gpt-5.4' }, contextWindow: 258_400 },
     { match: { kind: 'pattern', pattern: 'gpt-' }, contextWindow: 258_400 },
     { match: { kind: 'pattern', pattern: 'opus' }, contextWindow: 1_000_000 }, // Opus 4.6/4.7/4.8 = 1M

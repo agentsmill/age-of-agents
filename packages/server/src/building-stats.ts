@@ -1,5 +1,4 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
   completedBuildingForTheme,
@@ -12,18 +11,24 @@ import {
   type MappingConfig,
 } from '@agent-citadel/shared';
 import { loadMappingConfig } from './mapping-config.js';
-import { codexQualifiedToolName, codexToolToCanonical } from './sources/codex.js';
+import {
+  DEFAULT_BUILDING_STATS_SOURCES,
+  type BuildingStatsSource,
+  type BuildingStatsTool,
+} from './building-stats-sources/index.js';
+
+type BuildingStatsSourceInput = BuildingStatsSource | Pick<BuildingStatsSource, 'id' | 'roots'>;
+type StatsThemeId = 'fantasy' | 'scifi';
 
 /**
  * Token usage per building for day/week/30-day windows.
  *
  * Historical data does NOT exist in memory (watcher sees only live sessions), so
- * scan transcripts under ~/.claude/projects and ~/.codex/sessions: assign each
- * assistant message's OUTPUT tokens to the building of the tool it used, split
- * evenly when it touched multiple buildings. A message without a tool (reasoning/
- * text only) is assigned to the building where the session is CURRENTLY working
- * (last used tool); otherwise Citadel (fallback) would swallow most tokens. The
- * result is cached.
+ * scan source adapters: assign each OUTPUT token sample to the building of the
+ * tool it used, split evenly when it touched multiple buildings. A sample
+ * without a tool is assigned to the building where the session is CURRENTLY
+ * working (last used tool); otherwise Citadel (fallback) would swallow most
+ * tokens. The result is cached.
  *
  * USER CONTRIBUTION (learning): attribution (even split, reasoning->last building,
  * fallback→citadel) i okna czasowe to decyzje do strojenia.
@@ -32,10 +37,10 @@ import { codexQualifiedToolName, codexToolToCanonical } from './sources/codex.js
 const DAY = 86_400_000;
 const MONTH = 30 * DAY;
 const CACHE_TTL = 60_000;
-const DEFAULT_STATS_ROOTS = [
-  join(homedir(), '.claude', 'projects'),
-  join(homedir(), '.codex', 'sessions'),
-];
+
+export function normalizeStatsTheme(themeId: string | undefined): StatsThemeId {
+  return themeId === 'scifi' ? 'scifi' : 'fantasy';
+}
 
 interface Bucket {
   today: number;
@@ -47,12 +52,6 @@ export interface MsgSample {
   ts: number; // epoch ms
   output: number; // message output tokens
   tools: { name: string; detail?: string }[];
-}
-
-const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
-
-function clip(text: string, max = 240): string {
-  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
 
 /**
@@ -85,206 +84,98 @@ export function accumulateMessage(
   }
 }
 
-/** Extracts a sample from an assistant record (or null when irrelevant). */
-function sampleFromRecord(rec: any): MsgSample | undefined {
-  if (rec?.type !== 'assistant' || !rec.message) return undefined;
-  const ts = Date.parse(rec.timestamp);
-  if (!ts) return undefined;
-  const output = Number(rec.message.usage?.output_tokens ?? 0);
-  if (output <= 0) return undefined;
-  const blocks: any[] = Array.isArray(rec.message.content) ? rec.message.content : [];
-  const tools = blocks
-    .filter((b) => b?.type === 'tool_use' && typeof b.name === 'string')
-    .map((b) => ({
-      name: b.name as string,
-      detail: b.name === 'Bash' && typeof b.input?.command === 'string' ? (b.input.command as string) : undefined,
-    }));
-  return { ts, output, tools };
+function resolveStatsSource(input: BuildingStatsSourceInput): BuildingStatsSource {
+  if ('createExtractor' in input && typeof input.createExtractor === 'function') return input;
+  const source = DEFAULT_BUILDING_STATS_SOURCES.find((candidate) => candidate.id === input.id);
+  if (!source) throw new Error(`Unknown building stats source: ${input.id}`);
+  return { ...source, roots: input.roots };
 }
 
-function parseCodexArgs(name: string, raw: unknown): any | undefined {
-  if (typeof raw === 'string') {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      if (name === 'apply_patch' || name === 'functions.apply_patch') return { input: raw };
-      return { input: raw };
-    }
-  }
-  return raw && typeof raw === 'object' ? raw : undefined;
+function completedBuildingsForTheme(themeId: string): BuildingId[] {
+  return [completedBuildingForTheme(themeId)];
 }
 
-function codexToolDetail(name: string, raw: unknown): string | undefined {
-  const args = parseCodexArgs(name, raw);
-  if (!args) return undefined;
-
-  if (
-    name === 'shell' ||
-    name === 'local_shell' ||
-    name === 'exec' ||
-    name === 'exec_command' ||
-    name === 'functions.exec_command'
-  ) {
-    const cmd = Array.isArray(args.command) ? args.command.join(' ') : str(args.command) ?? str(args.cmd);
-    return cmd ? clip(cmd.replace(/^bash\s+-lc\s+/, ''), 60) : undefined;
-  }
-
-  if (name === 'apply_patch' || name === 'functions.apply_patch') {
-    const patch = str(args.input) ?? str(args.patch) ?? '';
-    const match = patch.match(/\*\*\* (?:Update|Add|Delete) File: (.+)/);
-    return match ? match[1].split('/').pop() : undefined;
-  }
-
-  if (name === 'web.run') {
-    const q = args.search_query?.[0]?.q ?? args.image_query?.[0]?.q;
-    return str(q);
-  }
-
-  return str(args.path) ?? str(args.file_path) ?? str(args.query);
-}
-
-function codexToolFromRecord(rec: any): { ts: number; name: string; detail?: string } | undefined {
-  if (rec?.type !== 'response_item') return undefined;
-  const ts = Date.parse(rec.timestamp);
-  if (!ts) return undefined;
-  const payload = rec.payload;
-  if (!payload || typeof payload !== 'object') return undefined;
-
-  if (payload.type === 'function_call' || payload.type === 'custom_tool_call') {
-    const rawName = str(payload.name);
-    if (!rawName) return undefined;
-    const qualifiedName = codexQualifiedToolName(rawName, str(payload.namespace));
-    return {
-      ts,
-      name: codexToolToCanonical(rawName, str(payload.namespace)),
-      detail: codexToolDetail(qualifiedName, payload.arguments ?? payload.input),
-    };
-  }
-
-  if (payload.type === 'tool_search_call') {
-    return { ts, name: 'ToolSearch', detail: str(payload.query) };
-  }
-
-  return undefined;
-}
-
-function codexOutputTotalFromRecord(rec: any): { ts: number; outputTotal: number } | undefined {
-  if (rec?.type !== 'event_msg') return undefined;
-  const ts = Date.parse(rec.timestamp);
-  if (!ts) return undefined;
-  const payload = rec.payload;
-  if (!payload || typeof payload !== 'object' || payload.type !== 'token_count') return undefined;
-
-  const info = payload.info ?? payload;
-  const total = info.total_token_usage ?? payload.total_token_usage ?? payload;
-  if (!total || typeof total !== 'object') return undefined;
-  const outputTotal = Number(total.output_tokens ?? total.output ?? 0);
-  return Number.isFinite(outputTotal) ? { ts, outputTotal } : undefined;
-}
-
-function codexTurnEndFromRecord(rec: any): boolean {
-  if (rec?.type !== 'event_msg') return false;
-  const payload = rec.payload;
-  return payload?.type === 'task_complete' || payload?.type === 'turn_complete';
-}
-
-function codexTurnAbortedFromRecord(rec: any): boolean {
-  if (rec?.type !== 'event_msg') return false;
-  const payload = rec.payload;
-  return payload?.type === 'turn_aborted';
-}
-
-function completedBuildingsForAllThemes(): BuildingId[] {
-  return [...new Set([completedBuildingForTheme('fantasy'), completedBuildingForTheme('scifi')])];
-}
-
-function recoveryBuildingsForAllThemes(): BuildingId[] {
-  return [...new Set([recoveryBuildingForTheme('fantasy'), recoveryBuildingForTheme('scifi')])];
+function recoveryBuildingsForTheme(themeId: string): BuildingId[] {
+  return [recoveryBuildingForTheme(themeId)];
 }
 
 async function scanFile(
+  source: BuildingStatsSource,
   path: string,
   acc: Map<BuildingId, Bucket>,
   now: number,
   dayStart: number,
   config: MappingConfig,
+  themeId: string,
 ): Promise<void> {
   const content = await readFile(path, 'utf8');
+  const extract = source.createExtractor();
   let current: BuildingId[] = ['citadel']; // current session work building(s)
-  let codexOutputTotal = 0;
-  let pendingCodexOutput: { ts: number; output: number; buildings: BuildingId[] } | undefined;
+  let pendingOutput: { ts: number; output: number; buildings: BuildingId[] } | undefined;
 
-  const flushPendingCodexOutput = (overrideBuildings?: BuildingId[]): void => {
-    if (!pendingCodexOutput) return;
-    const buildings = overrideBuildings ?? pendingCodexOutput.buildings;
+  const flushPendingOutput = (overrideBuildings?: BuildingId[]): void => {
+    if (!pendingOutput) return;
+    const buildings = overrideBuildings ?? pendingOutput.buildings;
     for (const building of buildings) {
       accumulateMessage(
         acc,
-        { ts: pendingCodexOutput.ts, output: pendingCodexOutput.output, tools: [] },
+        { ts: pendingOutput.ts, output: pendingOutput.output, tools: [] },
         now,
         dayStart,
         building,
         config,
       );
     }
-    pendingCodexOutput = undefined;
+    pendingOutput = undefined;
+  };
+
+  const recordOutput = (ts: number, output: number, tools?: BuildingStatsTool[]): void => {
+    if (tools?.length) {
+      flushPendingOutput();
+      const msgTools = tools.map((tool) => ({ name: tool.tool, detail: tool.detail }));
+      const last = msgTools[msgTools.length - 1];
+      current = [resolveBuilding(last.name, last.detail, config)];
+      accumulateMessage(acc, { ts, output, tools: msgTools }, now, dayStart, current[0] ?? 'citadel', config);
+      return;
+    }
+
+    flushPendingOutput();
+    pendingOutput = { ts, output, buildings: current };
   };
 
   for (const line of content.split('\n')) {
     if (!line) continue;
-    let rec: any;
-    try {
-      rec = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    if (codexTurnEndFromRecord(rec)) {
-      current = completedBuildingsForAllThemes();
-      flushPendingCodexOutput(current);
-      continue;
-    }
-    if (codexTurnAbortedFromRecord(rec)) {
-      current = recoveryBuildingsForAllThemes();
-      flushPendingCodexOutput(current);
-      continue;
-    }
-
-    const codexTool = codexToolFromRecord(rec);
-    if (codexTool) {
-      flushPendingCodexOutput();
-      current = [resolveBuilding(codexTool.name, codexTool.detail, config)];
-      continue;
-    }
-
-    const codexUsage = codexOutputTotalFromRecord(rec);
-    if (codexUsage) {
-      const delta = codexUsage.outputTotal - codexOutputTotal;
-      codexOutputTotal = codexUsage.outputTotal;
-      if (delta > 0) {
-        flushPendingCodexOutput();
-        pendingCodexOutput = { ts: codexUsage.ts, output: delta, buildings: current };
+    for (const event of extract(line)) {
+      switch (event.kind) {
+        case 'tool':
+          flushPendingOutput();
+          current = [resolveBuilding(event.tool, event.detail, config)];
+          break;
+        case 'output':
+          recordOutput(event.ts, event.output, event.tools);
+          break;
+        case 'turn-end':
+          flushPendingOutput();
+          current = completedBuildingsForTheme(themeId);
+          break;
+        case 'turn-aborted':
+          flushPendingOutput();
+          current = recoveryBuildingsForTheme(themeId);
+          break;
       }
-      continue;
     }
-
-    const sample = sampleFromRecord(rec);
-    if (!sample) continue;
-    flushPendingCodexOutput();
-    if (sample.tools.length) {
-      const last = sample.tools[sample.tools.length - 1];
-      current = [resolveBuilding(last.name, last.detail, config)];
-    }
-    accumulateMessage(acc, sample, now, dayStart, current[0] ?? 'citadel', config);
   }
-  flushPendingCodexOutput();
+  flushPendingOutput();
 }
 
 async function scanRoot(
+  source: BuildingStatsSource,
   root: string,
   acc: Map<BuildingId, Bucket>,
   now: number,
   dayStart: number,
   config: MappingConfig,
+  themeId: string,
 ): Promise<void> {
   let entries: string[] = [];
   try {
@@ -299,25 +190,30 @@ async function scanRoot(
     try {
       const s = await stat(path);
       if (now - s.mtimeMs > MONTH) continue; // file has no events in the 30-day window
-      await scanFile(path, acc, now, dayStart, config);
+      await scanFile(source, path, acc, now, dayStart, config, themeId);
     } catch {
       /* skip unreadable file */
     }
   }
 }
 
-export async function computeBuildingStatsForRoots(
-  roots: string[],
+export async function computeBuildingStatsForSources(
+  sources: BuildingStatsSourceInput[],
   now: number,
   config: MappingConfig = DEFAULT_MAPPING,
+  themeId = 'fantasy',
 ): Promise<BuildingStatsResponse> {
+  const normalizedTheme = normalizeStatsTheme(themeId);
   const ds = new Date(now);
   ds.setHours(0, 0, 0, 0);
   const dayStart = ds.getTime();
 
   const acc = new Map<BuildingId, Bucket>();
-  for (const root of roots) {
-    await scanRoot(root, acc, now, dayStart, config);
+  for (const input of sources) {
+    const source = resolveStatsSource(input);
+    for (const root of source.roots()) {
+      await scanRoot(source, root, acc, now, dayStart, config, normalizedTheme);
+    }
   }
 
   const buildings: BuildingStatsResponse['buildings'] = {};
@@ -331,17 +227,33 @@ export async function computeBuildingStatsForRoots(
   return { updatedAt: new Date(now).toISOString(), buildings };
 }
 
+export async function computeBuildingStatsForRoots(
+  roots: string[],
+  now: number,
+  config: MappingConfig = DEFAULT_MAPPING,
+  themeId = 'fantasy',
+): Promise<BuildingStatsResponse> {
+  const sourceRoots = [...roots];
+  return computeBuildingStatsForSources(
+    DEFAULT_BUILDING_STATS_SOURCES.map((source) => ({ ...source, roots: () => sourceRoots })),
+    now,
+    config,
+    themeId,
+  );
+}
+
 export async function computeBuildingStats(
   root: string,
   now: number,
   config: MappingConfig = DEFAULT_MAPPING,
+  themeId = 'fantasy',
 ): Promise<BuildingStatsResponse> {
-  return computeBuildingStatsForRoots([root], now, config);
+  return computeBuildingStatsForRoots([root], now, config, themeId);
 }
 
 // Cache: scan is expensive (many sessions x 30 days), so compute at most once/min.
-let cache: { at: number; data: BuildingStatsResponse } | undefined;
-let inflight: Promise<BuildingStatsResponse> | undefined;
+let cache = new Map<string, { at: number; data: BuildingStatsResponse }>();
+let inflight = new Map<string, Promise<BuildingStatsResponse>>();
 // Epoch counter: invalidation bumps it; a pass writes cache ONLY when the epoch
 // has not changed since it started. Otherwise PUT during a scan would cache a
 // result computed with the OLD config for the entire TTL.
@@ -349,32 +261,44 @@ let epoch = 0;
 
 /** After map edit (PUT /tool-mapping), drop cache so numbers catch up with the new config. */
 export function invalidateBuildingStatsCache(): void {
-  cache = undefined;
-  inflight = undefined; // abandon in-flight pass; its result is already stale
+  cache.clear();
+  inflight.clear(); // abandon in-flight passes; their results are already stale
   epoch++;
 }
 
 export async function getBuildingStats(
-  root: string | string[] = DEFAULT_STATS_ROOTS,
+  root?: string | string[],
+  themeId = 'fantasy',
 ): Promise<BuildingStatsResponse> {
   const now = Date.now();
-  if (cache && now - cache.at < CACHE_TTL) return cache.data;
-  if (inflight) return inflight;
+  const normalizedTheme = normalizeStatsTheme(themeId);
+  const rootKey = root === undefined ? '<default>' : Array.isArray(root) ? root.join('\0') : root;
+  const key = `${normalizedTheme}\0${rootKey}`;
+  const cached = cache.get(key);
+  if (cached && now - cached.at < CACHE_TTL) return cached.data;
+  const currentInflight = inflight.get(key);
+  if (currentInflight) return currentInflight;
   const startEpoch = epoch;
-  const roots = Array.isArray(root) ? root : [root];
-  inflight = loadMappingConfig()
-    .then((config) => computeBuildingStatsForRoots(roots, now, config))
+  const sources = root === undefined
+    ? DEFAULT_BUILDING_STATS_SOURCES
+    : DEFAULT_BUILDING_STATS_SOURCES.map((source) => ({
+        ...source,
+        roots: () => (Array.isArray(root) ? root : [root]),
+      }));
+  const promise = loadMappingConfig()
+    .then((config) => computeBuildingStatsForSources(sources, now, config, normalizedTheme))
     .then((data) => {
       // Save cache only if the map was not invalidated in the meantime.
       if (epoch === startEpoch) {
-        cache = { at: Date.now(), data };
-        inflight = undefined;
+        cache.set(key, { at: Date.now(), data });
+        if (inflight.get(key) === promise) inflight.delete(key);
       }
       return data;
     })
     .catch((err) => {
-      if (epoch === startEpoch) inflight = undefined;
+      if (epoch === startEpoch && inflight.get(key) === promise) inflight.delete(key);
       throw err;
     });
-  return inflight;
+  inflight.set(key, promise);
+  return promise;
 }

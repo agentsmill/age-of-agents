@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer, WebSocket, type VerifyClientCallbackSync } from 'ws';
 import { WS_PATH, type GameEvent, validateQuestionAnswer } from '@agent-citadel/shared';
 import { World } from './world.js';
 import { registerMappingRoutes } from './mapping-routes.js';
@@ -83,7 +83,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     const { SourceWatcher } = await import('./watcher.js');
     const { activeSources } = await import('./sources/index.js');
     const { translateHook, hooksStatus, installHooks, uninstallHooks, DECIDE_TIMEOUT_SEC } = await import('./hooks.js');
-    const { getBuildingStats, invalidateBuildingStatsCache } = await import('./building-stats.js');
+    const { getBuildingStats, invalidateBuildingStatsCache, normalizeStatsTheme } = await import('./building-stats.js');
     const sources = activeSources(process.env.AOA_SOURCES);
     watchers = sources.map((source) => new SourceWatcher(world, source));
     // HTTP hooks are the Claude channel; route them to the Claude watcher.
@@ -96,7 +96,11 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     const dockerEnabled = sources.some((source) => source.id === 'claude');
     dockerPoller = dockerEnabled ? new DockerPoller(world, new CliDockerClient()) : undefined;
 
-    app.get('/building-stats', async () => getBuildingStats());
+    app.get('/building-stats', async (request) => {
+      const query = request.query as { theme?: unknown };
+      const theme = normalizeStatsTheme(typeof query.theme === 'string' ? query.theme : undefined);
+      return getBuildingStats(undefined, theme);
+    });
     // Tool->building map: local server = source of truth (file on user's disk);
     // saving invalidates stats cache so numbers keep up with the new map.
     registerMappingRoutes(app, { persist: true, onSaved: invalidateBuildingStatsCache });
@@ -175,11 +179,12 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   const actualPort = typeof address === 'object' && address ? address.port : opts.port;
   resolvedPort = actualPort;
 
+  const verifyClient: VerifyClientCallbackSync = (info) =>
+    verifyWsClient({ origin: info.origin, reqUrl: info.req.url }, resolvedPort, token);
   const wss = new WebSocketServer({
     server: app.server,
     path: WS_PATH,
-    verifyClient: (info) =>
-      verifyWsClient({ origin: info.origin, reqUrl: info.req.url }, resolvedPort, token),
+    verifyClient,
   });
 
   const send = (socket: WebSocket, event: GameEvent): void => {

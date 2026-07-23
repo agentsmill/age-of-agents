@@ -35,6 +35,7 @@ describe('loadModelConfig', () => {
     const loaded = await loadModelConfig(p);
     expect(loaded.sprites).toEqual(expect.arrayContaining([
       expect.objectContaining({ match: { kind: 'exact', id: 'gpt-5.5' }, displayName: 'GPT-5.5' }),
+      expect.objectContaining({ match: { kind: 'pattern', pattern: 'gpt-5.3-codex-spark' }, displayName: 'GPT-5.3 Codex Spark' }),
     ]));
     expect(loaded.windows).toEqual(expect.arrayContaining([
       expect.objectContaining({ match: { kind: 'exact', id: 'gpt-5.5' }, contextWindow: 258_400 }),

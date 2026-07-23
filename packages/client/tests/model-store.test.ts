@@ -81,6 +81,10 @@ describe('useModels store', () => {
       displayName: 'GPT-5.5',
       contextWindow: 258_400,
     });
+    expect(resolveModelLive('gpt-5.3-codex-spark')).toMatchObject({
+      sprite: 'fable',
+      displayName: 'GPT-5.3 Codex Spark',
+    });
   });
   it('hydrate ignores invalid config from server', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ sprites: [], windows: [], fallback: { sprite: 'nope', contextWindow: 1 } })))));

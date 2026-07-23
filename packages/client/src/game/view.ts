@@ -24,6 +24,7 @@ import { homeBuilding, awaitingBuilding, completedBuilding, recoveryBuilding } f
 import { worldLayerTransform, worldToViewport, flipTextNodes } from './flip';
 import type { Lang } from '../settings';
 import { contextPct } from '../context-progress';
+import { shouldClearPathForSteer } from './steering';
 
 /** Target decoration width in tiles (for sprite scaling). */
 const DECO_W: Record<DecoKind, number> = { tree: 1.1, rock: 0.8, bush: 0.75, flower: 0.7 };
@@ -776,8 +777,9 @@ export class GameView {
       buildingId = completedBuilding(this.theme.id);
     } else if (!unit.isPeon && (state === 'recovering' || state === 'error')) {
       buildingId = recoveryBuilding(this.theme.id);
-    } else if (!unit.isPeon && state === 'thinking') {
+    } else if (shouldClearPathForSteer(state, unit.isPeon)) {
       this.targets.delete(unit.id); // hero: stay where you are (thinking at workshop)
+      unit.clearPath();
       return;
     } else {
       // idle/sleeping: off-duty heroes return to their stable social home.
