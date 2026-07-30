@@ -18,6 +18,17 @@
   image-rendering: pixelated;
 }
 
+.theme-switch {
+  position: absolute;
+}
+
+.theme-switch-inline-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 /* Pixel font: ONLY titles/labels/numbers (dense text stays readable). */
 .px {
   font-family: 'Pixelify Sans', system-ui, sans-serif;
@@ -299,6 +310,17 @@
   gap: 6px;
   min-height: 120px;
   justify-content: center;
+}
+
+.dario-reasoning-toggle {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .dario-reasoning-toggle {
+    display: none;
+  }
 }
 
 .zoom-controls button.ghost {

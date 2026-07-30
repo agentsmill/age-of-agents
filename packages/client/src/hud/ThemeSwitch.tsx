@@ -7,6 +7,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { LaunchAgentButton } from './LaunchAgentButton';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { useMenuKeyboard } from './useMenuKeyboard';
+import { DarioReasoningTuner } from './DarioReasoningTuner';
 
 /** Language dropdown list: endonyms (name in that language) + flag + short code. */
 const LANGS: { id: Lang; label: string; flag: string }[] = [
@@ -64,7 +65,7 @@ export function ThemeSwitch() {
   useMenuKeyboard(langOpen, langMenuRef);
 
   return (
-    <div className="hud-panel" style={{ top: 12, left: 12, padding: 6, display: 'flex', gap: 6 }}>
+    <div className="hud-panel theme-switch" style={{ top: 12, left: 12, padding: 6, display: 'flex', gap: 6 }}>
       {/* Collapse the WHOLE toolbar to a compact handle so it never stretches the
           top edge; state is remembered across reloads (default collapsed). */}
       <button
@@ -101,7 +102,7 @@ export function ThemeSwitch() {
       <LaunchAgentButton />
 
       {/* Language as dropdown instead of a cycling button. */}
-      <div ref={langRef} style={{ position: 'relative' }}>
+      <div ref={langRef} className="theme-switch-inline-stack">
         <button
           ref={langTriggerRef}
           className="ghost"
@@ -143,6 +144,7 @@ export function ThemeSwitch() {
             ))}
           </div>
         )}
+        <DarioReasoningTuner />
       </div>
 
       <button
