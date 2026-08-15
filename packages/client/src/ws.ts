@@ -2,9 +2,9 @@ import { WS_PATH, type GameEvent, type QuestionAnswer } from '@agent-citadel/sha
 import { useWorld } from './store';
 import { getToken } from './api';
 
-let current: WebSocket | undefined;
+let activeSocket: WebSocket | undefined;
 
-/** WS connection with auto-reconnect; the snapshot on each connection overwrites state. */
+/** Połączenie WS z auto-reconnectem; snapshot przy każdym połączeniu nadpisuje stan. */
 export function connectWorld(): void {
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
   let retryMs = 1000;
@@ -13,12 +13,14 @@ export function connectWorld(): void {
     const token = await getToken();
     const url = `${protocol}://${location.host}${WS_PATH}?token=${encodeURIComponent(token)}`;
     const socket = new WebSocket(url);
-    current = socket;
+    activeSocket = socket;
     socket.onopen = () => {
       retryMs = 1000;
       useWorld.getState().setConnected(true);
     };
     socket.onmessage = (msg) => {
+      // Tryb Chronicle (#7): replay włada światem — żywe eventy ignorujemy.
+      if (useWorld.getState().replayMode) return;
       const event = JSON.parse(msg.data as string) as GameEvent;
       useWorld.getState().apply(event);
     };
@@ -38,4 +40,9 @@ export function sendAnswer(answer: QuestionAnswer): void {
   if (current && current.readyState === WebSocket.OPEN) {
     current.send(JSON.stringify({ type: 'answer', payload: answer }));
   }
+}
+
+/** Wymusza świeży snapshot live (po wyjściu z Chronicle): zamknięcie → reconnect. */
+export function reconnectWorld(): void {
+  activeSocket?.close();
 }

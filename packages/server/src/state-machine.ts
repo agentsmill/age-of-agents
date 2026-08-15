@@ -1,5 +1,14 @@
 import { basename } from 'node:path';
-import type { ActionEntry, AgentKind, HeroSnapshot, WieldedArsenal } from '@agent-citadel/shared';
+import {
+  toolToBuilding,
+  type ActionEntry,
+  type AgentKind,
+  type BuildingId,
+  type HeroSnapshot,
+  type HeroStateKind,
+  type SessionSummary,
+  type WieldedArsenal,
+} from '@agent-citadel/shared';
 import type { Fact } from './transcript/facts.js';
 import { cleanTitle, isSubstantialPrompt } from './transcript/title.js';
 import type { World } from './world.js';
@@ -59,6 +68,10 @@ export class SessionTracker {
   private wieldedSkills = new Set<string>();
   private wieldedConnectors = new Set<string>();
   private wieldedPlugins = new Set<string>();
+  // Autopsy (#4): akumulatory liczone na żywo, zamknięte w buildSummary przy usunięciu.
+  private errorCount = 0;
+  private currentBuilding: BuildingId = 'citadel'; // budynek ostatniego narzędzia (atrybucja tokenów)
+  private perBuildingOutput = new Map<BuildingId, number>();
 
   private static readonly MAX_RECENT_ACTIONS = 5;
 
@@ -68,8 +81,10 @@ export class SessionTracker {
     private readonly projectDir: string,
     private readonly thresholds: StateThresholds = DEFAULT_THRESHOLDS,
     private readonly agent: AgentKind = 'claude',
-    /** Static fields mixed into the hero and preserved across patches. */
-    private readonly extra: SessionTrackerExtra = {},
+    /** Statyczne pola domieszane do bohatera (np. `container`). Zachowane przy każdym patch. */
+    private readonly extra: Partial<HeroSnapshot> = {},
+    /** Wołane raz, w chwili usunięcia bohatera — „sekcja zwłok" do utrwalenia. */
+    private readonly onRemoved?: (summary: SessionSummary) => void,
   ) {}
 
   private wielded(): WieldedArsenal {
@@ -181,7 +196,8 @@ export class SessionTracker {
         break;
 
       case 'tool-start': {
-        // Activity axis: add tool at buffer start (newest first), trim.
+        this.currentBuilding = toolToBuilding(fact.tool, fact.detail); // atrybucja tokenów (Autopsy)
+        // Oś aktywności: dorzuć narzędzie na początek bufora (najnowsze pierwsze), przytnij.
         this.recentActions = [{ tool: fact.tool, detail: fact.detail, ts: fact.ts }, ...this.recentActions].slice(
           0,
           SessionTracker.MAX_RECENT_ACTIONS,
@@ -197,6 +213,9 @@ export class SessionTracker {
       case 'usage':
         if (!this.seenUsage.has(fact.messageId)) {
           this.seenUsage.add(fact.messageId);
+          if (fact.output > 0) {
+            this.perBuildingOutput.set(this.currentBuilding, (this.perBuildingOutput.get(this.currentBuilding) ?? 0) + fact.output);
+          }
           this._tokens = {
             input: this.tokens.input + fact.input,
             output: this.tokens.output + fact.output,
@@ -225,6 +244,7 @@ export class SessionTracker {
 
       case 'tool-result':
         if (fact.isError) {
+          this.errorCount++; // Autopsy: licznik błędnych wyników narzędzi
           this.errorUntil = Date.now() + this.thresholds.errorFlashMs;
           this.patch({ state: 'error' }, fact.ts);
         } else if (this.world.getHero(this.sessionId)?.state === 'awaiting-input') {
@@ -277,7 +297,27 @@ export class SessionTracker {
     return Date.now() < this.errorUntil;
   }
 
-  /** Called periodically: transitions that depend on elapsed time. */
+  /** „Sekcja zwłok" sesji w chwili usunięcia — undefined, gdy nic istotnego nie zrobiła. */
+  private buildSummary(hero: HeroSnapshot): SessionSummary | undefined {
+    if (this._tokens.output <= 0) return undefined; // bez realnej pracy nie warto logować
+    const perBuilding: Partial<Record<BuildingId, number>> = {};
+    for (const [b, v] of this.perBuildingOutput) perBuilding[b] = Math.round(v);
+    return {
+      sessionId: this.sessionId,
+      agent: this.agent,
+      title: this.displayTitle(),
+      projectName: this.projectName,
+      model: hero.model,
+      startedAt: hero.startedAt,
+      endedAt: hero.lastActivityAt,
+      durationMs: Math.max(0, Date.parse(hero.lastActivityAt) - Date.parse(hero.startedAt)),
+      tokens: { input: this._tokens.input, output: this._tokens.output },
+      errorCount: this.errorCount,
+      perBuilding,
+    };
+  }
+
+  /** Wywoływane okresowo — przejścia zależne od upływu czasu. */
   tick(nowMs: number): 'keep' | 'remove' {
     const hero = this.world.getHero(this.sessionId);
     if (!hero) return 'remove';
@@ -288,6 +328,8 @@ export class SessionTracker {
       return 'keep';
     }
     if (sinceActivity > this.thresholds.removeAfterMs) {
+      const summary = this.buildSummary(hero);
+      if (summary) this.onRemoved?.(summary); // utrwal „sekcję zwłok" przed usunięciem
       this.world.removeHero(this.sessionId);
       return 'remove';
     }

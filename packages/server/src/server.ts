@@ -70,7 +70,10 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     app.post('/hooks', async () => ({ ok: true }));
     app.get('/hooks/status', async () => ({ installed: false, demo: true }));
     app.get('/building-stats', async () => ({ updatedAt: new Date().toISOString(), buildings: {} }));
-    // Tool->building map: demo does not persist (PUT only validates, GET = default).
+    app.get('/building-heatmap', async () => ({ updatedAt: new Date().toISOString(), buildings: {} }));
+    app.get('/session-history', async () => []);
+    app.get('/replay', async () => ({ startMs: 0, endMs: 0, frames: [] }));
+    // Mapa narzędzie→budynek: w demo nie persystujemy (PUT tylko waliduje, GET = domyślna).
     registerMappingRoutes(app, { persist: false });
     registerModelRoutes(app, { persist: false });
     app.post('/hooks/decide', async () => ({}));
@@ -81,13 +84,14 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     registerFsRoutes(app);
   } else {
     const { SourceWatcher } = await import('./watcher.js');
-    const { activeSources } = await import('./sources/index.js');
-    const { translateHook, hooksStatus, installHooks, uninstallHooks, DECIDE_TIMEOUT_SEC } = await import('./hooks.js');
-    const { getBuildingStats, invalidateBuildingStatsCache } = await import('./building-stats.js');
-    const sources = activeSources(process.env.AOA_SOURCES);
-    watchers = sources.map((source) => new SourceWatcher(world, source));
-    // HTTP hooks are the Claude channel; route them to the Claude watcher.
-    const claudeWatcher = watchers.find((w) => w.id === 'claude');
+    const { SOURCES } = await import('./sources/index.js');
+    const { translateHook, hooksInstalled, installHooks, uninstallHooks } = await import('./hooks.js');
+    const { getBuildingStats, getBuildingHeatmap, invalidateBuildingStatsCache } = await import('./building-stats.js');
+    const { readSessionLog } = await import('./session-log.js');
+    const { computeReplayTimeline } = await import('./replay.js');
+    const watchers = SOURCES.map((source) => new SourceWatcher(world, source));
+    // Hooki HTTP są kanałem Claude → kierujemy je do watchera Claude.
+    const claudeWatcher = watchers.find((w) => w.id === 'claude') ?? watchers[0];
     
     // OpenCode uses SQLite instead of JSONL: start poller.
     const opencodeEnabled = sources.some((source) => source.id === 'opencode');
@@ -97,8 +101,14 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     dockerPoller = dockerEnabled ? new DockerPoller(world, new CliDockerClient()) : undefined;
 
     app.get('/building-stats', async () => getBuildingStats());
-    // Tool->building map: local server = source of truth (file on user's disk);
-    // saving invalidates stats cache so numbers keep up with the new map.
+    app.get('/building-heatmap', async () => getBuildingHeatmap());
+    app.get('/session-history', async () => readSessionLog());
+    app.get('/replay', async (request) => {
+      const w = (request.query as { window?: string }).window;
+      return computeReplayTimeline(w === 'week' ? 'week' : 'today');
+    });
+    // Mapa narzędzie→budynek: lokalny serwer = źródło prawdy (plik na dysku usera);
+    // zapis invaliduje cache statystyk, by liczby nadążały za nową mapą.
     registerMappingRoutes(app, { persist: true, onSaved: invalidateBuildingStatsCache });
     registerModelRoutes(app, { persist: true });
     const { decideHook } = await import('./hook-decide.js');

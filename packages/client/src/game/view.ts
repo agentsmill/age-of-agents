@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Sprite, TextureStyle } from 'pixi.js';
+import { Application, ColorMatrixFilter, Container, type FederatedPointerEvent, Graphics, Sprite, TextureStyle } from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
 import type { HeroSnapshot, MissionSnapshot, PeonSnapshot } from '@agent-citadel/shared';
 import { useWorld } from '../store';
@@ -6,6 +6,8 @@ import { resolveBuildingLive, useMapping } from '../mapping-store';
 import type { BuildingDef, BuildingId, ThemeDef } from '../theme/types';
 import { WaypointGraph } from './pathfind';
 import { buildBuilding, drawRoads, drawTerrain, TEAM_COLORS } from './placeholders';
+import { themeRoadCurves } from './roads';
+import { MatrixRain } from './matrix-rain';
 import { Unit } from './unit';
 import { getHeroSheet, getPeonSheet, loadThemeSprites } from './sprites';
 import { loadEmblems } from './emblems';
@@ -22,6 +24,8 @@ import { BUILDING_FX, collectActiveBuildings, type WorkerSample } from './buildi
 import { buildingText } from '../i18n';
 import { homeBuilding, awaitingBuilding, completedBuilding, recoveryBuilding } from './home-building';
 import { worldLayerTransform, worldToViewport, flipTextNodes } from './flip';
+import { getRealmAudio } from './audio';
+import { deriveCrestSpec, buildCrest } from './heraldry';
 import type { Lang } from '../settings';
 import { contextPct } from '../context-progress';
 
@@ -104,6 +108,27 @@ export class GameView {
   private emitters = new Map<BuildingId, FxEmitter>();
   private lastClearedAt = new Map<string, number>();
   private elapsed = 0;
+  // Realm Heartbeat: scena przyciemnia/rozjaśnia się wg TEMPA tokenów wyjściowych
+  // (nie zegara) — realm „oddycha". Filtr na app.stage = jeden pełnoekranowy pass
+  // (HUD to osobny DOM, więc nie jest tintowany).
+  private dayNight = new ColorMatrixFilter();
+  private lastTotalOutput = 0;
+  private dayLevel = 0; // 0=noc, 1=dzień — wygładzane SYMETRYCZNIE (świt tak powolny jak zmierzch)
+  private lastProduceAt = -999; // elapsed (s) ostatniej produkcji tokenów
+  // Mission Thunderclap: rozchodzące się pierścienie przy ukończeniu misji.
+  private shockwaves: { g: Graphics; life: number; maxLife: number; color: number }[] = [];
+  // Tool Trail: ostatnia pozycja ekranowa, w której jednostka zostawiła ślad.
+  private footAt = new Map<string, { x: number; y: number }>();
+  // Soundscape: poprzedni stan bohatera — do wykrycia wejścia w 'awaiting-input' (cue).
+  private prevHeroState = new Map<string, string>();
+  // Living Banners (#9): herb wybranego projektu nad twierdzą + jego klucz cache.
+  private crest?: Container;
+  private crestKey?: string;
+  // Cyberpunk: deszcz Matriksa (tło ekranowe) + neonowe „pakiety światła" płynące drogami.
+  private matrix?: MatrixRain;
+  private neonFlowLayer?: Container;
+  private neonPaths: { pts: { x: number; y: number }[]; cum: number[]; total: number }[] = [];
+  private neonMotes: { g: Graphics; path: number; dist: number; speed: number }[] = [];
   private missionStatus = new Map<string, string>();
   private graph: WaypointGraph;
   private unsubscribe?: () => void;
@@ -122,7 +147,8 @@ export class GameView {
   async init(host: HTMLElement): Promise<void> {
     TextureStyle.defaultOptions.scaleMode = 'nearest';
     await this.app.init({
-      background: 0x1a1a17,
+      // Cyberpunk → czysta czerń OLED (deszcz Matriksa świeci w pustce); reszta → ciepły grafit.
+      background: this.theme.neon ? 0x000000 : 0x1a1a17,
       resizeTo: host,
       antialias: false,
       roundPixels: true,
@@ -171,7 +197,24 @@ export class GameView {
     });
     this.viewport.drag().pinch().wheel().decelerate();
     this.viewport.clamp({ direction: 'all', underflow: 'center' });
+    // Cyberpunk: deszcz Matriksa POD viewportem (tło ekranowe). Dodany pierwszy →
+    // renderuje się za światem, w pustce dookoła unoszącego się miasta.
+    if (this.theme.neon) {
+      // Deszcz pada w barwach budynków realm (paleta placeholderColor) — spójny z miastem.
+      const palette = this.theme.buildings.map((b) => `#${b.placeholderColor.toString(16).padStart(6, '0')}`);
+      this.matrix = new MatrixRain(palette);
+      this.app.stage.addChild(this.matrix.view);
+      // Kursor ugina deszcz („Neo" warp). globalpointermove na stage łapie ruch
+      // nad CAŁYM płótnem niezależnie od hit-testu — viewport (drag/zoom) go nie
+      // połyka. e.global jest w px CSS (przestrzeń ekranu = logiczna sprite'a).
+      this.app.stage.eventMode = 'static';
+      this.app.stage.on('globalpointermove', (e: FederatedPointerEvent) => this.matrix?.setPointer(e.global.x, e.global.y));
+      this.app.stage.on('pointerleave', () => this.matrix?.clearPointer());
+    }
     this.app.stage.addChild(this.viewport);
+    // Realm Heartbeat: filtr dnia/nocy NA VIEWPORCIE (nie na stage) — świat „oddycha",
+    // ale deszcz Matriksa (sąsiad na stage) zostaje nietknięty czystą zielenią.
+    this.viewport.filters = [this.dayNight];
 
     // Manual camera control (wheel zoom, pinch, drag) takes over and breaks
     // autofollow. Otherwise followSelected would undo pan-to-cursor on every
@@ -190,6 +233,7 @@ export class GameView {
       const screenW = this.app.screen.width;
       const screenH = this.app.screen.height;
       if (screenW < 50 || screenH < 50) return;
+      this.matrix?.resize(screenW, screenH);
       this.viewport.resize(screenW, screenH, worldWidth, worldHeight);
       // cover (Math.max): terrain ALWAYS fills the screen, ending letterbox/black corners.
       // Zoom in up to MAX_ZOOM; cannot zoom out beyond "cover" (no empty space).
@@ -231,8 +275,17 @@ export class GameView {
     }
     worldLayer.addChild(drawRoads(this.theme, projection));
 
-    // Buildings and units share one depth-sorted layer; in isometry, a unit can
-    // disappear BEHIND a building.
+    // Cyberpunk: „pakiety światła" płynące siecią dróg (świecące krople nad trasami).
+    // Warstwa tuż nad drogami, pod budynkami/jednostkami → światło sunie po gruncie.
+    if (this.theme.neon) {
+      this.neonFlowLayer = new Container();
+      this.neonFlowLayer.blendMode = 'add';
+      worldLayer.addChild(this.neonFlowLayer);
+      this.setupNeonFlow();
+    }
+
+    // Budynki i jednostki we wspólnej warstwie sortowanej po głębokości —
+    // w izometrii jednostka może zniknąć ZA budynkiem.
     this.unitLayer.sortableChildren = true;
     for (const def of this.theme.buildings) {
       const label = buildingText(this.theme.id, def.id, this.lang).label;
@@ -282,21 +335,28 @@ export class GameView {
       this.updateRetiring(dt);
       this.updateBuildingFx(dt);
       this.updateParticles(dt);
+      this.updateShockwaves(dt);
+      this.updateDayNight(dt);
+      this.dropFootprints();
+      this.matrix?.update(dt);
+      this.updateNeonFlow(dt);
     });
 
-    this.unsubscribe = useWorld.subscribe((state) =>
-      this.reconcile(state.heroes, state.peons, state.missions, state.selectedProjectDir),
-    );
-    // Changing the tool->building map forces target recomputation: units move to
-    // new buildings live (reconcile has an early return per unchanged key, so
-    // re-steer is cheap). Without this, the map would catch up to edits only on
-    // the next world event.
+    this.unsubscribe = useWorld.subscribe((state) => {
+      this.reconcile(state.heroes, state.peons, state.missions, state.selectedProjectDir);
+      this.updateCrest();
+    });
+    // Zmiana mapy narzędzie→budynek wymusza ponowne wyznaczenie celów: jednostki
+    // przechodzą do nowych budynków na żywo (reconcile ma early-return per
+    // niezmieniony klucz, więc re-steer jest tani). Bez tego mapa „doganiałaby"
+    // edycję dopiero przy następnym evencie świata.
     this.unsubscribeMapping = useMapping.subscribe(() => {
       const w = useWorld.getState();
       this.reconcile(w.heroes, w.peons, w.missions, w.selectedProjectDir);
     });
     const { heroes, peons, missions, selectedProjectDir } = useWorld.getState();
     this.reconcile(heroes, peons, missions, selectedProjectDir);
+    this.updateCrest();
     activeView = this;
   }
 
@@ -306,7 +366,8 @@ export class GameView {
     if (activeView === this) activeView = undefined;
     this.unsubscribe?.();
     this.unsubscribeMapping?.();
-    if (this.ready) this.app.destroy(true, { children: true }); // app.init() had to resolve first
+    this.matrix?.destroy();
+    if (this.ready) this.app.destroy(true, { children: true }); // app.init() musiało się rozwiązać
   }
 
   /** Center the camera on a grid position (minimap / portrait click). */
@@ -416,6 +477,54 @@ export class GameView {
     return this.theme.buildings.find((b) => b.id === id)!;
   }
 
+  /** Living Banners: zbuduj/odśwież herb wybranego projektu nad twierdzą (#9). */
+  private updateCrest(): void {
+    const { selectedProjectDir, arsenal } = useWorld.getState();
+    const seed = selectedProjectDir;
+    const ar = seed ? arsenal[seed] : undefined;
+    const key = seed ? `${seed}:${ar?.refreshedAt ?? 0}` : '';
+    if (key === this.crestKey) return; // bez zmian → nie przebudowuj (subskrypcja bije często)
+    this.crestKey = key;
+    if (this.crest) {
+      this.crest.parent?.removeChild(this.crest);
+      this.crest.destroy({ children: true });
+      this.crest = undefined;
+    }
+    if (!seed) return; // widok „All" → brak jednego właściciela, brak herbu
+    const spec = deriveCrestSpec({ seed, arsenal: ar });
+    const crest = buildCrest(spec, this.theme.tile * 2.2);
+    const c = this.building('citadel');
+    const top = this.theme.projection.toScreen(c.gx + c.w / 2, c.gy);
+    crest.position.set(top.x, top.y - this.theme.tile * 2.4);
+    crest.zIndex = 1_000_000; // nad budynkami/jednostkami w sortowanej warstwie
+    this.unitLayer.addChild(crest);
+    this.crest = crest;
+  }
+
+  /** Eksport „Realm Card": świeży herb w wysokiej rozdzielczości → PNG (w pełni lokalnie). */
+  exportCrest(projectDir: string): void {
+    const { arsenal } = useWorld.getState();
+    const spec = deriveCrestSpec({ seed: projectDir, arsenal: arsenal[projectDir] });
+    const big = buildCrest(spec, 320);
+    // extract.canvas zwraca HTMLCanvasElement LUB OffscreenCanvas — obsłuż oba.
+    const canvas = this.app.renderer.extract.canvas(big) as unknown as {
+      toBlob?: (cb: (b: Blob | null) => void, type?: string) => void;
+      convertToBlob?: (opts?: { type?: string }) => Promise<Blob>;
+    };
+    big.destroy({ children: true });
+    const download = (blob: Blob | null): void => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `realm-card-${projectDir.split('/').pop() || 'project'}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+    if (typeof canvas.toBlob === 'function') canvas.toBlob(download);
+    else if (typeof canvas.convertToBlob === 'function') canvas.convertToBlob({ type: 'image/png' }).then(download).catch(() => {});
+  }
+
   private reconcile(
     heroes: Record<string, HeroSnapshot>,
     peons: Record<string, PeonSnapshot>,
@@ -440,7 +549,11 @@ export class GameView {
       const prev = this.missionStatus.get(mission.id);
       if (mission.status === 'completed' && prev === 'active') {
         const hero = this.units.get(mission.sessionId);
-        if (hero) this.spawnFireworks(hero.gx, hero.gy, hero.colorIndex);
+        if (hero) {
+          this.spawnFireworks(hero.gx, hero.gy, hero.colorIndex);
+          this.spawnShockwave(hero.gx, hero.gy, hero.colorIndex);
+          getRealmAudio().cue('mission-complete');
+        }
       }
       this.missionStatus.set(mission.id, mission.status);
     }
@@ -458,9 +571,8 @@ export class GameView {
         const home = this.building(homeId);
         const o = heroSpawnScatter(hero.sessionId);
         const door = { gx: home.door.gx + o.dx, gy: home.door.gy + o.dy };
-        const sheet = getHeroSheet(sessionToArchetypeKey(hero, pickSpriteLive(hero.model)));
-        unit = new Unit(hero.sessionId, hero.teamColor, false, clipName(hero.title), door, this.theme.projection, sheet, hero.agent ?? 'claude', this.theme.heroSprite.scale, this.theme.heroSprite.footAnchor);
-        unit.setScreenFlipped(this.flipped);
+        const sheet = getHeroSheet(sessionToArchetypeKey(hero, resolveModelLive(hero.model).sprite));
+        unit = new Unit(hero.sessionId, hero.teamColor, false, clipName(hero.title), door, this.theme.projection, sheet, hero.agent ?? 'claude', this.theme.heroSprite.scale, this.theme.heroSprite.footAnchor, this.theme.neon);
         unit.container.eventMode = 'static';
         unit.container.cursor = 'pointer';
         const sessionId = hero.sessionId;
@@ -475,8 +587,14 @@ export class GameView {
       }
       unit.setName(clipName(hero.title));
       unit.setState(hero.state, hero.state === 'working' ? hero.toolDetail ?? hero.currentTool : undefined);
-      const contextWindow = hero.contextWindowTokens ?? resolveModelLive(hero.model).contextWindow;
-      unit.setContextProgress(typeof hero.contextTokens === 'number' ? contextPct(hero.contextTokens, contextWindow) : undefined);
+      // Soundscape: miękki cue, gdy bohater właśnie wszedł w oczekiwanie na usera.
+      if (hero.state === 'awaiting-input' && this.prevHeroState.get(hero.sessionId) !== 'awaiting-input') {
+        getRealmAudio().cue('awaiting-input');
+      }
+      this.prevHeroState.set(hero.sessionId, hero.state);
+      // Context Pressure: bursztynowy pierścień, gdy okno modelu ≥80% pełne.
+      const ctxWin = resolveModelLive(hero.model).contextWindow;
+      unit.setContextPressure(!!hero.contextTokens && hero.contextTokens / ctxWin >= 0.8);
       this.steer(unit, hero.state, hero.currentTool, hero.toolDetail, hero.teamColor);
       const cleared = hero.clearedAt ?? 0;
       if (cleared !== (this.lastClearedAt.get(hero.sessionId) ?? 0)) {
@@ -495,8 +613,7 @@ export class GameView {
         const door = this.building('barracks').door;
         const o = peonSpawnScatter(peon.agentId);
         const start = { gx: door.gx + o.dx, gy: door.gy + o.dy };
-        unit = new Unit(peon.agentId, this.parentColor(peon, heroes), true, clipName(peon.description ?? 'peon', 22), start, this.theme.projection, getPeonSheet());
-        unit.setScreenFlipped(this.flipped);
+        unit = new Unit(peon.agentId, this.parentColor(peon, heroes), true, clipName(peon.description ?? 'peon', 22), start, this.theme.projection, getPeonSheet(), 'claude', undefined, undefined, this.theme.neon);
         unit.container.eventMode = 'static';
         unit.container.cursor = 'pointer';
         const parentId = peon.parentSessionId;
@@ -513,8 +630,8 @@ export class GameView {
       if (!seen.has(id)) {
         this.units.delete(id);
         this.targets.delete(id);
-        this.homeByUnit.delete(id);
-        this.lastClearedAt.delete(id);
+        this.footAt.delete(id);
+        this.prevHeroState.delete(id);
         if (unit.isPeon) {
           this.retirePeon(unit);
         } else {
@@ -660,6 +777,9 @@ export class GameView {
       em.intensity += ((on ? 1 : 0) - em.intensity) * Math.min(1, dt * 4);
       const pulse = 0.78 + 0.22 * Math.sin(this.elapsed * 3 + b.gx + b.gy);
       em.glow.alpha = em.intensity * style.glow * pulse;
+      // Soundscape: barwa budynku śpiewa proporcjonalnie do aktywności (lazy/no-op
+      // dopóki user nie włączy dźwięku i nie wznowi AudioContext gestem).
+      getRealmAudio().setBuildingIntensity(b.id, em.intensity);
 
       if (on) {
         em.accum += dt * style.rate * em.intensity;
@@ -671,6 +791,7 @@ export class GameView {
         this.fxLayer.removeChild(em.glow);
         em.glow.destroy();
         this.emitters.delete(b.id);
+        getRealmAudio().setBuildingIntensity(b.id, 0); // wycisz głos budynku
       }
     }
   }
@@ -731,6 +852,137 @@ export class GameView {
         p.g.destroy();
         this.particles.splice(i, 1);
       }
+    }
+  }
+
+  /**
+   * Realm Heartbeat: koryto dnia/nocy sterowane TEMPEM tokenów wyjściowych
+   * (suma output po wszystkich bohaterach). Brak pracy → chłodna, przyciemniona
+   * noc; intensywna praca → neutralne południe. Bardzo wolna EMA, by realm
+   * „oddychał", a nie migotał przy każdym evencie.
+   */
+  private updateDayNight(dt: number): void {
+    let total = 0;
+    for (const h of Object.values(useWorld.getState().heroes)) total += h.tokens.output;
+    // Tylko dodatnie przyrosty: zniknięcie sesji obniża sumę, ale to nie „ujemna praca".
+    const delta = Math.max(0, total - this.lastTotalOutput);
+    this.lastTotalOutput = total;
+    if (delta > 0) this.lastProduceAt = this.elapsed; // właśnie była produkcja tokenów
+    // Cel: dzień, gdy ktoś produkował w ostatnich ~6 s (most nad ciszą myślenia); inaczej noc.
+    // Binarny cel zamiast spikującego TEMPA — paczka tokenów nie „przeskakuje" już od razu w dzień.
+    const target = this.elapsed - this.lastProduceAt < 6 ? 1 : 0;
+    // SYMETRYCZNE wygładzanie: TA SAMA stała czasowa w obie strony — świt jest teraz
+    // tak samo powolny jak zmierzch (koniec brzydkiego skoku noc→dzień).
+    this.dayLevel += (target - this.dayLevel) * Math.min(1, dt * 0.35);
+    const day = this.dayLevel;
+    // Noc: przyciemniona i chłodna (więcej niebieskiego). Dzień: neutralna pełnia.
+    const r = 0.55 + 0.45 * day;
+    const g = 0.62 + 0.38 * day;
+    const b = 0.85 + 0.15 * day;
+    // Macierz 4x5 (RGBA): skalowanie per-kanał, bez przesunięć.
+    this.dayNight.matrix = [r, 0, 0, 0, 0, 0, g, 0, 0, 0, 0, 0, b, 0, 0, 0, 0, 0, 1, 0];
+  }
+
+  /** Tool Trail: jednostki w ruchu zostawiają znikające ślady w barwie drużyny. */
+  private dropFootprints(): void {
+    const step = this.theme.tile * 0.7; // rozstaw śladów (px ekranu)
+    for (const [id, unit] of this.units) {
+      if (!unit.moving) continue;
+      const { x, y } = this.theme.projection.toScreen(unit.gx, unit.gy);
+      const last = this.footAt.get(id);
+      if (last && Math.hypot(x - last.x, y - last.y) < step) continue;
+      this.footAt.set(id, { x, y });
+      const color = TEAM_COLORS[unit.colorIndex % TEAM_COLORS.length];
+      const g = new Graphics();
+      g.ellipse(0, 2, 5, 2.5).fill({ color, alpha: 0.4 });
+      g.position.set(x, y);
+      this.fxLayer.addChild(g);
+      // Ślad to nieruchoma drobinka — recykluje istniejący system cząstek (sam gaśnie).
+      const life = 1.8;
+      this.particles.push({ g, vx: 0, vy: 0, life, maxLife: life, gravity: 0 });
+    }
+  }
+
+  /** Mission Thunderclap: trzy rozchodzące się pierścienie w barwie drużyny. */
+  private spawnShockwave(gx: number, gy: number, colorIndex: number): void {
+    const { x, y } = this.theme.projection.toScreen(gx, gy);
+    const color = TEAM_COLORS[colorIndex % TEAM_COLORS.length];
+    const maxLife = 0.8;
+    for (let i = 0; i < 3; i++) {
+      const g = new Graphics();
+      g.position.set(x, y - 14);
+      g.blendMode = 'add';
+      this.fxLayer.addChild(g);
+      // delay rozkłada pierścienie w czasie (efekt „tętna"); życie startuje po delayu.
+      this.shockwaves.push({ g, life: maxLife + i * 0.08, maxLife, color });
+    }
+  }
+
+  private updateShockwaves(dt: number): void {
+    const maxRadius = 140;
+    for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+      const s = this.shockwaves[i];
+      s.life -= dt;
+      if (s.life > s.maxLife) continue; // jeszcze w fazie opóźnienia
+      const t = 1 - Math.max(0, s.life) / s.maxLife; // 0→1 w miarę rozchodzenia
+      const alpha = Math.max(0, s.life / s.maxLife);
+      s.g.clear();
+      s.g.circle(0, 0, t * maxRadius).stroke({ width: 3, color: s.color, alpha });
+      if (s.life <= 0) {
+        this.fxLayer.removeChild(s.g);
+        s.g.destroy();
+        this.shockwaves.splice(i, 1);
+      }
+    }
+  }
+
+  /**
+   * Cyberpunk: przygotuj geometrię „pakietów światła". Każda droga motywu →
+   * polilinia ekranowa z tablicą skumulowanych długości (do próbkowania pozycji).
+   * Na każdej trasie sieją się 1–2 świecące krople sunące w kółko.
+   */
+  private setupNeonFlow(): void {
+    const neon = this.theme.neon!;
+    const proj = this.theme.projection;
+    const palette = [neon.edge, neon.primary, neon.secondary, neon.tertiary];
+    for (const curve of themeRoadCurves(this.theme)) {
+      if (curve.length < 2) continue;
+      const pts = curve.map((p) => proj.toScreen(p.gx, p.gy));
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+      const total = cum[cum.length - 1];
+      if (total < 1) continue;
+      const pathIdx = this.neonPaths.push({ pts, cum, total }) - 1;
+      const count = total > this.theme.tile * 6 ? 2 : 1;
+      for (let k = 0; k < count; k++) {
+        const color = palette[(pathIdx + k) % palette.length];
+        const g = new Graphics();
+        g.circle(0, 0, 5).fill({ color, alpha: 0.22 }); // halo
+        g.circle(0, 0, 2).fill({ color: neon.edge, alpha: 0.95 }); // rdzeń
+        this.neonFlowLayer!.addChild(g);
+        this.neonMotes.push({
+          g,
+          path: pathIdx,
+          dist: (total * (k + Math.random())) / count,
+          speed: this.theme.tile * (1.4 + Math.random() * 1.2), // px/s wzdłuż trasy
+        });
+      }
+    }
+  }
+
+  /** Cyberpunk: przesuń pakiety światła wzdłuż dróg (zapętlone) z delikatnym tętnem. */
+  private updateNeonFlow(dt: number): void {
+    for (const m of this.neonMotes) {
+      const path = this.neonPaths[m.path];
+      m.dist = (m.dist + m.speed * dt) % path.total;
+      // Próbkuj pozycję na polilinii wg skumulowanej długości.
+      const { cum, pts } = path;
+      let i = 1;
+      while (i < cum.length - 1 && cum[i] < m.dist) i++;
+      const seg = cum[i] - cum[i - 1] || 1;
+      const t = (m.dist - cum[i - 1]) / seg;
+      m.g.position.set(pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t, pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t);
+      m.g.alpha = 0.7 + 0.3 * Math.sin(this.elapsed * 5 + m.path);
     }
   }
 
