@@ -89,7 +89,7 @@ describe('startServer', () => {
 
     vi.resetModules();
     vi.doMock('../src/sources/opencode-poller.js', () => ({
-      OpenCodePoller: vi.fn().mockImplementation(() => ({ start, stop })),
+      OpenCodePoller: vi.fn().mockImplementation(function () { return { start, stop }; }),
     }));
 
     process.env.AOA_SOURCES = 'opencode';
@@ -120,24 +120,24 @@ describe('startServer', () => {
 
     vi.resetModules();
     vi.doMock('../src/watcher.js', () => ({
-      SourceWatcher: vi.fn().mockImplementation((_world, source) => ({
+      SourceWatcher: vi.fn().mockImplementation(function (_world, source) { return {
         id: source.id,
         start: watcherStart,
         stop: watcherStop,
         applyExternalFacts: vi.fn(),
-      })),
+      }; }),
     }));
     vi.doMock('../src/sources/docker-poller.js', () => ({
-      DockerPoller: vi.fn().mockImplementation(() => ({ start: dockerStart, stop: dockerStop })),
+      DockerPoller: vi.fn().mockImplementation(function () { return { start: dockerStart, stop: dockerStop }; }),
     }));
     vi.doMock('../src/sources/docker-client.js', () => ({
       CliDockerClient: vi.fn(),
     }));
     vi.doMock('../src/arsenal/arsenal-poller.js', () => ({
-      ArsenalPoller: vi.fn().mockImplementation(() => ({
+      ArsenalPoller: vi.fn().mockImplementation(function () { return {
         start: vi.fn(),
         stop: vi.fn(),
-      })),
+      }; }),
     }));
 
     process.env.AOA_SOURCES = 'claude';
@@ -163,30 +163,30 @@ describe('startServer', () => {
 
   it('does not start Docker poller when Claude source is disabled', async () => {
     const prev = process.env.AOA_SOURCES;
-    const DockerPoller = vi.fn().mockImplementation(() => ({
+    const DockerPoller = vi.fn().mockImplementation(function () { return {
       start: vi.fn().mockResolvedValue(undefined),
       stop: vi.fn(),
-    }));
+    }; });
     let localRunning: RunningServer | undefined;
 
     vi.resetModules();
     vi.doMock('../src/watcher.js', () => ({
-      SourceWatcher: vi.fn().mockImplementation((_world, source) => ({
+      SourceWatcher: vi.fn().mockImplementation(function (_world, source) { return {
         id: source.id,
         start: vi.fn(),
         stop: vi.fn().mockResolvedValue(undefined),
         applyExternalFacts: vi.fn(),
-      })),
+      }; }),
     }));
     vi.doMock('../src/sources/docker-poller.js', () => ({ DockerPoller }));
     vi.doMock('../src/sources/docker-client.js', () => ({
       CliDockerClient: vi.fn(),
     }));
     vi.doMock('../src/arsenal/arsenal-poller.js', () => ({
-      ArsenalPoller: vi.fn().mockImplementation(() => ({
+      ArsenalPoller: vi.fn().mockImplementation(function () { return {
         start: vi.fn(),
         stop: vi.fn(),
-      })),
+      }; }),
     }));
 
     process.env.AOA_SOURCES = 'codex';
@@ -219,18 +219,18 @@ describe('startServer', () => {
 
     vi.resetModules();
     vi.doMock('../src/watcher.js', () => ({
-      SourceWatcher: vi.fn().mockImplementation((_world, source) => ({
+      SourceWatcher: vi.fn().mockImplementation(function (_world, source) { return {
         id: source.id,
         start: watcherStart,
         stop: watcherStop,
         applyExternalFacts: vi.fn(),
-      })),
+      }; }),
     }));
     vi.doMock('../src/arsenal/arsenal-poller.js', () => ({
-      ArsenalPoller: vi.fn().mockImplementation(() => ({
+      ArsenalPoller: vi.fn().mockImplementation(function () { return {
         start: arsenalStart,
         stop: arsenalStop,
-      })),
+      }; }),
     }));
 
     process.env.AOA_SOURCES = 'codex';
@@ -261,18 +261,18 @@ describe('startServer', () => {
 
     vi.resetModules();
     vi.doMock('../src/watcher.js', () => ({
-      SourceWatcher: vi.fn().mockImplementation((_world, source) => ({
+      SourceWatcher: vi.fn().mockImplementation(function (_world, source) { return {
         id: source.id,
         start: vi.fn(),
         stop: vi.fn().mockResolvedValue(undefined),
         applyExternalFacts,
-      })),
+      }; }),
     }));
     vi.doMock('../src/arsenal/arsenal-poller.js', () => ({
-      ArsenalPoller: vi.fn().mockImplementation(() => ({
+      ArsenalPoller: vi.fn().mockImplementation(function () { return {
         start: vi.fn(),
         stop: vi.fn(),
-      })),
+      }; }),
     }));
 
     process.env.AOA_SOURCES = 'codex';
