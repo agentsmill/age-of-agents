@@ -48,7 +48,7 @@
     "pngjs": "^7.0.0"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22"
   },
   "dependencies": {
     "@fastify/static": "^10.1.12",
