@@ -172,6 +172,19 @@ describe('SessionTracker', () => {
     expect(world.getHero('session-1')).toBeUndefined();
   });
 
+  it('metadata facts without ts do not refresh lastActivityAt (no ghost heroes on replay)', () => {
+    // Regression: replaying a closed transcript at startup re-applied untimestamped
+    // ai-title / permission-mode records, stamping "now" and reviving the hero for 30 min.
+    const { world, tracker } = setup();
+    const lastReal = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    tracker.apply({ kind: 'turn-end', ts: lastReal });
+    tracker.apply({ kind: 'title', title: 'Some session' });
+    tracker.apply({ kind: 'meta', permissionMode: 'auto' });
+
+    expect(world.getHero('session-1')?.lastActivityAt).toBe(lastReal);
+    expect(tracker.tick(Date.now())).toBe('remove');
+  });
+
   it('meta stores full workingDir (cwd) alongside projectName=basename', () => {
     // Regression: for the Claude source, projectDir is the encoded folder name, NOT a path.
     // ArsenalPoller reads config from workingDir, so cwd must reach the snapshot in full.

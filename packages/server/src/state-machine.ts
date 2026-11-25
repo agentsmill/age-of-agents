@@ -115,7 +115,8 @@ export class SessionTracker {
     this.world.upsertHero({
       ...hero,
       ...patch,
-      lastActivityAt: ts ?? new Date().toISOString(),
+      // Metadata (title, meta, usage, attribution) is not activity: keep the previous timestamp.
+      lastActivityAt: ts ?? hero.lastActivityAt,
     });
   }
 
