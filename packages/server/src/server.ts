@@ -1,3 +1,4 @@
+import type { IncomingMessage } from 'node:http';
 import Fastify from 'fastify';
 import { WebSocketServer, WebSocket } from 'ws';
 import { WS_PATH, type GameEvent, validateQuestionAnswer } from '@agent-citadel/shared';
@@ -178,7 +179,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   const wss = new WebSocketServer({
     server: app.server,
     path: WS_PATH,
-    verifyClient: (info) =>
+    verifyClient: (info: { origin: string; req: IncomingMessage }) =>
       verifyWsClient({ origin: info.origin, reqUrl: info.req.url }, resolvedPort, token),
   });
 
